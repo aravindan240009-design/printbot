@@ -48,8 +48,8 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
         request_id = request.headers.get("X-Request-ID") or f"req_{secrets.token_hex(8)}"
         request.state.request_id = request_id
 
-        # Exempt public endpoints (exact match or qr route)
-        if path in EXEMPT_EXACT_PATHS or path.startswith("/api/v1/qr/") or path.startswith("/docs") or path.startswith("/openapi"):
+        # Exempt public endpoints (exact match, qr route, or lab diagnostic simulator)
+        if path in EXEMPT_EXACT_PATHS or path.startswith("/api/v1/qr/") or path.startswith("/api/v1/lab") or path.startswith("/docs") or path.startswith("/openapi"):
             response = await call_next(request)
             self._add_security_headers(response, request_id)
             return response

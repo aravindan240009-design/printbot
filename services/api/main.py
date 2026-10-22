@@ -25,6 +25,7 @@ from services.api.routers import (
     studio,
     differentiation,
     hardware,
+    virtual_lab,
 )
 
 
@@ -84,6 +85,7 @@ app.include_router(shop_customization.router, prefix=settings.API_V1_STR)
 app.include_router(studio.router, prefix=settings.API_V1_STR)
 app.include_router(differentiation.router, prefix=settings.API_V1_STR)
 app.include_router(hardware.router, prefix=settings.API_V1_STR)
+app.include_router(virtual_lab.router, prefix=settings.API_V1_STR)
 
 
 @app.get("/metrics")
