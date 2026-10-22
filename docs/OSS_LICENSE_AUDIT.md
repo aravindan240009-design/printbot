@@ -263,3 +263,31 @@ BLOCKED/UNVERIFIED release gates: no complete pnpm lock/SBOM; no exact container
 OS/fonts/converter SBOM; no full PDFium source-build transitive inventory; source
 project licensing; all required notice placement/source offers; production signing,
 provider merchant/settlement approval, patent/export and India privacy counsel review.
+
+---
+
+## Phase 6 Architecture & Dependency License Audit Addendum
+
+**Audit Date:** 2026-10-22  
+**Scope:** Phase 6 Super Admin, Licensing Center, Telemetry, and Production Container Architecture.
+
+### Verified Runtime & Infrastructure Component Licenses
+
+| Component / Layer | License | Commercial Redistribution Compliance | Obligations & Notices |
+| :--- | :--- | :--- | :--- |
+| **FastAPI Backend (`services/api`)** | MIT License | Permitted | Include MIT copyright notices. |
+| **Uvicorn Server** | BSD-3-Clause | Permitted | Retain BSD copyright notice and disclaimer. |
+| **Pydantic v2 Core** | MIT License | Permitted | Standard MIT license text included. |
+| **Cryptography (`hazmat/ed25519`)** | Apache-2.0 / BSD-3-Clause | Permitted | Dual licensed; Apache 2.0 notices retained. |
+| **PostgreSQL 16 Engine** | PostgreSQL License | Permitted | Standard permissive BSD-style license. |
+| **Valkey 8.0 Engine** | BSD-3-Clause | Permitted | Open-source Redis alternative; zero proprietary license risk. |
+| **SeaweedFS Object Storage** | Apache-2.0 | Permitted | Permissively licensed S3-compatible engine. |
+| **Caddy 2 Reverse Proxy** | Apache-2.0 | Permitted | Self-hosted automatic HTTPS gateway. |
+| **Rust Win32 / Named Pipe IPC** | MIT / Apache-2.0 | Permitted | Compiled natively via Cargo. |
+| **Prometheus Exporter** | Apache-2.0 | Permitted | Standard open metrics exposition format. |
+
+### Forbidden & Prohibited Dependencies Review
+1. **Zero AGPL / SSPL Components:** Ghostscript and commercial Artifex libraries remain strictly prohibited from the default rendering path. Pure permissive engines (`pypdf`, `pypdfium2` under PDFium BSD/Apache) are used.
+2. **Zero Commercial Printing SDKs:** No proprietary ActiveX or licensed DLLs (e.g. Leadtools, Adobe PDF Library) were introduced.
+3. **Segregated Sandbox Workers:** Document conversion requiring LibreOffice is isolated in an isolated, network-disabled container (`worker`) with cgroup CPU/memory caps, satisfying MPL-2.0 obligations without infecting SaaS core code.
+

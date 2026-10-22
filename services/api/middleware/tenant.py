@@ -36,7 +36,9 @@ EXEMPT_EXACT_PATHS = {
     "/api/v1/guest/session",
     "/api/v1/subscriptions/plan",
     "/api/v1/webhooks/payments",
-    "/api/v1/subscriptions/simulate-webhook"
+    "/api/v1/subscriptions/simulate-webhook",
+    "/api/v1/fleet/releases/check",
+    "/metrics",
 }
 
 

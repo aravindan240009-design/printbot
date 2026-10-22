@@ -335,3 +335,172 @@ export interface PhoneCaptureResponse {
   legibilityConfirmed: boolean;
 }
 
+// ==============================================================================
+// Phase 6: Super Admin, Licensing, Fleet, Security Hardening & Pilot Readiness
+// ==============================================================================
+
+export type SuperAdminRole = 'SUPER_ADMIN' | 'SUPPORT_OPERATOR' | 'AUDITOR';
+export type ShopLifecycleStatus = 'PENDING_APPROVAL' | 'ACTIVE' | 'SUSPENDED' | 'OFFBOARDED';
+export type HardwareAssurance = 'TPM_2_0' | 'SOFTWARE_FALLBACK';
+export type ReleaseChannel = 'dev_unsigned' | 'beta_tested' | 'production_signed';
+export type AlertSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
+
+export interface BreakGlassRequest {
+  shopId: string;
+  reason: string;
+  durationMinutes?: number;
+}
+
+export interface BreakGlassResponse {
+  id: string;
+  shopId: string;
+  requesterId: string;
+  approverId?: string;
+  reason: string;
+  sessionToken: string;
+  expiresAt: string;
+  status: string;
+  canAccessDocuments: boolean;
+  notice: string;
+}
+
+export interface StepUpChallengeRequest {
+  actionType: string;
+}
+
+export interface StepUpChallengeResponse {
+  challengeId: string;
+  actionType: string;
+  expiresAt: string;
+  message: string;
+}
+
+export interface StepUpVerifyRequest {
+  challengeId: string;
+  password?: string;
+  totpCode?: string;
+}
+
+export interface ShopOnboardRequest {
+  name: string;
+  slug: string;
+  ownerEmail: string;
+  ownerName: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  stateCode?: string;
+  orderMode?: OrderMode;
+  parentShopId?: string;
+}
+
+export interface ShopOnboardResponse {
+  shopId: string;
+  name: string;
+  slug: string;
+  status: ShopLifecycleStatus;
+  qrLink: string;
+  planId: string;
+  billingInterval: string;
+  trialEnd: string;
+}
+
+export interface ShopTaxInvoice {
+  id: string;
+  shopId: string;
+  invoiceNumber: string;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  basePaise: number;
+  cgstPaise: number;
+  sgstPaise: number;
+  igstPaise: number;
+  totalPaise: number;
+  sacCode: string;
+  hsnDescription: string;
+  stateCode: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface SuperAdminKPIs {
+  activeSubscribers: number;
+  mrrPaise: number;
+  arrPaise: number;
+  churnRatePct: number;
+  totalDevices: number;
+  activeDevices24h: number;
+  queueAgeSecondsP50: number;
+  queueAgeSecondsP95: number;
+  failureRatePct: number;
+  totalSheetsPrinted: number;
+  processingCostPaise: number;
+  storageCostPaise: number;
+  openIncidents: number;
+}
+
+export interface FleetRelease {
+  version: string;
+  releaseChannel: ReleaseChannel;
+  downloadUrl: string;
+  sha256Hash: string;
+  signatureVerified: boolean;
+  minSupportedVersion: string;
+  isCritical: boolean;
+  gracePeriodHours: number;
+  rolloutPercentage: number;
+  releaseNotes?: string;
+  createdAt: string;
+}
+
+export interface FleetTelemetryReport {
+  deviceId: string;
+  shopId: string;
+  agentVersion: string;
+  uptimeSeconds: number;
+  jobsProcessed: number;
+  rasterAvgMs: number;
+  sheetsPrinted: number;
+  spoolErrorsCount: number;
+  hardwareStatus: string;
+}
+
+export interface DiagnosticBundleSubmit {
+  shopId: string;
+  deviceId: string;
+  operatorConsented: boolean;
+  redactionVerified: boolean;
+  logSummary: Record<string, unknown>;
+}
+
+export interface DiagnosticBundleResponse {
+  bundleRef: string;
+  shopId: string;
+  deviceId: string;
+  receivedAt: string;
+  status: string;
+}
+
+export interface ShopMicrositePreview {
+  shopId: string;
+  shopName: string;
+  slug: string;
+  orderMode: OrderMode;
+  brandPrimaryColor: string;
+  logoUrl?: string;
+  supportedLanguages: string[];
+  servicesEnabled: Record<string, boolean>;
+  allowedFileTypes: string[];
+  pricingSummary: Record<string, number>;
+  operatingHours: Record<string, unknown>;
+  retentionHours: number;
+}
+
+export interface StolenDeviceReport {
+  deviceId: string;
+  shopId: string;
+  incidentNotes: string;
+  generateReplacementPairingCode?: boolean;
+}
+
+

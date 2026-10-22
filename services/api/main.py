@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from services.api.core.config import settings
 from services.api.middleware.tenant import TenantContextMiddleware
 from services.api.routers import (
@@ -18,6 +18,10 @@ from services.api.routers import (
     dashboards,
     documents,
     bookings,
+    superadmin,
+    licenses,
+    fleet,
+    shop_customization,
 )
 
 
@@ -70,6 +74,45 @@ app.include_router(qr.router, prefix=settings.API_V1_STR)
 app.include_router(dashboards.router, prefix=settings.API_V1_STR)
 app.include_router(documents.router, prefix=settings.API_V1_STR)
 app.include_router(bookings.router, prefix=settings.API_V1_STR)
+app.include_router(superadmin.router, prefix=settings.API_V1_STR)
+app.include_router(licenses.router, prefix=settings.API_V1_STR)
+app.include_router(fleet.router, prefix=settings.API_V1_STR)
+app.include_router(shop_customization.router, prefix=settings.API_V1_STR)
+
+
+@app.get("/metrics")
+async def prometheus_metrics():
+    """Prometheus exposition format metrics for platform observability."""
+    from services.api.services.superadmin_service import superadmin_service
+    kpis = superadmin_service.calculate_kpis()
+    lines = [
+        "# HELP printbot_active_shops_total Number of active paying shops",
+        "# TYPE printbot_active_shops_total gauge",
+        f"printbot_active_shops_total {kpis.active_subscribers}",
+        "# HELP printbot_mrr_paise Monthly Recurring Revenue in Indian paise",
+        "# TYPE printbot_mrr_paise gauge",
+        f"printbot_mrr_paise {kpis.mrr_paise}",
+        "# HELP printbot_arr_paise Annual Recurring Revenue in Indian paise",
+        "# TYPE printbot_arr_paise gauge",
+        f"printbot_arr_paise {kpis.arr_paise}",
+        "# HELP printbot_devices_total Total registered Windows agent devices",
+        "# TYPE printbot_devices_total gauge",
+        f"printbot_devices_total {kpis.total_devices}",
+        "# HELP printbot_active_devices_24h Devices active in last 24 hours",
+        "# TYPE printbot_active_devices_24h gauge",
+        f"printbot_active_devices_24h {kpis.active_devices_24h}",
+        "# HELP printbot_queue_age_seconds_p50 Median print queue age in seconds",
+        "# TYPE printbot_queue_age_seconds_p50 gauge",
+        f"printbot_queue_age_seconds_p50 {kpis.queue_age_seconds_p50}",
+        "# HELP printbot_failure_rate_pct Overall print failure rate percentage",
+        "# TYPE printbot_failure_rate_pct gauge",
+        f"printbot_failure_rate_pct {kpis.failure_rate_pct}",
+        "# HELP printbot_sheets_printed_total Total physical paper sheets printed",
+        "# TYPE printbot_sheets_printed_total counter",
+        f"printbot_sheets_printed_total {kpis.total_sheets_printed}",
+    ]
+    return Response(content="\n".join(lines) + "\n", media_type="text/plain; version=0.0.4")
+
 
 
 @app.exception_handler(Exception)

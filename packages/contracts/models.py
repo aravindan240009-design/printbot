@@ -589,4 +589,196 @@ class PhoneCaptureResponse(BaseModel):
     legibility_confirmed: bool = True
 
 
+# ==============================================================================
+# Phase 6: Super Admin, Licensing, Fleet, Security Hardening & Pilot Readiness
+# ==============================================================================
+
+class SuperAdminRole(str, Enum):
+    SUPER_ADMIN = "SUPER_ADMIN"
+    SUPPORT_OPERATOR = "SUPPORT_OPERATOR"
+    AUDITOR = "AUDITOR"
+
+
+class ShopLifecycleStatus(str, Enum):
+    PENDING_APPROVAL = "PENDING_APPROVAL"
+    ACTIVE = "ACTIVE"
+    SUSPENDED = "SUSPENDED"
+    OFFBOARDED = "OFFBOARDED"
+
+
+class HardwareAssurance(str, Enum):
+    TPM_2_0 = "TPM_2_0"
+    SOFTWARE_FALLBACK = "SOFTWARE_FALLBACK"
+
+
+class ReleaseChannel(str, Enum):
+    DEV_UNSIGNED = "dev_unsigned"
+    BETA_TESTED = "beta_tested"
+    PRODUCTION_SIGNED = "production_signed"
+
+
+class AlertSeverity(str, Enum):
+    INFO = "INFO"
+    WARNING = "WARNING"
+    CRITICAL = "CRITICAL"
+
+
+class BreakGlassRequest(BaseModel):
+    shop_id: str
+    reason: str
+    duration_minutes: int = 30
+
+
+class BreakGlassResponse(BaseModel):
+    id: str
+    shop_id: str
+    requester_id: str
+    approver_id: Optional[str] = None
+    reason: str
+    session_token: str
+    expires_at: datetime
+    status: str
+    can_access_documents: bool = False
+    notice: str = "Zero-retention emergency support session active. Document downloads strictly blocked."
+
+
+class StepUpChallengeRequest(BaseModel):
+    action_type: str
+
+
+class StepUpChallengeResponse(BaseModel):
+    challenge_id: str
+    action_type: str
+    expires_at: datetime
+    message: str = "Re-enter password or active TOTP code to confirm elevated action."
+
+
+class StepUpVerifyRequest(BaseModel):
+    challenge_id: str
+    password: Optional[str] = None
+    totp_code: Optional[str] = None
+
+
+class ShopOnboardRequest(BaseModel):
+    name: str
+    slug: str
+    owner_email: str
+    owner_name: str
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    city: str = "Chennai"
+    state_code: str = "33"  # Tamil Nadu
+    order_mode: OrderMode = OrderMode.FULL_AUTOMATIC
+    parent_shop_id: Optional[str] = None
+
+
+class ShopOnboardResponse(BaseModel):
+    shop_id: str
+    name: str
+    slug: str
+    status: ShopLifecycleStatus
+    qr_link: str
+    plan_id: str = "ALL_INCLUSIVE"
+    billing_interval: BillingInterval = BillingInterval.MONTHLY
+    trial_end: datetime
+
+
+class ShopTaxInvoice(BaseModel):
+    id: str
+    shop_id: str
+    invoice_number: str
+    billing_period_start: datetime
+    billing_period_end: datetime
+    base_paise: int
+    cgst_paise: int
+    sgst_paise: int
+    igst_paise: int
+    total_paise: int
+    sac_code: str = "998313"
+    hsn_description: str = "Information Technology Software Services for Print Automation"
+    state_code: str = "33"
+    status: str = "PAID"
+    created_at: datetime
+
+
+class SuperAdminKPIs(BaseModel):
+    active_subscribers: int
+    mrr_paise: int
+    arr_paise: int
+    churn_rate_pct: float
+    total_devices: int
+    active_devices_24h: int
+    queue_age_seconds_p50: float
+    queue_age_seconds_p95: float
+    failure_rate_pct: float
+    total_sheets_printed: int
+    processing_cost_paise: int
+    storage_cost_paise: int
+    open_incidents: int
+
+
+class FleetRelease(BaseModel):
+    version: str
+    release_channel: ReleaseChannel
+    download_url: str
+    sha256_hash: str
+    signature_verified: bool
+    min_supported_version: str
+    is_critical: bool
+    grace_period_hours: int = 72
+    rollout_percentage: int = 100
+    release_notes: Optional[str] = None
+    created_at: datetime
+
+
+class FleetTelemetryReport(BaseModel):
+    device_id: str
+    shop_id: str
+    agent_version: str
+    uptime_seconds: int
+    jobs_processed: int
+    raster_avg_ms: float
+    sheets_printed: int
+    spool_errors_count: int
+    hardware_status: str = "HEALTHY"
+
+
+class DiagnosticBundleSubmit(BaseModel):
+    shop_id: str
+    device_id: str
+    operator_consented: bool = True
+    redaction_verified: bool = True
+    log_summary: Dict[str, Any] = Field(default_factory=dict)
+
+
+class DiagnosticBundleResponse(BaseModel):
+    bundle_ref: str
+    shop_id: str
+    device_id: str
+    received_at: datetime
+    status: str = "STORED_REDACTED"
+
+
+class ShopMicrositePreview(BaseModel):
+    shop_id: str
+    shop_name: str
+    slug: str
+    order_mode: OrderMode
+    brand_primary_color: str
+    logo_url: Optional[str] = None
+    supported_languages: List[str]
+    services_enabled: Dict[str, bool]
+    allowed_file_types: List[str]
+    pricing_summary: Dict[str, int]
+    operating_hours: Dict[str, Any]
+    retention_hours: int
+
+
+class StolenDeviceReport(BaseModel):
+    device_id: str
+    shop_id: str
+    incident_notes: str
+    generate_replacement_pairing_code: bool = True
+
+
 
