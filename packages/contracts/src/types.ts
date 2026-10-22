@@ -503,4 +503,233 @@ export interface StolenDeviceReport {
   generateReplacementPairingCode?: boolean;
 }
 
+// ==============================================================================
+// Phase 7: Advanced Print Studio, Optional Hardware Adapters & Differentiation
+// ==============================================================================
+
+export interface BookletSignature {
+  sheetNumber: number;
+  frontLeft?: number;
+  frontRight?: number;
+  backLeft?: number;
+  backRight?: number;
+}
+
+export interface BookletImpositionRequest {
+  pageCount: number;
+  paperSize?: PaperSize;
+  duplexMode?: DuplexMode;
+}
+
+export interface BookletImpositionResponse {
+  totalInputPages: number;
+  totalSheets: number;
+  signatures: BookletSignature[];
+  impositionType: string;
+}
+
+export interface MixedColorPageBreakdown {
+  pageNumber: number;
+  isColor: boolean;
+  coveragePercent?: number;
+}
+
+export interface MixedColorQuoteRequest {
+  shopId: string;
+  totalPages: number;
+  pageBreakdown: MixedColorPageBreakdown[];
+  copies?: number;
+  paperSize?: PaperSize;
+}
+
+export interface MixedColorQuoteResponse {
+  shopId: string;
+  totalPages: number;
+  copies: number;
+  bwPagesPerCopy: number;
+  colorPagesPerCopy: number;
+  bwRatePaise: number;
+  colorRatePaise: number;
+  totalBwPaise: number;
+  totalColorPaise: number;
+  totalPaise: number;
+  pricingStrategy: string;
+}
+
+export interface PosterTile {
+  tileCol: number;
+  tileRow: number;
+  cropBoxMm: number[];
+}
+
+export interface PosterTiledLayoutRequest {
+  inputAssetId: string;
+  gridCols?: number;
+  gridRows?: number;
+  overlapBleedMm?: number;
+  targetPaperSize?: PaperSize;
+}
+
+export interface PosterTiledLayoutResponse {
+  totalTiles: number;
+  gridCols: number;
+  gridRows: number;
+  overlapBleedMm: number;
+  tiles: PosterTile[];
+  previewUrl: string;
+}
+
+export interface IDCardLayoutRequest {
+  frontAssetId: string;
+  backAssetId: string;
+  cardWidthMm?: number;
+  cardHeightMm?: number;
+  targetPaperSize?: PaperSize;
+  copies?: number;
+}
+
+export interface IDCardLayoutResponse {
+  compositeAssetId: string;
+  previewUrl: string;
+  cardWidthMm: number;
+  cardHeightMm: number;
+  orientation: Orientation;
+  frontCoordsMm: Record<string, number>;
+  backCoordsMm: Record<string, number>;
+}
+
+export interface ShopPreset {
+  id: string;
+  shopId: string;
+  name: string;
+  description: string;
+  options: PrintOptions;
+  isDefault?: boolean;
+  createdAt: string;
+}
+
+export interface PrepaidAccount {
+  id: string;
+  shopId: string;
+  accountName: string;
+  accountCode: string;
+  balancePaise: number;
+  contactEmail: string;
+  authorizedDomains: string[];
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface PrepaidChargeRequest {
+  accountCode: string;
+  orderId: string;
+  amountPaise: number;
+}
+
+export interface ResumableUploadInit {
+  fileName: string;
+  fileSizeBytes: number;
+  totalChunks: number;
+  sha256Checksum: string;
+}
+
+export interface ResumableUploadChunk {
+  uploadId: string;
+  chunkIndex: number;
+  chunkDataBase64: string;
+}
+
+export interface QueueEstimateResponse {
+  shopId: string;
+  jobsAhead: number;
+  estimatedMinutesMin: number;
+  estimatedMinutesMax: number;
+  displayText: string;
+  uncertaintyLabel: string;
+}
+
+export interface CryptographicReceipt {
+  receiptNumber: string;
+  shopId: string;
+  orderId: string;
+  timestamp: string;
+  totalPaise: number;
+  sheetsPrinted: number;
+  customerEmail?: string;
+  signatureHmac: string;
+}
+
+export interface PrinterConsumableStatus {
+  printerId: string;
+  shopId: string;
+  printerName: string;
+  tonerBlackPercent: number;
+  tonerCyanPercent?: number;
+  tonerMagentaPercent?: number;
+  tonerYellowPercent?: number;
+  drumLifePercent: number;
+  maintenanceBoxPercent: number;
+  alerts: string[];
+}
+
+export interface IntelligentRoutingRequest {
+  shopId: string;
+  requiredPaper: PaperSize;
+  requiresColor: boolean;
+  requiresDuplex: boolean;
+  pageCount: number;
+  deadline?: string;
+}
+
+export interface IntelligentRoutingResponse {
+  shopId: string;
+  selectedPrinterId: string;
+  printerName: string;
+  routingReason: string;
+  estimatedDurationSeconds: number;
+}
+
+export interface ScannerTaskRequest {
+  shopId: string;
+  sourceType?: string;
+  duplex?: boolean;
+  dpi?: number;
+  colorMode?: string;
+}
+
+export interface ScannerTaskResponse {
+  taskId: string;
+  shopId: string;
+  scannerId: string;
+  status: string;
+  pagesScanned: number;
+  outputAssetId?: string;
+  hardwareStatus: string;
+  disclaimer: string;
+}
+
+export interface TimedCopierSessionRequest {
+  shopId: string;
+  deviceId: string;
+  customerIdentifier: string;
+  durationMinutes: number;
+  maxCopies?: number;
+}
+
+export interface TimedCopierSessionResponse {
+  sessionId: string;
+  shopId: string;
+  deviceId: string;
+  status: string;
+  sessionToken: string;
+  startTime: string;
+  expiresAt: string;
+  allocatedCopies: number;
+  actualCopies: number;
+  billAmountPaise: number;
+  hardwareLockState: string;
+  emergencyStaffOverrideAvailable: boolean;
+}
+
+
 

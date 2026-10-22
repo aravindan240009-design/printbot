@@ -2,6 +2,7 @@
 Core Domain Models & Pydantic Schemas for Xerox Platform (Backend & Workers)
 """
 
+import uuid
 from enum import Enum
 from typing import Dict, List, Optional, Any
 from pydantic import BaseModel, Field, EmailStr
@@ -779,6 +780,234 @@ class StolenDeviceReport(BaseModel):
     shop_id: str
     incident_notes: str
     generate_replacement_pairing_code: bool = True
+
+
+# ==============================================================================
+# Phase 7: Advanced Print Studio, Optional Hardware Adapters & Differentiation
+# ==============================================================================
+
+class BookletSignature(BaseModel):
+    sheet_number: int
+    front_left: Optional[int] = None
+    front_right: Optional[int] = None
+    back_left: Optional[int] = None
+    back_right: Optional[int] = None
+
+
+class BookletImpositionRequest(BaseModel):
+    page_count: int
+    paper_size: PaperSize = PaperSize.A4
+    duplex_mode: DuplexMode = DuplexMode.DUPLEX_LONG
+
+
+class BookletImpositionResponse(BaseModel):
+    total_input_pages: int
+    total_sheets: int
+    signatures: List[BookletSignature]
+    imposition_type: str = "SADDLE_STITCH_4UP"
+
+
+class MixedColorPageBreakdown(BaseModel):
+    page_number: int
+    is_color: bool
+    coverage_percent: float = 0.0
+
+
+class MixedColorQuoteRequest(BaseModel):
+    shop_id: str
+    total_pages: int
+    page_breakdown: List[MixedColorPageBreakdown]
+    copies: int = 1
+    paper_size: PaperSize = PaperSize.A4
+
+
+class MixedColorQuoteResponse(BaseModel):
+    shop_id: str
+    total_pages: int
+    copies: int
+    bw_pages_per_copy: int
+    color_pages_per_copy: int
+    bw_rate_paise: int
+    color_rate_paise: int
+    total_bw_paise: int
+    total_color_paise: int
+    total_paise: int
+    pricing_strategy: str = "ACCURATE_PER_PAGE_SPLIT"
+
+
+class PosterTile(BaseModel):
+    tile_col: int
+    tile_row: int
+    crop_box_mm: List[float]
+
+
+class PosterTiledLayoutRequest(BaseModel):
+    input_asset_id: str
+    grid_cols: int = 2
+    grid_rows: int = 2
+    overlap_bleed_mm: float = 10.0
+    target_paper_size: PaperSize = PaperSize.A4
+
+
+class PosterTiledLayoutResponse(BaseModel):
+    total_tiles: int
+    grid_cols: int
+    grid_rows: int
+    overlap_bleed_mm: float
+    tiles: List[PosterTile]
+    preview_url: str
+
+
+class IDCardLayoutRequest(BaseModel):
+    front_asset_id: str
+    back_asset_id: str
+    card_width_mm: float = 85.6
+    card_height_mm: float = 53.98
+    target_paper_size: PaperSize = PaperSize.A4
+    copies: int = 1
+
+
+class IDCardLayoutResponse(BaseModel):
+    composite_asset_id: str
+    preview_url: str
+    card_width_mm: float
+    card_height_mm: float
+    orientation: Orientation
+    front_coords_mm: Dict[str, float]
+    back_coords_mm: Dict[str, float]
+
+
+class ShopPreset(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    shop_id: str
+    name: str
+    description: str
+    options: PrintOptions
+    is_default: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class PrepaidAccount(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    shop_id: str
+    account_name: str
+    account_code: str
+    balance_paise: int
+    contact_email: str
+    authorized_domains: List[str] = Field(default_factory=list)
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class PrepaidChargeRequest(BaseModel):
+    account_code: str
+    order_id: str
+    amount_paise: int
+
+
+class ResumableUploadInit(BaseModel):
+    file_name: str
+    file_size_bytes: int
+    total_chunks: int
+    sha256_checksum: str
+
+
+class ResumableUploadChunk(BaseModel):
+    upload_id: str
+    chunk_index: int
+    chunk_data_base64: str
+
+
+class QueueEstimateResponse(BaseModel):
+    shop_id: str
+    jobs_ahead: int
+    estimated_minutes_min: int
+    estimated_minutes_max: int
+    display_text: str
+    uncertainty_label: str
+
+
+class CryptographicReceipt(BaseModel):
+    receipt_number: str
+    shop_id: str
+    order_id: str
+    timestamp: datetime
+    total_paise: int
+    sheets_printed: int
+    customer_email: Optional[str] = None
+    signature_hmac: str
+
+
+class PrinterConsumableStatus(BaseModel):
+    printer_id: str
+    shop_id: str
+    printer_name: str
+    toner_black_percent: int
+    toner_cyan_percent: Optional[int] = None
+    toner_magenta_percent: Optional[int] = None
+    toner_yellow_percent: Optional[int] = None
+    drum_life_percent: int = 100
+    maintenance_box_percent: int = 100
+    alerts: List[str] = Field(default_factory=list)
+
+
+class IntelligentRoutingRequest(BaseModel):
+    shop_id: str
+    required_paper: PaperSize
+    requires_color: bool
+    requires_duplex: bool
+    page_count: int
+    deadline: Optional[datetime] = None
+
+
+class IntelligentRoutingResponse(BaseModel):
+    shop_id: str
+    selected_printer_id: str
+    printer_name: str
+    routing_reason: str
+    estimated_duration_seconds: int
+
+
+class ScannerTaskRequest(BaseModel):
+    shop_id: str
+    source_type: str = "FLATBED"  # FLATBED or ADF
+    duplex: bool = False
+    dpi: int = 300
+    color_mode: str = "bw"
+
+
+class ScannerTaskResponse(BaseModel):
+    task_id: str
+    shop_id: str
+    scanner_id: str
+    status: str
+    pages_scanned: int
+    output_asset_id: Optional[str] = None
+    hardware_status: str = "SIMULATED_TWAIN_BRIDGE"
+    disclaimer: str = "Physical scanner hardware testing is marked UNVERIFIED until on-site scanner deployment."
+
+
+class TimedCopierSessionRequest(BaseModel):
+    shop_id: str
+    device_id: str
+    customer_identifier: str
+    duration_minutes: int
+    max_copies: int = 50
+
+
+class TimedCopierSessionResponse(BaseModel):
+    session_id: str
+    shop_id: str
+    device_id: str
+    status: str
+    session_token: str
+    start_time: datetime
+    expires_at: datetime
+    allocated_copies: int
+    actual_copies: int
+    bill_amount_paise: int
+    hardware_lock_state: str = "UNLOCKED"
+    emergency_staff_override_available: bool = True
 
 
 

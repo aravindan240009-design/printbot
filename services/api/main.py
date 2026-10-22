@@ -22,6 +22,9 @@ from services.api.routers import (
     licenses,
     fleet,
     shop_customization,
+    studio,
+    differentiation,
+    hardware,
 )
 
 
@@ -78,6 +81,9 @@ app.include_router(superadmin.router, prefix=settings.API_V1_STR)
 app.include_router(licenses.router, prefix=settings.API_V1_STR)
 app.include_router(fleet.router, prefix=settings.API_V1_STR)
 app.include_router(shop_customization.router, prefix=settings.API_V1_STR)
+app.include_router(studio.router, prefix=settings.API_V1_STR)
+app.include_router(differentiation.router, prefix=settings.API_V1_STR)
+app.include_router(hardware.router, prefix=settings.API_V1_STR)
 
 
 @app.get("/metrics")
