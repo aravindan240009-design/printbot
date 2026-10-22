@@ -16,6 +16,10 @@ class Settings(BaseModel):
     R2_ACCESS_KEY_ID: str = os.getenv("R2_ACCESS_KEY_ID", "local-r2-key")
     R2_SECRET_ACCESS_KEY: str = os.getenv("R2_SECRET_ACCESS_KEY", "local-r2-secret")
     SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")
+    RAZORPAY_KEY_ID: str = os.getenv("RAZORPAY_KEY_ID", "rzp_test_mock_key_id")
+    RAZORPAY_KEY_SECRET: str = os.getenv("RAZORPAY_KEY_SECRET", "rzp_test_mock_secret_key")
+    RAZORPAY_WEBHOOK_SECRET: str = os.getenv("RAZORPAY_WEBHOOK_SECRET", "rzp_whsec_test_secret_9981")
+    DEFAULT_PAYMENT_PROVIDER: str = os.getenv("DEFAULT_PAYMENT_PROVIDER", "MOCK")
 
 
 settings = Settings()

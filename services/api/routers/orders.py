@@ -102,3 +102,109 @@ def mark_order_unknown(job_id: str, req: MarkUnknownRequest, request: Request):
     tenant_id: str = getattr(request.state, "tenant_id", "default-tenant")
     return job_service.mark_completion_unknown(tenant_id, job_id, req.reason)
 
+
+class CashReceivedRequest(BaseModel):
+    amount_paise: Optional[int] = None
+    staff_email: str = "staff@shop.com"
+
+
+class CancelOrderRequest(BaseModel):
+    reason: str = "Customer cancelled before print"
+
+
+class SupervisedReconcileRequest(BaseModel):
+    action: str  # 'CONFIRM_PRINTED', 'REPRINT', 'REFUND'
+    staff_email: str = "staff@shop.com"
+
+
+@router.post("/{job_id}/cash-received", response_model=PrintJobResponse)
+def record_cash_received(job_id: str, req: CashReceivedRequest, request: Request):
+    """
+    Staff records in-person cash receipt at counter.
+    In MANUAL_APPROVAL mode, transitions to AWAITING_APPROVAL.
+    In FULL_AUTOMATIC mode, dispatches to QUEUED if hardware is online.
+    """
+    tenant_id: str = getattr(request.state, "tenant_id", "default-tenant")
+    return job_service.record_cash_payment(
+        tenant_id=tenant_id,
+        job_id=job_id,
+        staff_email=req.staff_email,
+        amount_paise=req.amount_paise,
+    )
+
+
+@router.post("/{job_id}/cancel", response_model=PrintJobResponse)
+def cancel_order(job_id: str, req: CancelOrderRequest, request: Request):
+    """
+    Cancels order prior to print spooling.
+    If paid online, triggers automatic gateway refund.
+    Blocks cancellation if document is already in the physical spooler.
+    """
+    tenant_id: str = getattr(request.state, "tenant_id", "default-tenant")
+    return job_service.cancel_order(
+        tenant_id=tenant_id,
+        job_id=job_id,
+        reason=req.reason,
+    )
+
+
+@router.post("/{job_id}/reconcile-unknown", response_model=PrintJobResponse)
+def supervise_unknown_order(job_id: str, req: SupervisedReconcileRequest, request: Request):
+    """
+    Operator supervises a COMPLETION_UNKNOWN job.
+    Actions: CONFIRM_PRINTED, REPRINT, or REFUND.
+    Strict Invariant: Automatic reprint is blocked; only human supervisor can authorize reprint.
+    """
+    tenant_id: str = getattr(request.state, "tenant_id", "default-tenant")
+    return job_service.supervised_reconcile_unknown(
+        tenant_id=tenant_id,
+        job_id=job_id,
+        action=req.action,
+        staff_email=req.staff_email,
+    )
+
+
+@router.get("/{job_id}/callback")
+def payment_browser_callback(job_id: str, request: Request):
+    """
+    Browser return URL after external payment gateway checkout.
+    STRICT SECURITY INVARIANT:
+    Browser redirects are NEVER proof of payment!
+    Returns current true server status; only verified webhook or server-to-server check marks paid.
+    """
+    tenant_id: str = getattr(request.state, "tenant_id", "default-tenant")
+    job = job_service.get_job(tenant_id, job_id)
+    return {
+        "order_id": job.id,
+        "shop_id": job.tenant_id,
+        "status": job.status,
+        "payment_verified": job.status not in (JobStatus.AWAITING_PAYMENT, JobStatus.PENDING_PAYMENT),
+        "hold_reason": job.hold_reason,
+        "server_authoritative": True,
+        "note": "Payment verification is handled strictly via server-to-server signed webhook.",
+    }
+
+
+@router.get("/{job_id}/events")
+async def stream_order_events(job_id: str, request: Request, max_events: Optional[int] = None):
+    """
+    Server-Sent Events (SSE) streaming real-time status to the customer's phone browser.
+    Provides honest status (including PAID_HELD reasons) without false print promises.
+    """
+    from fastapi.responses import StreamingResponse
+    from services.api.services.outbox_service import outbox_service
+
+    tenant_id: str = getattr(request.state, "tenant_id", "default-tenant")
+    # Verify order belongs to tenant
+    _ = job_service.get_job(tenant_id, job_id)
+
+    return StreamingResponse(
+        outbox_service.sse_event_generator(job_id, max_events=max_events),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+

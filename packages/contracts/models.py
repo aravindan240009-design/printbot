@@ -67,15 +67,54 @@ class SupportedFormat(str, Enum):
 
 
 class JobStatus(str, Enum):
+    # Phase 4: Canonical 20-State Machine
+    DRAFT = "DRAFT"
+    VALIDATING = "VALIDATING"
+    READY_TO_QUOTE = "READY_TO_QUOTE"
+    AWAITING_PAYMENT = "AWAITING_PAYMENT"
+    PAYMENT_VERIFYING = "PAYMENT_VERIFYING"
+    PAID_HELD = "PAID_HELD"
+    AWAITING_APPROVAL = "AWAITING_APPROVAL"
+    APPROVED = "APPROVED"
+    QUEUED = "QUEUED"
+    LEASED = "LEASED"
+    SPOOL_SUBMITTED = "SPOOL_SUBMITTED"
+    COMPLETION_UNKNOWN = "COMPLETION_UNKNOWN"
+    PRINT_CONFIRMED = "PRINT_CONFIRMED"
+    READY_FOR_PICKUP = "READY_FOR_PICKUP"
+    COLLECTED = "COLLECTED"
+    REJECTED = "REJECTED"
+    CANCELLED = "CANCELLED"
+    REFUND_PENDING = "REFUND_PENDING"
+    REFUNDED = "REFUNDED"
+    EXPIRED = "EXPIRED"
+    # Backward compatibility aliases
     PENDING_PAYMENT = "PENDING_PAYMENT"
     PAID = "PAID"
-    QUEUED = "QUEUED"
     SPOOLING = "SPOOLING"
     PRINTING = "PRINTING"
     COMPLETED = "COMPLETED"
-    COMPLETION_UNKNOWN = "COMPLETION_UNKNOWN"
     FAILED = "FAILED"
-    CANCELLED = "CANCELLED"
+
+
+class BookingState(str, Enum):
+    NONE = "NONE"
+    SCHEDULED_PRINT = "SCHEDULED_PRINT"
+    RESERVED_PICKUP_SLOT = "RESERVED_PICKUP_SLOT"
+    ASSISTED_COUNTER_XEROX = "ASSISTED_COUNTER_XEROX"
+
+
+class PaymentMethod(str, Enum):
+    UPI = "UPI"
+    CASH = "CASH"
+    CARD = "CARD"
+    NETBANKING = "NETBANKING"
+
+
+class PaymentProviderType(str, Enum):
+    MOCK = "MOCK"
+    RAZORPAY = "RAZORPAY"
+    CASH = "CASH"
 
 
 class OrderMode(str, Enum):
@@ -132,6 +171,10 @@ class PrintJobCreateRequest(BaseModel):
     customer_email: EmailStr
     customer_phone: Optional[str] = None
     idempotency_key: Optional[str] = None
+    order_mode: Optional[OrderMode] = None
+    booking_state: BookingState = BookingState.NONE
+    quote_hash: Optional[str] = None
+    payment_method: Optional[str] = "UPI"
 
 
 class PrintJobResponse(BaseModel):
@@ -144,11 +187,19 @@ class PrintJobResponse(BaseModel):
     page_count: int
     options: PrintOptions
     calculated_price_cents: int
+    total_paise: int = 0
     currency: str = "USD"
     status: JobStatus
+    order_mode: OrderMode = OrderMode.FULL_AUTOMATIC
+    booking_state: BookingState = BookingState.NONE
+    version: int = 1
     payment_intent_id: Optional[str] = None
     spooler_job_id: Optional[str] = None
     workstation_id: Optional[str] = None
+    hold_reason: Optional[str] = None
+    rejection_reason: Optional[str] = None
+    refund_id: Optional[str] = None
+    lease_expires_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

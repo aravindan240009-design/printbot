@@ -30,15 +30,41 @@ export type SupportedFormat =
   | 'unsupported';
 
 export type JobStatus =
+  | 'DRAFT'
+  | 'VALIDATING'
+  | 'READY_TO_QUOTE'
+  | 'AWAITING_PAYMENT'
+  | 'PAYMENT_VERIFYING'
+  | 'PAID_HELD'
+  | 'AWAITING_APPROVAL'
+  | 'APPROVED'
+  | 'QUEUED'
+  | 'LEASED'
+  | 'SPOOL_SUBMITTED'
+  | 'COMPLETION_UNKNOWN'
+  | 'PRINT_CONFIRMED'
+  | 'READY_FOR_PICKUP'
+  | 'COLLECTED'
+  | 'REJECTED'
+  | 'CANCELLED'
+  | 'REFUND_PENDING'
+  | 'REFUNDED'
+  | 'EXPIRED'
   | 'PENDING_PAYMENT'
   | 'PAID'
-  | 'QUEUED'
   | 'SPOOLING'
   | 'PRINTING'
   | 'COMPLETED'
-  | 'COMPLETION_UNKNOWN'
-  | 'FAILED'
-  | 'CANCELLED';
+  | 'FAILED';
+
+export type BookingState =
+  | 'NONE'
+  | 'SCHEDULED_PRINT'
+  | 'RESERVED_PICKUP_SLOT'
+  | 'ASSISTED_COUNTER_XEROX';
+
+export type PaymentMethod = 'UPI' | 'CASH' | 'CARD' | 'NETBANKING';
+export type PaymentProviderType = 'MOCK' | 'RAZORPAY' | 'CASH';
 
 export type OrderMode = 'FULL_AUTOMATIC' | 'MANUAL_APPROVAL';
 
@@ -132,6 +158,10 @@ export interface PrintJobCreateRequest {
   customerEmail: string;
   customerPhone?: string;
   idempotencyKey?: string;
+  orderMode?: OrderMode;
+  bookingState?: BookingState;
+  quoteHash?: string;
+  paymentMethod?: string;
 }
 
 export interface PrintJobResponse {
@@ -144,11 +174,19 @@ export interface PrintJobResponse {
   pageCount: number;
   options: PrintOptions;
   calculatedPriceCents: number;
+  totalPaise?: number;
   currency: string;
   status: JobStatus;
+  orderMode?: OrderMode;
+  bookingState?: BookingState;
+  version?: number;
   paymentIntentId?: string;
   spoolerJobId?: string;
   workstationId?: string;
+  holdReason?: string;
+  rejectionReason?: string;
+  refundId?: string;
+  leaseExpiresAt?: string;
   createdAt: string;
   updatedAt: string;
 }

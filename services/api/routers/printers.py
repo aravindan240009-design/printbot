@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Request, HTTPException, status
 from pydantic import BaseModel
 from packages.contracts.models import (
@@ -60,6 +60,26 @@ def claim_queued_job(req: ClaimJobRequest, request: Request):
         job_id=req.job_id,
         workstation_id=req.workstation_id
     )
+
+
+class ClaimNextJobRequest(BaseModel):
+    workstation_id: Optional[str] = "ws-default-counter"
+    lease_seconds: int = 60
+
+
+@router.post("/claim-next")
+def claim_next_job(request: Request, req: Optional[ClaimNextJobRequest] = None):
+    """
+    Claims the next eligible QUEUED job for an active workstation with an atomic lease.
+    Enforces CAS lease window and prevents race conditions between two workstations.
+    """
+    tenant_id: str = getattr(request.state, "tenant_id", "default-tenant")
+    ws_id = req.workstation_id if req else "ws-default-counter"
+    lease_sec = req.lease_seconds if req else 60
+    job = job_service.claim_next_job_with_lease(tenant_id, ws_id, lease_sec)
+    if not job:
+        return {"status": "empty", "message": "No QUEUED jobs available for this shop."}
+    return job
 
 
 @router.post("/spool-status", response_model=PrintJobResponse)

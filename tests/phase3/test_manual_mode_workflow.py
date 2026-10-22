@@ -10,6 +10,9 @@ Verifies:
 from fastapi.testclient import TestClient
 from services.api.main import app
 
+from services.api.services.shop_service import shop_service
+from packages.contracts.models import OrderMode
+
 client = TestClient(app)
 
 SHOP_A = "11111111-1111-1111-1111-111111111111"
@@ -17,6 +20,7 @@ SHOP_B = "22222222-2222-2222-2222-222222222222"
 
 
 def test_manual_mode_approval_and_rejection_workflow():
+    shop_service.update_settings(SHOP_A, new_mode=OrderMode.MANUAL_APPROVAL)
     # 1. Customer places order at Shop A
     order_res = client.post(
         "/api/v1/orders",

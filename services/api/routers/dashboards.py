@@ -8,8 +8,50 @@ from services.api.services.job_service import job_service
 from services.api.services.subscription_service import subscription_service
 from services.api.services.device_service import device_service
 from services.api.services.audit_service import audit_service
+from services.api.services.shop_service import shop_service, ShopSettings
+from packages.contracts.models import OrderMode
+from pydantic import BaseModel
 
 router = APIRouter(tags=["Operations & Dashboards"])
+
+
+class UpdateShopSettingsRequest(BaseModel):
+    order_mode: Optional[OrderMode] = None
+    cash_allowed: Optional[bool] = None
+    upi_allowed: Optional[bool] = None
+    retention_hours: Optional[int] = None
+
+
+@router.get("/shops/settings", response_model=ShopSettings)
+async def get_shop_settings(request: Request):
+    """Retrieves operational settings and order mode for the shop."""
+    shop_id = getattr(request.state, "tenant_id", None) or getattr(request.state, "shop_id", None)
+    if not shop_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Shop context required.")
+    return shop_service.get_settings(shop_id)
+
+
+@router.patch("/shops/settings", response_model=ShopSettings)
+async def update_shop_settings(req: UpdateShopSettingsRequest, request: Request):
+    """
+    Updates shop mode (FULL_AUTOMATIC vs MANUAL_APPROVAL) and policies.
+    Logged to audit trail and applied to future jobs only.
+    """
+    shop_id = getattr(request.state, "tenant_id", None) or getattr(request.state, "shop_id", None)
+    if not shop_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Shop context required.")
+
+    user = getattr(request.state, "user", None)
+    actor_id = user.get("email", "owner@shop.com") if user else "owner@shop.com"
+
+    return shop_service.update_settings(
+        shop_id=shop_id,
+        new_mode=req.order_mode,
+        cash_allowed=req.cash_allowed,
+        upi_allowed=req.upi_allowed,
+        retention_hours=req.retention_hours,
+        actor_id=actor_id,
+    )
 
 
 @router.get("/shops/dashboard")

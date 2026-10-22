@@ -98,6 +98,20 @@ class DeviceService:
         )
         self._device_identifiers[(shop_a, "ws-counter-anna-1")] = dev_a_id
 
+        # Seed paired device for Shop B
+        dev_b_id = "d2222222-0000-0000-0000-000000000002"
+        shop_b = "22222222-2222-2222-2222-222222222222"
+        self._devices[dev_b_id] = DeviceRecord(
+            id=dev_b_id,
+            shop_id=shop_b,
+            device_identifier="ws-counter-bharat-1",
+            name="Madurai Counter PC 1",
+            os_info="Windows 11 Pro",
+            public_key_pem="MOCK_ED25519_PUBKEY_BHARAT_1",
+            status="active"
+        )
+        self._device_identifiers[(shop_b, "ws-counter-bharat-1")] = dev_b_id
+
     def create_pairing_code(
         self,
         shop_id: str,
@@ -375,6 +389,43 @@ class DeviceService:
 
     def list_devices(self, shop_id: str) -> List[DeviceRecord]:
         return [d for d in self._devices.values() if d.shop_id == shop_id]
+
+    def is_device_online(self, shop_id: str, max_age_seconds: int = 120) -> bool:
+        """Checks if at least one authorized, active device has checked in recently."""
+        devices = [d for d in self._devices.values() if d.shop_id == shop_id]
+        if not devices:
+            return True
+        now = datetime.utcnow()
+        for d in devices:
+            if d.status == "active":
+                diff = (now - d.last_seen_at).total_seconds()
+                if diff <= max_age_seconds:
+                    return True
+        return False
+
+    def set_device_online_status(self, shop_id: str, is_online: bool) -> None:
+        """Helper to simulate device online/offline state in tests and staging."""
+        found = False
+        for d in self._devices.values():
+            if d.shop_id == shop_id:
+                found = True
+                if is_online:
+                    d.last_seen_at = datetime.utcnow()
+                    d.status = "active"
+                else:
+                    d.last_seen_at = datetime.utcnow() - timedelta(minutes=15)
+        if not found:
+            dev_id = f"dev_{uuid.uuid4().hex[:8]}"
+            self._devices[dev_id] = DeviceRecord(
+                id=dev_id,
+                shop_id=shop_id,
+                device_identifier=f"ws-{shop_id[:8]}",
+                name="Workstation Default",
+                os_info="Windows 11",
+                public_key_pem="MOCK_ED25519_KEY",
+                status="active",
+                last_seen_at=datetime.utcnow() if is_online else datetime.utcnow() - timedelta(minutes=15)
+            )
 
     def clear(self):
         self._pairing_codes.clear()

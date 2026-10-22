@@ -55,14 +55,15 @@ async def handle_payment_webhook(
     )
 
     # 3. Process payment event
-    if payload.event_type == "payment_intent.succeeded":
+    if payload.event_type in ("payment_intent.succeeded", "payment.captured", "payment.success"):
         # Extract job_id from payment_intent_id or custom payload metadata
         job_id = payload.payment_intent_id.replace("pi_mock_", "")
         try:
             updated_job = job_service.mark_paid(
                 tenant_id=payload.tenant_id,
                 job_id=job_id,
-                payment_intent_id=payload.payment_intent_id
+                payment_intent_id=payload.payment_intent_id,
+                amount_paise=payload.amount_cents * 10
             )
             result = {
                 "status": "success",
@@ -90,4 +91,72 @@ async def handle_payment_webhook(
         response=result
     )
 
+    return result
+
+
+@router.post("/razorpay")
+async def handle_razorpay_webhook(
+    request: Request,
+    x_razorpay_signature: Optional[str] = Header(None, alias="X-Razorpay-Signature"),
+    x_shop_id: Optional[str] = Header(None, alias="X-Shop-ID"),
+):
+    """
+    Razorpay Webhook Receiver with Strict Per-Merchant Credential Verification.
+    1. Validates HMAC SHA-256 signature using merchant's independent webhook secret.
+    2. Enforces idempotency via event_id.
+    3. Handles payment.captured, payment.failed, and refund.processed.
+    """
+    from services.api.services.payment_provider import razorpay_provider
+
+    raw_body = await request.body()
+    headers_dict = dict(request.headers)
+
+    verified_event = razorpay_provider.verify_webhook(
+        raw_body=raw_body,
+        headers=headers_dict,
+        expected_shop_id=x_shop_id,
+    )
+
+    # Check idempotency
+    matches, cached_resp, _ = idempotency_store.check(
+        tenant_id=verified_event.shop_id,
+        idempotency_key=verified_event.event_id,
+        payload=verified_event.raw_payload,
+    )
+    if matches and cached_resp:
+        return cached_resp
+
+    idempotency_store.start(
+        tenant_id=verified_event.shop_id,
+        idempotency_key=verified_event.event_id,
+        payload=verified_event.raw_payload,
+    )
+
+    if verified_event.status == "PAID":
+        updated_job = job_service.mark_paid(
+            tenant_id=verified_event.shop_id,
+            job_id=verified_event.order_id,
+            payment_intent_id=verified_event.payment_intent_id,
+            payment_method="UPI",
+            amount_paise=verified_event.amount_paise,
+        )
+        result = {
+            "status": "success",
+            "event_id": verified_event.event_id,
+            "order_id": updated_job.id,
+            "new_status": updated_job.status,
+        }
+    else:
+        result = {
+            "status": "acknowledged",
+            "event_id": verified_event.event_id,
+            "event_type": verified_event.event_type,
+        }
+
+    idempotency_store.complete(
+        tenant_id=verified_event.shop_id,
+        idempotency_key=verified_event.event_id,
+        status_code=200,
+        response=result,
+    )
     return result
