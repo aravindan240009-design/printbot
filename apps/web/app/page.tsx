@@ -132,14 +132,14 @@ export default function CustomerPortal() {
 
   const [options, setOptions] = useState<PrintOptions>({
     copies: 1,
-    color_mode: 'bw' as any,
-    paper_size: 'A4' as any,
-    duplex_mode: 'duplex_long' as any,
-    orientation: 'portrait' as any,
-    binding: 'staple' as any,
-    paper_gsm: 75,
-    page_range: 'all',
-    pages_per_sheet: 1,
+    colorMode: 'bw',
+    paperSize: 'A4',
+    duplexMode: 'duplex_long',
+    orientation: 'portrait',
+    binding: 'staple',
+    paperGsm: 75,
+    pageRange: 'all',
+    pagesPerSheet: 1,
   });
 
   const [quote, setQuote] = useState<{
@@ -183,8 +183,8 @@ export default function CustomerPortal() {
         }
       } catch {
         // Fallback quick approximation
-        const sheets = options.duplex_mode === 'simplex' ? pageCount : Math.ceil(pageCount / 2);
-        const paise = (options.color_mode === 'color' ? 1000 : 150) * pageCount * options.copies;
+        const sheets = options.duplexMode === 'simplex' ? pageCount : Math.ceil(pageCount / 2);
+        const paise = (options.colorMode === 'color' ? 1000 : 150) * pageCount * options.copies;
         if (active) {
           setQuote({
             total_cents: Math.round(paise / 83),
@@ -339,9 +339,9 @@ export default function CustomerPortal() {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setOptions({ ...options, color_mode: 'bw' as any })}
+                onClick={() => setOptions({ ...options, colorMode: 'bw' })}
                 className={`min-h-[44px] p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center space-x-2 transition-all ${
-                  options.color_mode === 'bw'
+                  options.colorMode === 'bw'
                     ? 'border-indigo-600 bg-indigo-50/70 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 ring-2 ring-indigo-500/20'
                     : 'border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
                 }`}
@@ -351,9 +351,9 @@ export default function CustomerPortal() {
               </button>
               <button
                 type="button"
-                onClick={() => setOptions({ ...options, color_mode: 'color' as any })}
+                onClick={() => setOptions({ ...options, colorMode: 'color' })}
                 className={`min-h-[44px] p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center space-x-2 transition-all ${
-                  options.color_mode === 'color'
+                  options.colorMode === 'color'
                     ? 'border-indigo-600 bg-indigo-50/70 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 ring-2 ring-indigo-500/20'
                     : 'border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
                 }`}
@@ -376,9 +376,9 @@ export default function CustomerPortal() {
                 <button
                   key={s.id}
                   type="button"
-                  onClick={() => setOptions({ ...options, duplex_mode: s.id as any })}
+                  onClick={() => setOptions({ ...options, duplexMode: s.id as any })}
                   className={`min-h-[44px] p-2 rounded-xl border text-center text-xs font-bold flex flex-col items-center justify-center transition-all ${
-                    options.duplex_mode === s.id
+                    options.duplexMode === s.id
                       ? 'border-indigo-600 bg-indigo-50/70 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 ring-2 ring-indigo-500/20'
                       : 'border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
                   }`}
@@ -398,8 +398,8 @@ export default function CustomerPortal() {
             </div>
             <input
               type="text"
-              value={options.page_range}
-              onChange={(e) => setOptions({ ...options, page_range: e.target.value })}
+              value={options.pageRange}
+              onChange={(e) => setOptions({ ...options, pageRange: e.target.value })}
               placeholder={t.rangePlaceholder}
               className="w-full min-h-[44px] text-xs p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono"
             />
@@ -410,8 +410,8 @@ export default function CustomerPortal() {
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 dark:text-slate-300">{t.paperSize}</label>
               <select
-                value={options.paper_size}
-                onChange={(e) => setOptions({ ...options, paper_size: e.target.value as any })}
+                value={options.paperSize}
+                onChange={(e) => setOptions({ ...options, paperSize: e.target.value as any })}
                 className="w-full min-h-[44px] text-xs p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold"
               >
                 <option value="A4">A4 (Standard)</option>
@@ -424,8 +424,8 @@ export default function CustomerPortal() {
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 dark:text-slate-300">{t.nup}</label>
               <select
-                value={options.pages_per_sheet}
-                onChange={(e) => setOptions({ ...options, pages_per_sheet: parseInt(e.target.value) })}
+                value={options.pagesPerSheet}
+                onChange={(e) => setOptions({ ...options, pagesPerSheet: parseInt(e.target.value) })}
                 className="w-full min-h-[44px] text-xs p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold"
               >
                 <option value={1}>1 Page / Sheet</option>
