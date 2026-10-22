@@ -1,0 +1,9 @@
+[workspace]
+members = ["packages/printplan/rust", "tools/printer-proof", "services/print-agent"]
+exclude = ["apps/desktop/src-tauri"]
+resolver = "2"
+
+[workspace.dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.145"
+sha2 = "=0.10.9"

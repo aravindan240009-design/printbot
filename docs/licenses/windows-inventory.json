@@ -1,0 +1,205 @@
+﻿{
+    "schema_version":  1,
+    "collected_utc":  "2026-10-22T14:01:22.7622213Z",
+    "read_only":  true,
+    "privacy":  "Queue/port names, IPs, serials, host/user names, PnP instance IDs and document/job data omitted",
+    "os":  [
+               {
+                   "Caption":  "Microsoft Windows 11 Home",
+                   "Version":  "10.0.26200",
+                   "BuildNumber":  "26200",
+                   "OSArchitecture":  "64-bit"
+               }
+           ],
+    "queues":  [
+                   {
+                       "queue_id":  "queue-1",
+                       "driver":  "Send to Microsoft OneNote 16 Driver",
+                       "type":  "Local",
+                       "status":  "Normal",
+                       "virtual":  true,
+                       "configuration":  [
+                                             {
+                                                 "Collate":  true,
+                                                 "Color":  true,
+                                                 "DuplexingMode":  0,
+                                                 "PaperSize":  1
+                                             }
+                                         ]
+                   },
+                   {
+                       "queue_id":  "queue-2",
+                       "driver":  "Microsoft Print To PDF",
+                       "type":  "Local",
+                       "status":  "Normal",
+                       "virtual":  true,
+                       "configuration":  [
+                                             {
+                                                 "Collate":  true,
+                                                 "Color":  true,
+                                                 "DuplexingMode":  0,
+                                                 "PaperSize":  1
+                                             }
+                                         ]
+                   }
+               ],
+    "drivers":  [
+                    {
+                        "Name":  "Universal Print Class Driver",
+                        "Manufacturer":  "Microsoft",
+                        "MajorVersion":  4,
+                        "PrinterEnvironment":  "Windows x64"
+                    },
+                    {
+                        "Name":  "Send to Microsoft OneNote 16 Driver",
+                        "Manufacturer":  "Microsoft",
+                        "MajorVersion":  4,
+                        "PrinterEnvironment":  "Windows x64"
+                    },
+                    {
+                        "Name":  "Microsoft Virtual Print Class Driver",
+                        "Manufacturer":  "Microsoft",
+                        "MajorVersion":  4,
+                        "PrinterEnvironment":  "Windows x64"
+                    },
+                    {
+                        "Name":  "Microsoft Print To PDF",
+                        "Manufacturer":  "Microsoft",
+                        "MajorVersion":  4,
+                        "PrinterEnvironment":  "Windows x64"
+                    },
+                    {
+                        "Name":  "Microsoft IPP Class Driver",
+                        "Manufacturer":  "Microsoft",
+                        "MajorVersion":  4,
+                        "PrinterEnvironment":  "Windows x64"
+                    },
+                    {
+                        "Name":  "Microsoft enhanced Point and Print compatibility driver",
+                        "Manufacturer":  "Microsoft",
+                        "MajorVersion":  3,
+                        "PrinterEnvironment":  "Windows x64"
+                    },
+                    {
+                        "Name":  "Microsoft enhanced Point and Print compatibility driver",
+                        "Manufacturer":  "Microsoft",
+                        "MajorVersion":  3,
+                        "PrinterEnvironment":  "Windows NT x86"
+                    }
+                ],
+    "ports":  [
+                  {
+                      "type":  "Local Monitor",
+                      "description":  "Local Port",
+                      "network_configured":  false
+                  },
+                  {
+                      "type":  "Local Monitor",
+                      "description":  "Local Port",
+                      "network_configured":  false
+                  },
+                  {
+                      "type":  "Local Monitor",
+                      "description":  "Local Port",
+                      "network_configured":  false
+                  },
+                  {
+                      "type":  "Local Monitor",
+                      "description":  "Local Port",
+                      "network_configured":  false
+                  },
+                  {
+                      "type":  "Local Monitor",
+                      "description":  "Local Port",
+                      "network_configured":  false
+                  },
+                  {
+                      "type":  "Local Monitor",
+                      "description":  "Local Port",
+                      "network_configured":  false
+                  },
+                  {
+                      "type":  "Local Monitor",
+                      "description":  "Local Port",
+                      "network_configured":  false
+                  },
+                  {
+                      "type":  "Local Monitor",
+                      "description":  "Local Port",
+                      "network_configured":  false
+                  },
+                  {
+                      "type":  "Local Monitor",
+                      "description":  "Local Port",
+                      "network_configured":  false
+                  },
+                  {
+                      "type":  "Local Monitor",
+                      "description":  "Local Port",
+                      "network_configured":  false
+                  },
+                  {
+                      "type":  "Local Monitor",
+                      "description":  "Local Port",
+                      "network_configured":  false
+                  },
+                  {
+                      "type":  "Local Monitor",
+                      "description":  "Local Port",
+                      "network_configured":  false
+                  },
+                  {
+                      "type":  "Local Monitor",
+                      "description":  "Local Port",
+                      "network_configured":  false
+                  },
+                  {
+                      "type":  "Local Monitor",
+                      "description":  "Local Port",
+                      "network_configured":  false
+                  },
+                  {
+                      "type":  "Local Monitor",
+                      "description":  "Local Port",
+                      "network_configured":  false
+                  },
+                  {
+                      "type":  "Local Monitor",
+                      "description":  "Local Port",
+                      "network_configured":  false
+                  },
+                  {
+                      "type":  "Local Monitor",
+                      "description":  "Local Port",
+                      "network_configured":  false
+                  },
+                  {
+                      "type":  "Local Monitor",
+                      "description":  "Local Port",
+                      "network_configured":  false
+                  }
+              ],
+    "pnp":  [
+                {
+                    "Class":  "PrintQueue",
+                    "Status":  "OK"
+                },
+                {
+                    "Class":  "PrintQueue",
+                    "Status":  "OK"
+                },
+                {
+                    "Class":  "PrintQueue",
+                    "Status":  "OK"
+                }
+            ],
+    "spooler":  [
+                    {
+                        "Status":  4,
+                        "StartType":  2
+                    }
+                ],
+    "errors":  [
+
+               ]
+}

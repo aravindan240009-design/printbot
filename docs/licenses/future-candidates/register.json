@@ -1,0 +1,137 @@
+[
+  {
+    "component": "fastapi",
+    "candidate_version": "0.115.0",
+    "status": "FUTURE_NOT_DISTRIBUTED_NOT_APPROVED",
+    "declared_license_to_verify": "MIT",
+    "evidence": "PINNED_SOURCE_LICENSE_RETRIEVED",
+    "source": "https://raw.githubusercontent.com/fastapi/fastapi/0.115.0/LICENSE",
+    "sha256": "4ec89ffc81485b97fec584b2d4a961032eeffe834453894fd9c1274906cc744e"
+  },
+  {
+    "component": "pydantic",
+    "candidate_version": "2.9.2",
+    "status": "FUTURE_NOT_DISTRIBUTED_NOT_APPROVED",
+    "declared_license_to_verify": "MIT",
+    "source": "https://raw.githubusercontent.com/pydantic/pydantic/v2.9.2/LICENSE",
+    "sha256": "a9e186f3ca16b5eef84318e7a701721351a00cb7b8ae3a4394b67b49e3529ef3",
+    "evidence": "PINNED_SOURCE_LICENSE_RETRIEVED"
+  },
+  {
+    "component": "react",
+    "candidate_version": "18.3.1",
+    "status": "FUTURE_NOT_DISTRIBUTED_NOT_APPROVED",
+    "declared_license_to_verify": "MIT",
+    "source": "https://raw.githubusercontent.com/facebook/react/v18.3.1/LICENSE",
+    "sha256": "52412d7bc7ce4157ea628bbaacb8829e0a9cb3c58f57f99176126bc8cf2bfc85",
+    "evidence": "PINNED_SOURCE_LICENSE_RETRIEVED"
+  },
+  {
+    "component": "vite",
+    "candidate_version": "5.2.11",
+    "status": "FUTURE_NOT_DISTRIBUTED_NOT_APPROVED",
+    "declared_license_to_verify": "MIT",
+    "source": "https://raw.githubusercontent.com/vitejs/vite/v5.2.11/LICENSE",
+    "sha256": "29b68325fe026047d13e187b44c33b2acacf7dc647dec4583702e59f235e13b5",
+    "evidence": "PINNED_SOURCE_LICENSE_RETRIEVED"
+  },
+  {
+    "component": "tauri",
+    "candidate_version": "2.0.0",
+    "status": "FUTURE_NOT_DISTRIBUTED_NOT_APPROVED",
+    "declared_license_to_verify": "MIT OR Apache-2.0",
+    "source": "https://raw.githubusercontent.com/tauri-apps/tauri/tauri-v2.0.0/LICENSE_MIT",
+    "sha256": "9dd42ea92cff2ede5cd477cbfcce051b2d0115c0ac7f368ee88cb545055dff1d",
+    "evidence": "PINNED_SOURCE_LICENSE_RETRIEVED"
+  },
+  {
+    "component": "valkey",
+    "candidate_version": "8.0.0",
+    "status": "FUTURE_NOT_DISTRIBUTED_NOT_APPROVED",
+    "declared_license_to_verify": "BSD-3-Clause",
+    "source": "https://raw.githubusercontent.com/valkey-io/valkey/8.0.0/COPYING",
+    "sha256": "f19701ee041aae9c4883d86856db2afb4ec2e970af1a83d04470b6edae9228ed",
+    "evidence": "PINNED_SOURCE_LICENSE_RETRIEVED"
+  },
+  {
+    "component": "celery",
+    "candidate_version": "5.4.0",
+    "status": "FUTURE_NOT_DISTRIBUTED_NOT_APPROVED",
+    "declared_license_to_verify": "BSD-3-Clause",
+    "source": "https://raw.githubusercontent.com/celery/celery/v5.4.0/LICENSE",
+    "sha256": "c358cdf77f28bbab50d4a754e123118339c15230349e82bf66489cece3ac093a",
+    "evidence": "PINNED_SOURCE_LICENSE_RETRIEVED"
+  },
+  {
+    "component": "seaweedfs",
+    "candidate_version": "3.77",
+    "status": "FUTURE_NOT_DISTRIBUTED_NOT_APPROVED",
+    "declared_license_to_verify": "Apache-2.0",
+    "source": "https://raw.githubusercontent.com/seaweedfs/seaweedfs/3.77/LICENSE",
+    "sha256": "d95f64dad8fc4884f325890eba1171e3c23cf443b090f2db637d2fc469221cd8",
+    "evidence": "PINNED_SOURCE_LICENSE_RETRIEVED"
+  },
+  {
+    "component": "caddy",
+    "candidate_version": "2.8.4",
+    "status": "FUTURE_NOT_DISTRIBUTED_NOT_APPROVED",
+    "declared_license_to_verify": "Apache-2.0",
+    "source": "https://raw.githubusercontent.com/caddyserver/caddy/v2.8.4/LICENSE",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "evidence": "PINNED_SOURCE_LICENSE_RETRIEVED"
+  },
+  {
+    "component": "pdfjs",
+    "candidate_version": "4.4.168",
+    "status": "FUTURE_NOT_DISTRIBUTED_NOT_APPROVED",
+    "declared_license_to_verify": "Apache-2.0",
+    "source": "https://raw.githubusercontent.com/mozilla/pdf.js/v4.4.168/LICENSE",
+    "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+    "evidence": "PINNED_SOURCE_LICENSE_RETRIEVED"
+  },
+  {
+    "component": "konva",
+    "candidate_version": "9.3.14",
+    "status": "FUTURE_NOT_DISTRIBUTED_NOT_APPROVED",
+    "declared_license_to_verify": "MIT",
+    "evidence": "PINNED_SOURCE_LICENSE_RETRIEVED",
+    "source": "https://raw.githubusercontent.com/konvajs/konva/9.3.14/LICENSE",
+    "sha256": "7190132c82df30243dc2ba512c9509ea3b629329b4266e9f2c3b5dbd04029613"
+  },
+  {
+    "component": "pikepdf",
+    "candidate_version": "9.2.1",
+    "status": "FUTURE_NOT_DISTRIBUTED_NOT_APPROVED",
+    "declared_license_to_verify": "MPL-2.0",
+    "source": "https://raw.githubusercontent.com/pikepdf/pikepdf/v9.2.1/LICENSE.txt",
+    "sha256": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5",
+    "evidence": "PINNED_SOURCE_LICENSE_RETRIEVED"
+  },
+  {
+    "component": "qpdf",
+    "candidate_version": "11.9.1",
+    "status": "FUTURE_NOT_DISTRIBUTED_NOT_APPROVED",
+    "declared_license_to_verify": "Apache-2.0",
+    "source": "https://raw.githubusercontent.com/qpdf/qpdf/v11.9.1/LICENSE.txt",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "evidence": "PINNED_SOURCE_LICENSE_RETRIEVED"
+  },
+  {
+    "component": "gotenberg",
+    "candidate_version": "8.13.0",
+    "status": "FUTURE_NOT_DISTRIBUTED_NOT_APPROVED",
+    "declared_license_to_verify": "MIT",
+    "source": "https://raw.githubusercontent.com/gotenberg/gotenberg/v8.13.0/LICENSE",
+    "sha256": "a0857757e9ce0ed8ce070798028d709dddce363a5363bbebf413a615b5a1d95f",
+    "evidence": "PINNED_SOURCE_LICENSE_RETRIEVED"
+  },
+  {
+    "component": "podman",
+    "candidate_version": "5.2.2",
+    "status": "FUTURE_NOT_DISTRIBUTED_NOT_APPROVED",
+    "declared_license_to_verify": "Apache-2.0",
+    "source": "https://raw.githubusercontent.com/containers/podman/v5.2.2/LICENSE",
+    "sha256": "62fb8a3a9621dc2388174caaabe9c2317b694bb9a1d46c98bcf5655b68f51be3",
+    "evidence": "PINNED_SOURCE_LICENSE_RETRIEVED"
+  }
+]

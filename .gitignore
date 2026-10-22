@@ -17,6 +17,10 @@ out/
 build/
 dist/
 target/
+.tools/
+.phase0-local/
+.local-evidence/
+.venv-phase0/
 
 # Python
 __pycache__/

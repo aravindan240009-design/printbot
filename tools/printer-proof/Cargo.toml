@@ -1,0 +1,18 @@
+[package]
+name = "printer-proof"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Print Bot Phase 0 trusted-local PDF printer proof; not the production agent"
+
+[dependencies]
+printplan = { path = "../../packages/printplan/rust" }
+serde_json.workspace = true
+sha2.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "=0.61.2", features = [
+  "Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Printing",
+  "Win32_Storage_Xps", "Win32_System_LibraryLoader", "Win32_System_Threading",
+  "Win32_Security", "Win32_Storage_FileSystem"
+] }

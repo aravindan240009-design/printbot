@@ -1,0 +1,103 @@
+[
+  {
+    "source_file": "share/doc/COPYING.RUNTIME",
+    "evidence": "COPYING.RUNTIME",
+    "uncompressed_sha256": "28e85c5aa4af9b4f1dfe6b4817aa3eefb3eaaee7fd735045016f29ccf50276a1",
+    "bytes": 3323
+  },
+  {
+    "source_file": "share/doc/COPYING3",
+    "evidence": "COPYING3",
+    "uncompressed_sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+    "bytes": 35147
+  },
+  {
+    "source_file": "share/doc/README.txt",
+    "evidence": "README.txt",
+    "uncompressed_sha256": "cdd0eaf36ec136a87f1b7fbae6d7b22c1488e2435c83fc1755f0f4f802e97c67",
+    "bytes": 635
+  },
+  {
+    "source_file": "share/doc/rust/COPYRIGHT-library.html",
+    "evidence": "COPYRIGHT-library.html.gz",
+    "uncompressed_sha256": "5647be074c8edf7339fd863055923a8fc80bc5610a8d4661ec3b767b9d392c27",
+    "bytes": 1499465
+  },
+  {
+    "source_file": "share/doc/rust/COPYRIGHT.html",
+    "evidence": "COPYRIGHT.html.gz",
+    "uncompressed_sha256": "d518ae2d76bc7a1f0cbf0069b8deafb56efc39c2614cab74a859ef0b467f8373",
+    "bytes": 14423589
+  },
+  {
+    "source_file": "LICENSE-MIT",
+    "evidence": "LICENSE-MIT",
+    "uncompressed_sha256": "b71bd43a069ca0641a9ecfe585ca7b3c53b5cc1608f8b68321168698e28b5ea1",
+    "bytes": 1068
+  },
+  {
+    "source_file": "LICENSE-APACHE",
+    "evidence": "LICENSE-APACHE",
+    "uncompressed_sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+    "bytes": 9723
+  },
+  {
+    "source_file": "COPYRIGHT",
+    "evidence": "COPYRIGHT",
+    "uncompressed_sha256": "172020dbfd5b53a226dfde77616190a48dcff519b0bc0e6deb91a8450782c4af",
+    "bytes": 1571
+  },
+  {
+    "source_file": "git-commit-hash",
+    "evidence": "git-commit-hash",
+    "uncompressed_sha256": "6677d7088677f1eb3c6f5fa5c91821d126d06795bfcde409119a001a863af8b6",
+    "bytes": 40
+  },
+  {
+    "source_file": "git-commit-info",
+    "evidence": "git-commit-info",
+    "uncompressed_sha256": "c41a1b7d2142cc39a8a5828f05da46abb30669349327b20d563bc5c4083fdf5e",
+    "bytes": 62
+  },
+  {
+    "source_file": "version",
+    "evidence": "version",
+    "uncompressed_sha256": "e2653d9c1b679f5a1c54e1a3101e98c092da894981a29440f46f8f20fa5a4f3a",
+    "bytes": 29
+  },
+  {
+    "artifact": "lib\\rustlib\\x86_64-pc-windows-gnu\\lib\\self-contained\\crt2.o",
+    "sha256": "58594eccbd0033eef7648628c743fcb7a1f61d78fbb912f2d06ccf1492010b70",
+    "bytes": 9105
+  },
+  {
+    "artifact": "lib\\rustlib\\x86_64-pc-windows-gnu\\lib\\self-contained\\dllcrt2.o",
+    "sha256": "6425e4978e75e697da5a138bd5b0337ed8c3c446af68d620fcd3bee7c2c44e72",
+    "bytes": 4796
+  },
+  {
+    "artifact": "lib\\rustlib\\x86_64-pc-windows-gnu\\lib\\self-contained\\libmingw32.a",
+    "sha256": "d06edb2a4153e6357de8edfc25978e5ae21a6f1ba19ceac9ef312f91ab93a6bf",
+    "bytes": 40722
+  },
+  {
+    "artifact": "lib\\rustlib\\x86_64-pc-windows-gnu\\lib\\self-contained\\libmingwex.a",
+    "sha256": "20a0f280bf2efc71ec417e4b4bd5cda3d81dc7922282ecec074f0a72ce4ad115",
+    "bytes": 480124
+  },
+  {
+    "artifact": "lib\\rustlib\\x86_64-pc-windows-gnu\\lib\\self-contained\\libgcc.a",
+    "sha256": "bf8219715a3aae5edd7cb1c59a9bd6deaf59f295681eed7a90c03465dc79e7ac",
+    "bytes": 6739988
+  },
+  {
+    "artifact": "lib\\rustlib\\x86_64-pc-windows-gnu\\lib\\self-contained\\libgcc_eh.a",
+    "sha256": "6adb5ffcb1be31ca4ac5f521f1872d1770f67e3274aee3b32390c9877b9cf8fc",
+    "bytes": 56366
+  },
+  {
+    "artifact": "lib\\rustlib\\x86_64-pc-windows-gnu\\lib\\self-contained\\libgcc_s.a",
+    "sha256": "879bd943e59919a7d39f7b832450e742bc38528e9159d9d7496ac9af26b90245",
+    "bytes": 86286
+  }
+]

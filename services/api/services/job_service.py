@@ -9,6 +9,8 @@ from packages.contracts.models import (
     PrintOptions,
 )
 from services.api.services.pricing import pricing_engine
+from services.api.services.subscription_service import subscription_service
+from services.api.services.audit_service import audit_service
 
 
 class JobService:
@@ -20,6 +22,12 @@ class JobService:
         return f"{tenant_id}:{job_id}"
 
     def create_job(self, tenant_id: str, req: PrintJobCreateRequest) -> PrintJobResponse:
+        can_submit, reason = subscription_service.can_submit_order(tenant_id)
+        if not can_submit:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=reason
+            )
         job_id = str(uuid.uuid4())
         quote = pricing_engine.calculate(req.page_count, req.options)
         now = datetime.utcnow()
@@ -74,6 +82,12 @@ class JobService:
 
     def assign_to_workstation(self, tenant_id: str, job_id: str, workstation_id: str) -> PrintJobResponse:
         job = self.get_job(tenant_id, job_id)
+        can_dispatch, reason = subscription_service.can_dispatch_job(tenant_id, job.status)
+        if not can_dispatch:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=reason
+            )
         if job.status != JobStatus.QUEUED:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

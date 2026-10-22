@@ -1,0 +1,17 @@
+{
+  "name": "referencing",
+  "version": "0.37.0",
+  "source": "https://files.pythonhosted.org/packages/22/f5/df4e9027acead3ecc63e50fe1e36aca1523e1719559c499951bb4b53188f/referencing-0.37.0.tar.gz",
+  "source_archive_sha256": "44aefc3142c5b842538163acb373e24cce6632bd54bdb01b21ad5863489f50d8",
+  "notices": [
+    {
+      "file": "referencing-0.37.0/suite/LICENSE",
+      "sha256": "42dcd63495f87b4eb7c7757afa379bb55a53f94afd7a5f657d9adf57236e515c"
+    },
+    {
+      "file": "referencing-0.37.0/COPYING",
+      "sha256": "42dcd63495f87b4eb7c7757afa379bb55a53f94afd7a5f657d9adf57236e515c"
+    }
+  ],
+  "scope": "Official source archive; installed files/wheel bundled components not verified."
+}

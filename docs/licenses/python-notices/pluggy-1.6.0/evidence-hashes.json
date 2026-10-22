@@ -1,0 +1,13 @@
+{
+  "name": "pluggy",
+  "version": "1.6.0",
+  "source": "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe6ef3fa267035b518369d9511ffab804f839851d2779/pluggy-1.6.0.tar.gz",
+  "source_archive_sha256": "7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3",
+  "notices": [
+    {
+      "file": "pluggy-1.6.0/LICENSE",
+      "sha256": "d6b65e6c213a5d0b577911d34d6e5949b9f59d76c238c5071a2f3fc16cfb2606"
+    }
+  ],
+  "scope": "Official source archive; installed files/wheel bundled components not verified."
+}

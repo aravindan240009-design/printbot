@@ -1,0 +1,17 @@
+{
+  "name": "jsonschema",
+  "version": "4.26.0",
+  "source": "https://files.pythonhosted.org/packages/b3/fc/e067678238fa451312d4c62bf6e6cf5ec56375422aee02f9cb5f909b3047/jsonschema-4.26.0.tar.gz",
+  "source_archive_sha256": "0c26707e2efad8aa1bfc5b7ce170f3fccc2e4918ff85989ba9ffa9facb2be326",
+  "notices": [
+    {
+      "file": "jsonschema-4.26.0/json/LICENSE",
+      "sha256": "837402bd25fad9b704265801ca3f92566a98157c1f9a7acd6f446299ba1c305a"
+    },
+    {
+      "file": "jsonschema-4.26.0/COPYING",
+      "sha256": "4f92a015a13c4d1a040bef018aa13430b4f1bc73b41b16bb846c346766de7439"
+    }
+  ],
+  "scope": "Official source archive; installed files/wheel bundled components not verified."
+}

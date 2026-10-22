@@ -3,7 +3,7 @@ Core Domain Models & Pydantic Schemas for Xerox Platform (Backend & Workers)
 """
 
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from pydantic import BaseModel, Field, EmailStr
 from datetime import datetime
 
@@ -164,3 +164,137 @@ class ReconciliationResponse(BaseModel):
     re_spool_required_job_ids: List[str]
     invalid_job_ids: List[str]
     server_timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ==============================================================================
+# Phase 1 Domain Models: Subscriptions, Auth, Devices, Assets, Audit
+# ==============================================================================
+
+class SubscriptionStatus(str, Enum):
+    TRIAL = "trial"
+    ACTIVE = "active"
+    PAST_DUE = "past_due"
+    GRACE = "grace"
+    SUSPENDED = "suspended"
+    CANCELED = "canceled"
+
+
+class BillingInterval(str, Enum):
+    MONTHLY = "monthly"
+    ANNUAL = "annual"
+
+
+class SafetyQuotas(BaseModel):
+    max_monthly_bandwidth_bytes: int = 107_374_182_400  # 100 GB
+    max_storage_bytes: int = 53_687_091_200            # 50 GB
+    max_daily_orders: int = 10_000
+    max_burst_requests_per_minute: int = 600
+
+
+class PlanFeatures(BaseModel):
+    unlimited_printers: bool = True
+    automatic_routing: bool = True
+    timed_xerox: bool = True
+    custom_branding: bool = True
+    multi_language: bool = True
+    advanced_analytics: bool = True
+    all_paper_sizes: bool = True
+
+
+class SubscriptionDetails(BaseModel):
+    id: str
+    shop_id: str
+    plan_id: str = "ALL_INCLUSIVE"
+    billing_interval: BillingInterval
+    status: SubscriptionStatus
+    current_period_start: datetime
+    current_period_end: datetime
+    trial_end: Optional[datetime] = None
+    grace_period_end: Optional[datetime] = None
+    features: PlanFeatures = Field(default_factory=PlanFeatures)
+    quota_limits: SafetyQuotas = Field(default_factory=SafetyQuotas)
+    admin_override: bool = False
+    admin_override_reason: Optional[str] = None
+
+
+class StaffRole(str, Enum):
+    OWNER = "OWNER"
+    MANAGER = "MANAGER"
+    OPERATOR = "OPERATOR"
+    SUPERADMIN = "SUPERADMIN"
+
+
+class StaffLoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+    totp_code: Optional[str] = None
+
+
+class DevicePairingCodeResponse(BaseModel):
+    code: str
+    shop_id: str
+    expires_at: datetime
+    ttl_seconds: int
+
+
+class DevicePairRequest(BaseModel):
+    pairing_code: str
+    device_identifier: str
+    device_name: str
+    public_key_pem: str
+    os_info: str = "Windows"
+
+
+class DeviceChallengeResponse(BaseModel):
+    device_id: str
+    challenge_nonce: str
+    expires_at: datetime
+
+
+class DeviceChallengeProof(BaseModel):
+    device_id: str
+    challenge_nonce: str
+    signature: str
+
+
+class DeviceTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    device_id: str
+    shop_id: str
+    expires_in_seconds: int
+
+
+class DeviceHeartbeatRequest(BaseModel):
+    device_id: str
+    agent_version: str = "1.0.0"
+    status: str = "ONLINE"
+    metrics: Dict[str, Any] = Field(default_factory=dict)
+
+
+class DeviceHeartbeatResponse(BaseModel):
+    acknowledged: bool = True
+    server_time: datetime = Field(default_factory=datetime.utcnow)
+    subscription_warning: Optional[str] = None
+
+
+class AssetUploadIntentRequest(BaseModel):
+    file_name: str
+    file_size_bytes: int
+    mime_type: str
+    sha256_hash: str
+
+
+class AssetUploadIntentResponse(BaseModel):
+    asset_id: str
+    shop_id: str
+    upload_url: str
+    storage_path: str
+    expires_at: datetime
+    upload_headers: Dict[str, str]
+
+
+class AdminOverrideRequest(BaseModel):
+    shop_id: str
+    reason: str
+

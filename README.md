@@ -1,5 +1,11 @@
 # Xerox PrintFlow SaaS Platform & Windows Desktop Workstation
 
+> **Current status:** Phase 0 executable proof is isolated from this legacy scaffold.
+> Start with [Phase 0 runbook](docs/PHASE0_RUNBOOK.md) and
+> [actual results/blockers](docs/PHASE0_IMPLEMENTATION_RESULTS.md). The older
+> production/readiness/benchmark claims below are not release certification.
+> Physical printer, source-document and redistribution gates remain blocked.
+
 A production-grade, multi-tenant Print Shop SaaS platform engineered for university copy centers, retail print shops, and franchise commercial printers.
 
 ## Technology Stack

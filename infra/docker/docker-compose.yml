@@ -1,45 +1,112 @@
 version: '3.8'
 
 services:
-  api:
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.api
-    container_name: xerox_api
-    ports:
-      - "8000:8000"
-    environment:
-      - ENVIRONMENT=production
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/xerox_db
-      - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=prod-secret-must-be-rotated-via-vault
-      - WEBHOOK_SIGNING_SECRET=whsec_production_secret_key
-    depends_on:
-      - postgres
-      - redis
-    restart: always
-
+  # 1. PostgreSQL 16 Database with Forced RLS
   postgres:
     image: postgres:16-alpine
-    container_name: xerox_postgres
+    container_name: printbot_postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres_dev_secret_change_me
-      POSTGRES_DB: xerox_db
+      POSTGRES_DB: printbot_db
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ../migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql
+      - ../migrations/001_phase1_schema.sql:/docker-entrypoint-initdb.d/001_phase1_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
-  redis:
-    image: redis:7-alpine
-    container_name: xerox_redis
+  # 2. Valkey (Open-Source BSD-3-Clause Redis Alternative)
+  valkey:
+    image: valkey/valkey:8-alpine
+    container_name: printbot_valkey
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - valkey_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # 3. SeaweedFS (Permissively Licensed Apache-2.0 S3-Compatible Object Store)
+  object-store:
+    image: chrislusf/seaweedfs:latest
+    container_name: printbot_storage
+    command: "server -s3"
+    ports:
+      - "8333:8333" # S3 endpoint
+      - "9333:9333" # Master endpoint
+    volumes:
+      - seaweedfs_data:/data
+    restart: unless-stopped
+
+  # 4. FastAPI Backend Modular API
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api
+    container_name: printbot_api
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres_dev_secret_change_me@postgres:5432/printbot_db
+      - REDIS_URL=redis://valkey:6379/0
+      - S3_ENDPOINT_URL=http://object-store:8333
+      - S3_BUCKET_NAME=printbot-assets
+      - SECRET_KEY=replace-with-a-64-character-cryptographically-secure-random-secret
+      - WEBHOOK_SIGNING_SECRET=whsec_dev_mock_signing_key_44321
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # 5. Background Conversion and Cleanup Worker
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api
+    container_name: printbot_worker
+    command: python -m services.worker.worker
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres_dev_secret_change_me@postgres:5432/printbot_db
+      - REDIS_URL=redis://valkey:6379/0
+      - S3_ENDPOINT_URL=http://object-store:8333
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # 6. Local Mock Webhook Dispatcher
+  mock-webhooks:
+    image: python:3.11-alpine
+    container_name: printbot_mock_webhooks
+    command: python -c "print('Mock Webhook Receiver listening for local billing simulations...')"
+    restart: unless-stopped
+
+  # 7. Mailpit (FOSS Local Email / OTP Sandbox)
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: printbot_mailpit
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
+    restart: unless-stopped
 
 volumes:
   postgres_data:
-  redis_data:
+  valkey_data:
+  seaweedfs_data:

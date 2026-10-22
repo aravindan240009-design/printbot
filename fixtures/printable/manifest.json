@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "synthetic_only": true,
+  "generator": "scripts/phase0/generate_corpus.py",
+  "files": [
+    {
+      "file": "landscape-3.pdf",
+      "sha256": "41c4f3b0adcde3555e3b35a475f82646e7ee4efacf07db4a412e5d8005111f88",
+      "bytes": 2687,
+      "expected_valid": true,
+      "logical_pages": 3,
+      "media_boxes_pt": [
+        [
+          842,
+          595
+        ],
+        [
+          842,
+          595
+        ],
+        [
+          842,
+          595
+        ]
+      ]
+    },
+    {
+      "file": "legal-1.pdf",
+      "sha256": "8df6e12f2a557c51c79792f11e4151b6d95948ea44a5d8763d251055bd2c4ee7",
+      "bytes": 1130,
+      "expected_valid": true,
+      "logical_pages": 1,
+      "media_boxes_pt": [
+        [
+          612,
+          1008
+        ]
+      ]
+    },
+    {
+      "file": "malformed-empty.pdf",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "expected_valid": false,
+      "logical_pages": null,
+      "media_boxes_pt": []
+    },
+    {
+      "file": "malformed-not-pdf.pdf",
+      "sha256": "bdd8d601d4f6a90e561a36e46496d33e817c89457301436be309fb5d5787f73c",
+      "bytes": 35,
+      "expected_valid": false,
+      "logical_pages": null,
+      "media_boxes_pt": []
+    },
+    {
+      "file": "malformed-truncated.pdf",
+      "sha256": "f125c3f4685ec03aa79d05f0d51ad3c024a51b2b115cb02b97604248fd5dc4ff",
+      "bytes": 34,
+      "expected_valid": false,
+      "logical_pages": null,
+      "media_boxes_pt": []
+    },
+    {
+      "file": "mixed-sizes-5.pdf",
+      "sha256": "0476d5e1ebce558bc36d3eb1cbbf886de5a25e4faa3bb02912b7f47e095912d6",
+      "bytes": 4261,
+      "expected_valid": true,
+      "logical_pages": 5,
+      "media_boxes_pt": [
+        [
+          595,
+          842
+        ],
+        [
+          842,
+          595
+        ],
+        [
+          842,
+          1191
+        ],
+        [
+          420,
+          595
+        ],
+        [
+          612,
+          792
+        ]
+      ]
+    },
+    {
+      "file": "odd-duplex-5.pdf",
+      "sha256": "884ffa189431602ff65198137fbf35ae4ca91c9046697ddbbcc0defddebabdb5",
+      "bytes": 4251,
+      "expected_valid": true,
+      "logical_pages": 5,
+      "media_boxes_pt": [
+        [
+          595,
+          842
+        ],
+        [
+          595,
+          842
+        ],
+        [
+          595,
+          842
+        ],
+        [
+          595,
+          842
+        ],
+        [
+          595,
+          842
+        ]
+      ]
+    },
+    {
+      "file": "portrait-3.pdf",
+      "sha256": "7cee18998639124167f3ceac13b123c0345d00315fb865f86433103374dbb377",
+      "bytes": 2687,
+      "expected_valid": true,
+      "logical_pages": 3,
+      "media_boxes_pt": [
+        [
+          595,
+          842
+        ],
+        [
+          595,
+          842
+        ],
+        [
+          595,
+          842
+        ]
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "name": "pygments",
+  "version": "2.20.0",
+  "source": "https://files.pythonhosted.org/packages/c3/b2/bc9c9196916376152d655522fdcebac55e66de6603a76a02bca1b6414f6c/pygments-2.20.0.tar.gz",
+  "source_archive_sha256": "6757cd03768053ff99f3039c1a36d6c0aa0b263438fcab17520b30a303a82b5f",
+  "notices": [
+    {
+      "file": "pygments-2.20.0/doc/docs/authors.rst",
+      "sha256": "d86fefcc8ff00f1a7d9205849f993ba26d17cb9ad91ecf6325ddaecfd4bb87be"
+    },
+    {
+      "file": "pygments-2.20.0/AUTHORS",
+      "sha256": "0db603a5f4499f690c4425477ff664c166da325d3acc3b5a8d4de3db072443d0"
+    },
+    {
+      "file": "pygments-2.20.0/LICENSE",
+      "sha256": "a9d66f1d526df02e29dce73436d34e56e8632f46c275bbdffc70569e882f9f17"
+    }
+  ],
+  "scope": "Official source archive; installed files/wheel bundled components not verified."
+}

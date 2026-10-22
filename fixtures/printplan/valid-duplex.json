@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "job_id": "22222222-2222-4222-8222-222222222222",
+  "shop_id": "11111111-1111-4111-8111-111111111111",
+  "device_id": "33333333-3333-4333-8333-333333333333",
+  "pricing_version": "price-v1",
+  "files": [
+    {
+      "file_id": "44444444-4444-4444-8444-444444444444",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "page_count": 3,
+      "range": "1-",
+      "parity": "all"
+    }
+  ],
+  "settings": {
+    "copies": 2,
+    "collate": true,
+    "color": "bw",
+    "duplex": "long_edge",
+    "orientation": "portrait",
+    "paper_size": "A4",
+    "width_um": 210000,
+    "height_um": 297000,
+    "media": "plain",
+    "bin_id": null,
+    "scaling": "fit",
+    "margins_um": {
+      "top": 5000,
+      "right": 5000,
+      "bottom": 5000,
+      "left": 5000
+    },
+    "pages_per_sheet": 1,
+    "booklet": false,
+    "photo": null
+  },
+  "capabilities": {
+    "snapshot_version": "driver-v1",
+    "color_modes": [
+      "bw",
+      "grayscale",
+      "color"
+    ],
+    "duplex_modes": [
+      "simplex",
+      "long_edge",
+      "short_edge"
+    ],
+    "paper_sizes": [
+      "A3",
+      "A4",
+      "A5",
+      "Letter",
+      "Legal"
+    ],
+    "media": [
+      "plain"
+    ],
+    "max_copies": 500
+  },
+  "policy": {
+    "mode": "MANUAL_APPROVAL",
+    "version": "policy-v1"
+  },
+  "render_hash": "b1116c2dca61d5a96499016ecbc1845feb9115c91d3019fe17b659d6b85e010f"
+}

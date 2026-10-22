@@ -1,0 +1,427 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://printbot.invalid/contracts/printplan/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "job_id",
+    "shop_id",
+    "device_id",
+    "pricing_version",
+    "files",
+    "settings",
+    "capabilities",
+    "policy",
+    "render_hash"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "job_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "minLength": 36,
+      "maxLength": 36
+    },
+    "shop_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "minLength": 36,
+      "maxLength": 36
+    },
+    "device_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "minLength": 36,
+      "maxLength": 36
+    },
+    "pricing_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\uD800-\\uDFFF]*$"
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file_id",
+          "sha256",
+          "page_count",
+          "range",
+          "parity"
+        ],
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "minLength": 36,
+            "maxLength": 36
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "page_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "range": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "parity": {
+            "type": "string",
+            "enum": [
+              "all",
+              "odd",
+              "even"
+            ]
+          }
+        }
+      }
+    },
+    "settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "copies",
+        "collate",
+        "color",
+        "duplex",
+        "orientation",
+        "paper_size",
+        "width_um",
+        "height_um",
+        "media",
+        "bin_id",
+        "scaling",
+        "margins_um",
+        "pages_per_sheet",
+        "booklet",
+        "photo"
+      ],
+      "properties": {
+        "copies": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "collate": {
+          "type": "boolean"
+        },
+        "color": {
+          "type": "string",
+          "enum": [
+            "bw",
+            "grayscale",
+            "color"
+          ]
+        },
+        "duplex": {
+          "type": "string",
+          "enum": [
+            "simplex",
+            "long_edge",
+            "short_edge"
+          ]
+        },
+        "orientation": {
+          "type": "string",
+          "enum": [
+            "portrait",
+            "landscape",
+            "auto"
+          ]
+        },
+        "paper_size": {
+          "type": "string",
+          "enum": [
+            "A3",
+            "A4",
+            "A5",
+            "Letter",
+            "Legal"
+          ]
+        },
+        "width_um": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 1000000
+        },
+        "height_um": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 1000000
+        },
+        "media": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\uD800-\\uDFFF]*$"
+        },
+        "bin_id": {
+          "type": [
+            "null",
+            "integer"
+          ],
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "scaling": {
+          "type": "string",
+          "enum": [
+            "fit",
+            "actual"
+          ]
+        },
+        "margins_um": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "top",
+            "right",
+            "bottom",
+            "left"
+          ],
+          "properties": {
+            "top": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            },
+            "right": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            },
+            "bottom": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            },
+            "left": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            }
+          }
+        },
+        "pages_per_sheet": {
+          "type": "integer",
+          "enum": [
+            1,
+            2,
+            4,
+            6,
+            9,
+            16
+          ]
+        },
+        "booklet": {
+          "type": "boolean"
+        },
+        "photo": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "layout",
+                "crop",
+                "rotation",
+                "width_um",
+                "height_um"
+              ],
+              "properties": {
+                "layout": {
+                  "type": "string",
+                  "enum": [
+                    "single",
+                    "passport",
+                    "id_front_back"
+                  ]
+                },
+                "crop": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "x",
+                    "y",
+                    "width",
+                    "height"
+                  ],
+                  "properties": {
+                    "x": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 10000
+                    },
+                    "y": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 10000
+                    },
+                    "width": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 10000
+                    },
+                    "height": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 10000
+                    }
+                  }
+                },
+                "rotation": {
+                  "type": "integer",
+                  "enum": [
+                    0,
+                    90,
+                    180,
+                    270
+                  ]
+                },
+                "width_um": {
+                  "type": "integer",
+                  "minimum": 1000,
+                  "maximum": 1000000
+                },
+                "height_um": {
+                  "type": "integer",
+                  "minimum": 1000,
+                  "maximum": 1000000
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot_version",
+        "color_modes",
+        "duplex_modes",
+        "paper_sizes",
+        "media",
+        "max_copies"
+      ],
+      "properties": {
+        "snapshot_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\uD800-\\uDFFF]*$"
+        },
+        "color_modes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "bw",
+              "grayscale",
+              "color"
+            ]
+          }
+        },
+        "duplex_modes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "simplex",
+              "long_edge",
+              "short_edge"
+            ]
+          }
+        },
+        "paper_sizes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "A3",
+              "A4",
+              "A5",
+              "Letter",
+              "Legal"
+            ]
+          }
+        },
+        "media": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[^\\uD800-\\uDFFF]*$"
+          }
+        },
+        "max_copies": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "version"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "FULL_AUTOMATIC",
+            "MANUAL_APPROVAL"
+          ]
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\uD800-\\uDFFF]*$"
+        }
+      }
+    },
+    "render_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "minLength": 64,
+      "maxLength": 64
+    }
+  }
+}

@@ -4,7 +4,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from services.api.core.config import settings
 from services.api.middleware.tenant import TenantContextMiddleware
-from services.api.routers import health, orders, webhooks, printers, reconciliation
+from services.api.routers import (
+    health,
+    orders,
+    webhooks,
+    printers,
+    reconciliation,
+    auth,
+    subscriptions,
+    devices,
+    assets,
+    qr,
+    dashboards,
+)
 
 
 @asynccontextmanager
@@ -48,6 +60,12 @@ app.include_router(orders.router, prefix=settings.API_V1_STR)
 app.include_router(webhooks.router, prefix=settings.API_V1_STR)
 app.include_router(printers.router, prefix=settings.API_V1_STR)
 app.include_router(reconciliation.router, prefix=settings.API_V1_STR)
+app.include_router(auth.router, prefix=settings.API_V1_STR)
+app.include_router(subscriptions.router, prefix=settings.API_V1_STR)
+app.include_router(devices.router, prefix=settings.API_V1_STR)
+app.include_router(assets.router, prefix=settings.API_V1_STR)
+app.include_router(qr.router, prefix=settings.API_V1_STR)
+app.include_router(dashboards.router, prefix=settings.API_V1_STR)
 
 
 @app.exception_handler(Exception)
