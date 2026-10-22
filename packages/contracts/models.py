@@ -45,8 +45,14 @@ class JobStatus(str, Enum):
     SPOOLING = "SPOOLING"
     PRINTING = "PRINTING"
     COMPLETED = "COMPLETED"
+    COMPLETION_UNKNOWN = "COMPLETION_UNKNOWN"
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
+
+
+class OrderMode(str, Enum):
+    FULL_AUTOMATIC = "FULL_AUTOMATIC"
+    MANUAL_APPROVAL = "MANUAL_APPROVAL"
 
 
 class PrintOptions(BaseModel):
@@ -57,6 +63,8 @@ class PrintOptions(BaseModel):
     orientation: Orientation = Orientation.PORTRAIT
     binding: BindingType = BindingType.NONE
     paper_gsm: int = Field(default=75, description="Paper thickness in GSM: 75, 80, 100, 120, 200")
+    page_range: Optional[str] = Field(default="all", description="Arbitrary valid non-contiguous PDF page ranges, e.g. '1-3,5,8-' or 'all'")
+    pages_per_sheet: int = Field(default=1, description="N-up layout: 1, 2, 4, 6, 9, 16")
     notes: Optional[str] = None
 
 

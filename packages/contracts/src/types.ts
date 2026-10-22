@@ -16,8 +16,11 @@ export type JobStatus =
   | 'SPOOLING'
   | 'PRINTING'
   | 'COMPLETED'
+  | 'COMPLETION_UNKNOWN'
   | 'FAILED'
   | 'CANCELLED';
+
+export type OrderMode = 'FULL_AUTOMATIC' | 'MANUAL_APPROVAL';
 
 export interface PrintOptions {
   copies: number;
@@ -27,6 +30,8 @@ export interface PrintOptions {
   orientation: Orientation;
   binding: BindingType;
   paperGsm: PaperGsm;
+  pageRange?: string;
+  pagesPerSheet?: number;
   notes?: string;
 }
 

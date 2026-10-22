@@ -13,6 +13,7 @@ class ReconciliationService:
         Reconciles workstation local spool log against cloud source-of-truth.
         Zero duplicate print guarantee:
         - Confirmed jobs are locked and acknowledged.
+        - COMPLETION_UNKNOWN jobs require supervised operator confirmation, NEVER automatic reprint.
         - Only jobs that NEVER spooled are marked for re-spooling.
         - Spooled jobs are never sent again.
         """
@@ -27,7 +28,10 @@ class ReconciliationService:
                 if job.status in (JobStatus.SPOOLING, JobStatus.PRINTING, JobStatus.COMPLETED):
                     # Already successfully submitted to spooler; confirm it
                     confirmed.append(job_id)
-                elif job.status == JobStatus.CANCELLED:
+                elif job.status in (JobStatus.CANCELLED, JobStatus.FAILED):
+                    invalid.append(job_id)
+                elif job.status == JobStatus.COMPLETION_UNKNOWN:
+                    # Ambiguous outcome; requires supervised staff reconciliation, NEVER auto reprint
                     invalid.append(job_id)
                 else:
                     # Cloud says not yet marked spooled; update cloud status to prevent duplicate spooling
@@ -44,7 +48,7 @@ class ReconciliationService:
         # 2. Check for QUEUED jobs in cloud that workstation missed while offline
         queued_jobs = job_service.list_jobs(req.tenant_id, status_filter=JobStatus.QUEUED)
         for q_job in queued_jobs:
-            if q_job.id not in req.spooled_job_ids:
+            if q_job.id not in req.spooled_job_ids and q_job.status != JobStatus.COMPLETION_UNKNOWN:
                 re_spool.append(q_job.id)
 
         return ReconciliationResponse(

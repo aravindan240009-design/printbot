@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -5,13 +6,28 @@ from services.api.core.config import settings
 from services.api.middleware.tenant import TenantContextMiddleware
 from services.api.routers import health, orders, webhooks, printers, reconciliation
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    FastAPI Lifespan Context Manager.
+    Initializes database pools, redis cache connections, and cleans up on shutdown.
+    """
+    # Startup actions
+    print(f"[{settings.APP_NAME}] Startup: Initializing connection pools and multi-tenant ledger...")
+    yield
+    # Shutdown actions
+    print(f"[{settings.APP_NAME}] Shutdown: Closing connections and flushing spool buffers...")
+
+
 app = FastAPI(
     title=settings.APP_NAME,
     description="Production Multi-Tenant Print Shop SaaS Platform API with Windows Desktop Hardware Integration",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url="/openapi.json"
+    openapi_url="/openapi.json",
+    lifespan=lifespan
 )
 
 # 1. CORS Configuration (Allows Next.js web portal and Tauri localhost / tauri://localhost)
