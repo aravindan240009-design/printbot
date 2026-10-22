@@ -129,11 +129,7 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
         if user_session and user_session.get("is_superadmin"):
             resolved_shop_id = header_tenant_id or "superadmin-plane"
 
-        # If still no resolved shop, use header if present
-        if not resolved_shop_id and header_tenant_id:
-            resolved_shop_id = header_tenant_id
-
-        # If token was supplied but invalid/revoked, return 401/403
+        # If token was supplied but invalid/revoked, return 401/403 immediately (prevent header bypass)
         if had_bearer and not resolved_shop_id:
             status_code = auth_error.status_code if auth_error else status.HTTP_401_UNAUTHORIZED
             detail = auth_error.detail if auth_error else "Invalid, expired, or revoked authorization credentials."
@@ -141,6 +137,10 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
                 status_code=status_code,
                 content={"detail": detail}
             )
+
+        # If still no resolved shop, use header if present
+        if not resolved_shop_id and header_tenant_id:
+            resolved_shop_id = header_tenant_id
 
         if not resolved_shop_id:
             return JSONResponse(

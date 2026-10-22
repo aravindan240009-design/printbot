@@ -72,3 +72,33 @@ def list_orders(
     """Lists print jobs strictly scoped to the tenant."""
     tenant_id: str = getattr(request.state, "tenant_id", "default-tenant")
     return job_service.list_jobs(tenant_id, status_filter=status)
+
+
+class RejectOrderRequest(BaseModel):
+    reason: str
+
+
+class MarkUnknownRequest(BaseModel):
+    reason: str
+
+
+@router.post("/{job_id}/approve", response_model=PrintJobResponse)
+def approve_order(job_id: str, request: Request):
+    """Staff approves an order in MANUAL_APPROVAL mode; transitions to QUEUED."""
+    tenant_id: str = getattr(request.state, "tenant_id", "default-tenant")
+    return job_service.approve_job(tenant_id, job_id)
+
+
+@router.post("/{job_id}/reject", response_model=PrintJobResponse)
+def reject_order(job_id: str, req: RejectOrderRequest, request: Request):
+    """Staff rejects an order; transitions to CANCELLED and blocks printing."""
+    tenant_id: str = getattr(request.state, "tenant_id", "default-tenant")
+    return job_service.reject_job(tenant_id, job_id, req.reason)
+
+
+@router.post("/{job_id}/mark-unknown", response_model=PrintJobResponse)
+def mark_order_unknown(job_id: str, req: MarkUnknownRequest, request: Request):
+    """Flags ambiguous job as COMPLETION_UNKNOWN; blocks automatic reprint."""
+    tenant_id: str = getattr(request.state, "tenant_id", "default-tenant")
+    return job_service.mark_completion_unknown(tenant_id, job_id, req.reason)
+

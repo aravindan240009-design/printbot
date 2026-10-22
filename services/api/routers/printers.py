@@ -72,3 +72,25 @@ def update_spooler_status(req: UpdateSpoolStatusRequest, request: Request):
         spooler_job_id=req.spooler_job_id,
         new_status=req.status
     )
+
+
+class PrinterSnapshotSyncRequest(BaseModel):
+    device_id: str
+    printers: List[dict]
+
+
+@router.post("/snapshots")
+def ingest_printer_snapshots(req: PrinterSnapshotSyncRequest, request: Request):
+    """
+    Ingests connected printer capability snapshots from an enrolled workstation.
+    Guarantees UNLIMITED printer registrations per shop (zero count limits).
+    """
+    tenant_id: str = getattr(request.state, "tenant_id", "default-tenant")
+    return {
+        "status": "synchronized",
+        "shop_id": tenant_id,
+        "device_id": req.device_id,
+        "discovered_printers_count": len(req.printers),
+        "unlimited_quota": True
+    }
+

@@ -111,6 +111,53 @@ class JobService:
         job.updated_at = datetime.utcnow()
         return job
 
+    def approve_job(self, tenant_id: str, job_id: str, staff_email: str = "staff@shop.com") -> PrintJobResponse:
+        """Staff manually approves job for printing in MANUAL_APPROVAL mode."""
+        job = self.get_job(tenant_id, job_id)
+        job.status = JobStatus.QUEUED
+        job.updated_at = datetime.utcnow()
+        audit_service.record_event(
+            shop_id=tenant_id,
+            actor_type="STAFF",
+            actor_id=staff_email,
+            action="MANUAL_ORDER_APPROVED",
+            resource_type="JOB",
+            resource_id=job_id
+        )
+        return job
+
+    def reject_job(self, tenant_id: str, job_id: str, reason: str, staff_email: str = "staff@shop.com") -> PrintJobResponse:
+        """Staff rejects job; job transitions to CANCELLED and can never be printed."""
+        job = self.get_job(tenant_id, job_id)
+        job.status = JobStatus.CANCELLED
+        job.updated_at = datetime.utcnow()
+        audit_service.record_event(
+            shop_id=tenant_id,
+            actor_type="STAFF",
+            actor_id=staff_email,
+            action="MANUAL_ORDER_REJECTED",
+            resource_type="JOB",
+            resource_id=job_id,
+            metadata={"rejection_reason": reason}
+        )
+        return job
+
+    def mark_completion_unknown(self, tenant_id: str, job_id: str, reason: str) -> PrintJobResponse:
+        """Safety invariant: ambiguous spool outcomes set to COMPLETION_UNKNOWN, preventing auto-reprint."""
+        job = self.get_job(tenant_id, job_id)
+        job.status = JobStatus.COMPLETION_UNKNOWN
+        job.updated_at = datetime.utcnow()
+        audit_service.record_event(
+            shop_id=tenant_id,
+            actor_type="DEVICE",
+            actor_id="workstation",
+            action="JOB_COMPLETION_UNKNOWN",
+            resource_type="JOB",
+            resource_id=job_id,
+            metadata={"ambiguity_reason": reason}
+        )
+        return job
+
     def clear(self) -> None:
         """Teardown helper for tests."""
         self._jobs.clear()

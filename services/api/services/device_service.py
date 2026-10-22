@@ -133,6 +133,11 @@ class DeviceService:
             ttl_seconds=PAIRING_CODE_TTL_SECONDS
         )
 
+    def generate_pairing_code(self, shop_id: str) -> str:
+        """Convenience helper returning raw pairing code string."""
+        return self.create_pairing_code(shop_id).code
+
+
     def pair_device(self, req: DevicePairRequest) -> DeviceChallengeResponse:
         """
         Device presents pairing code and public key.
