@@ -568,6 +568,48 @@ class JobService:
         )
         return job
 
+    def purge_job_documents(self, tenant_id: str, job_id: str) -> Dict[str, Any]:
+        """Customer right to erasure: purges document metadata and files while preserving accounting integrity."""
+        job = self.get_job(tenant_id, job_id)
+        job.file_name = "[PURGED_BY_CUSTOMER]"
+        job.file_size_bytes = 0
+        job.updated_at = datetime.utcnow()
+        self._jobs[self._key(tenant_id, job_id)] = job
+        audit_service.record_event(
+            shop_id=tenant_id,
+            actor_type="CUSTOMER",
+            actor_id="guest",
+            action="CUSTOMER_DOCUMENT_PURGE",
+            resource_type="JOB_DOCUMENTS",
+            resource_id=job_id,
+            metadata={"purged_at": datetime.utcnow().isoformat()},
+        )
+        return {"status": "purged", "job_id": job_id, "tenant_id": tenant_id}
+
+    def evaluate_held_jobs_for_shop(self, tenant_id: str) -> List[str]:
+        """Re-evaluates PAID_HELD jobs when a workstation comes online or printer status changes."""
+        released = []
+        is_device_online = device_service.is_device_online(tenant_id)
+        if not is_device_online:
+            return released
+
+        for key, job in list(self._jobs.items()):
+            if job.tenant_id == tenant_id and job.status == JobStatus.PAID_HELD:
+                printer_ok, _ = self.is_printer_compatible(tenant_id, job.options)
+                can_dispatch, _ = subscription_service.can_dispatch_job(tenant_id, JobStatus.QUEUED)
+                if printer_ok and can_dispatch and job.order_mode == OrderMode.FULL_AUTOMATIC:
+                    job.status = JobStatus.QUEUED
+                    job.hold_reason = None
+                    job.version += 1
+                    job.updated_at = datetime.utcnow()
+                    outbox_service.emit_event(
+                        shop_id=tenant_id,
+                        event_type="ORDER_QUEUED_FOR_DEVICE",
+                        payload={"order_id": job.id, "status": "QUEUED"},
+                    )
+                    released.append(job.id)
+        return released
+
     def clear(self) -> None:
         """Teardown helper for tests."""
         self._jobs.clear()

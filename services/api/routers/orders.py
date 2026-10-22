@@ -164,6 +164,16 @@ def supervise_unknown_order(job_id: str, req: SupervisedReconcileRequest, reques
     )
 
 
+@router.delete("/{job_id}/documents")
+def purge_order_documents(job_id: str, request: Request):
+    """
+    Customer privacy right to erasure: purges document files & metadata for a job.
+    Preserves financial ledger and audit logs while shredding customer data.
+    """
+    tenant_id: str = getattr(request.state, "tenant_id", "default-tenant")
+    return job_service.purge_job_documents(tenant_id, job_id)
+
+
 @router.get("/{job_id}/callback")
 def payment_browser_callback(job_id: str, request: Request):
     """

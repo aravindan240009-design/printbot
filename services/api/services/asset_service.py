@@ -150,6 +150,15 @@ class AssetService:
             "expires_at": expires_at
         }
 
+    def purge_asset(self, shop_id: str, asset_id: str) -> bool:
+        """Customer right to erasure: marks asset deleted and wipes storage metadata."""
+        key = self._key(shop_id, asset_id)
+        if key in self._assets:
+            self._assets[key].is_deleted = True
+            self._assets[key].storage_path = ""
+            return True
+        return False
+
     def clear(self):
         self._assets.clear()
 

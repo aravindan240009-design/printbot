@@ -60,3 +60,19 @@ async def get_download_url(
         is_impersonation=is_impersonation,
         explicit_tenant_consent=explicit_tenant_consent
     )
+
+
+@router.delete("/{asset_id}")
+async def delete_asset(asset_id: str, request: Request):
+    """
+    Customer or shop right to erasure. Purges asset storage reference.
+    Enforces tenant scoping: cannot delete assets belonging to other shops.
+    """
+    shop_id = getattr(request.state, "shop_id", None) or getattr(request.state, "tenant_id", None)
+    if not shop_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Shop context required.")
+
+    purged = asset_service.purge_asset(shop_id=shop_id, asset_id=asset_id)
+    if not purged:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Asset '{asset_id}' not found for shop '{shop_id}'.")
+    return {"status": "deleted", "asset_id": asset_id, "shop_id": shop_id}
