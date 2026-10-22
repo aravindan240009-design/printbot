@@ -1,0 +1,21 @@
+{
+  "name": "xerox-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Production Multi-Tenant Print Shop SaaS Platform & Windows Desktop Workstation",
+  "scripts": {
+    "dev:web": "pnpm --filter @xerox/web dev",
+    "dev:desktop": "pnpm --filter @xerox/desktop dev",
+    "dev:api": "uvicorn services.api.main:app --reload --port 8000",
+    "dev:worker": "python -m services.worker.worker",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test && pytest tests/",
+    "test:api": "pytest tests/ -v",
+    "test:bench": "python tests/benchmark_latency.py",
+    "lint": "pnpm -r lint",
+    "type-check": "pnpm -r type-check"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

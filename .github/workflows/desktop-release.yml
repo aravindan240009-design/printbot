@@ -1,0 +1,47 @@
+name: Windows Desktop Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release-windows-desktop:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install Workspace Dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build Web Assets for Desktop
+        working-directory: apps/desktop
+        run: pnpm build
+
+      - name: Build Tauri Windows Installer (.exe & .msi)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/desktop
+          tagName: v__VERSION__
+          releaseName: 'Xerox PrintFlow Workstation v__VERSION__'
+          releaseBody: 'Production release for Windows Print Shop Workstation.'
+          releaseDraft: false
+          prerelease: false
