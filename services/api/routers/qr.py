@@ -29,6 +29,7 @@ async def resolve_qr_code(code: str):
         "shop_id": link.shop_id,
         "shop_slug": link.shop_slug,
         "shop_name": link.shop_name,
+        "brand_name": link.shop_name,
         "scan_count": link.scan_count
     }
 

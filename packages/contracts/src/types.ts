@@ -3,11 +3,31 @@
  */
 
 export type ColorMode = 'bw' | 'color';
-export type PaperSize = 'A4' | 'A3' | 'Legal' | 'Letter';
+export type PaperSize = 'A4' | 'A3' | 'A5' | 'Legal' | 'Letter';
 export type DuplexMode = 'simplex' | 'duplex_long' | 'duplex_short';
-export type Orientation = 'portrait' | 'landscape';
+export type Orientation = 'portrait' | 'landscape' | 'auto';
 export type BindingType = 'none' | 'staple' | 'spiral' | 'hard_bind';
 export type PaperGsm = 75 | 80 | 100 | 120 | 200;
+export type PhotoLayoutPreset = 'standard' | 'passport_8up' | 'id_front_back';
+
+export type SupportedFormat =
+  | 'pdf'
+  | 'jpeg'
+  | 'png'
+  | 'webp'
+  | 'tiff'
+  | 'bmp'
+  | 'svg'
+  | 'docx'
+  | 'odt'
+  | 'rtf'
+  | 'xlsx'
+  | 'ods'
+  | 'csv'
+  | 'pptx'
+  | 'odp'
+  | 'txt'
+  | 'unsupported';
 
 export type JobStatus =
   | 'PENDING_PAYMENT'
@@ -32,7 +52,67 @@ export interface PrintOptions {
   paperGsm: PaperGsm;
   pageRange?: string;
   pagesPerSheet?: number;
+  photoLayout?: PhotoLayoutPreset;
+  scaling?: string;
+  reverseOrder?: boolean;
   notes?: string;
+}
+
+export interface FileScanResult {
+  isValid: boolean;
+  format: SupportedFormat;
+  mimeType: string;
+  fileSizeBytes: number;
+  pageCount: number;
+  isEncrypted: boolean;
+  needsPassword: boolean;
+  widthPts?: number;
+  heightPts?: number;
+  hasMacros?: boolean;
+  errorMessage?: string;
+  detectedPages?: number[];
+}
+
+export interface FileQuoteItemRequest {
+  fileId: string;
+  fileName: string;
+  pageCount: number;
+  options: PrintOptions;
+}
+
+export interface FileQuoteItemResponse {
+  fileId: string;
+  fileName: string;
+  pageCount: number;
+  logicalPages: number;
+  renderedSides: number;
+  physicalSheets: number;
+  costPaise: number;
+  costRupees: number;
+  costCents: number;
+  options: PrintOptions;
+}
+
+export interface MultiFileQuoteRequest {
+  shopId: string;
+  items: FileQuoteItemRequest[];
+  applyToAllOptions?: PrintOptions;
+}
+
+export interface MultiFileQuoteResponse {
+  quoteId: string;
+  quoteHash: string;
+  expiresAt: string;
+  shopId: string;
+  pricingVersion: number;
+  totalPaise: number;
+  totalRupees: number;
+  totalCents: number;
+  currency: string;
+  totalLogicalPages: number;
+  totalRenderedSides: number;
+  totalPhysicalSheets: number;
+  items: FileQuoteItemResponse[];
 }
 
 export interface PricingRule {

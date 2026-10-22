@@ -16,6 +16,7 @@ from services.api.routers import (
     assets,
     qr,
     dashboards,
+    documents,
 )
 
 
@@ -66,6 +67,7 @@ app.include_router(devices.router, prefix=settings.API_V1_STR)
 app.include_router(assets.router, prefix=settings.API_V1_STR)
 app.include_router(qr.router, prefix=settings.API_V1_STR)
 app.include_router(dashboards.router, prefix=settings.API_V1_STR)
+app.include_router(documents.router, prefix=settings.API_V1_STR)
 
 
 @app.exception_handler(Exception)

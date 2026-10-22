@@ -16,6 +16,7 @@ class ColorMode(str, Enum):
 class PaperSize(str, Enum):
     A4 = "A4"
     A3 = "A3"
+    A5 = "A5"
     LEGAL = "Legal"
     LETTER = "Letter"
 
@@ -29,6 +30,7 @@ class DuplexMode(str, Enum):
 class Orientation(str, Enum):
     PORTRAIT = "portrait"
     LANDSCAPE = "landscape"
+    AUTO = "auto"
 
 
 class BindingType(str, Enum):
@@ -36,6 +38,32 @@ class BindingType(str, Enum):
     STAPLE = "staple"
     SPIRAL = "spiral"
     HARD_BIND = "hard_bind"
+
+
+class PhotoLayoutPreset(str, Enum):
+    STANDARD = "standard"
+    PASSPORT_8UP = "passport_8up"
+    ID_FRONT_BACK = "id_front_back"
+
+
+class SupportedFormat(str, Enum):
+    PDF = "pdf"
+    JPEG = "jpeg"
+    PNG = "png"
+    WEBP = "webp"
+    TIFF = "tiff"
+    BMP = "bmp"
+    SVG = "svg"
+    DOCX = "docx"
+    ODT = "odt"
+    RTF = "rtf"
+    XLSX = "xlsx"
+    ODS = "ods"
+    CSV = "csv"
+    PPTX = "pptx"
+    ODP = "odp"
+    TXT = "txt"
+    UNSUPPORTED = "unsupported"
 
 
 class JobStatus(str, Enum):
@@ -65,6 +93,9 @@ class PrintOptions(BaseModel):
     paper_gsm: int = Field(default=75, description="Paper thickness in GSM: 75, 80, 100, 120, 200")
     page_range: Optional[str] = Field(default="all", description="Arbitrary valid non-contiguous PDF page ranges, e.g. '1-3,5,8-' or 'all'")
     pages_per_sheet: int = Field(default=1, description="N-up layout: 1, 2, 4, 6, 9, 16")
+    photo_layout: PhotoLayoutPreset = PhotoLayoutPreset.STANDARD
+    scaling: str = Field(default="fit", description="actual, fit, fill, percentage")
+    reverse_order: bool = False
     notes: Optional[str] = None
 
 
@@ -297,4 +328,95 @@ class AssetUploadIntentResponse(BaseModel):
 class AdminOverrideRequest(BaseModel):
     shop_id: str
     reason: str
+
+
+# ==============================================================================
+# Phase 2: Document Processing, Conversion, & Multi-File Quoting Contracts
+# ==============================================================================
+
+class FileScanResult(BaseModel):
+    is_valid: bool
+    format: SupportedFormat
+    mime_type: str
+    file_size_bytes: int
+    page_count: int
+    is_encrypted: bool = False
+    needs_password: bool = False
+    width_pts: Optional[float] = None
+    height_pts: Optional[float] = None
+    has_macros: bool = False
+    error_message: Optional[str] = None
+    detected_pages: List[int] = Field(default_factory=list)
+
+
+class UnlockPdfRequest(BaseModel):
+    asset_id: str
+    password: str
+
+
+class UnlockPdfResponse(BaseModel):
+    asset_id: str
+    is_unlocked: bool
+    page_count: int
+    error_message: Optional[str] = None
+
+
+class FileQuoteItemRequest(BaseModel):
+    file_id: str
+    file_name: str
+    page_count: int
+    options: PrintOptions
+
+
+class FileQuoteItemResponse(BaseModel):
+    file_id: str
+    file_name: str
+    page_count: int
+    logical_pages: int
+    rendered_sides: int
+    physical_sheets: int
+    cost_paise: int
+    cost_rupees: float
+    cost_cents: int
+    options: PrintOptions
+
+
+class MultiFileQuoteRequest(BaseModel):
+    shop_id: str
+    items: List[FileQuoteItemRequest]
+    apply_to_all_options: Optional[PrintOptions] = None
+
+
+class MultiFileQuoteResponse(BaseModel):
+    quote_id: str
+    quote_hash: str
+    expires_at: datetime
+    shop_id: str
+    pricing_version: int
+    total_paise: int
+    total_rupees: float
+    total_cents: int
+    currency: str = "INR"
+    total_logical_pages: int
+    total_rendered_sides: int
+    total_physical_sheets: int
+    items: List[FileQuoteItemResponse]
+
+
+class PhotoLayoutRequest(BaseModel):
+    asset_id: str
+    layout_preset: PhotoLayoutPreset
+    copies: int = 1
+    paper_size: PaperSize = PaperSize.A4
+    dpi: int = 300
+
+
+class PhotoLayoutResponse(BaseModel):
+    composite_asset_id: str
+    layout_preset: PhotoLayoutPreset
+    preview_url: str
+    width_px: int
+    height_px: int
+    dpi: int
+
 
