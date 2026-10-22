@@ -234,3 +234,104 @@ export interface ReconciliationResponse {
   invalidJobIds: string[];
   serverTimestamp: string;
 }
+
+export type ServiceType =
+  | 'SCHEDULE_PRINT'
+  | 'READY_BY_SLOT'
+  | 'PHYSICAL_XEROX_BOOKING'
+  | 'TIMED_SELF_SERVICE_COPIER';
+
+export type BookingStatus =
+  | 'CONFIRMED'
+  | 'CHECKED_IN'
+  | 'IN_PROGRESS'
+  | 'READY'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'NO_SHOW'
+  | 'MISSED_SLOT';
+
+export interface AvailableSlot {
+  slotId: string;
+  slotStart: string;
+  slotEnd: string;
+  capacityTotal: number;
+  capacityAvailable: number;
+  isRush: boolean;
+  rushSurchargePaise: number;
+}
+
+export interface ShopServiceCatalogue {
+  shopId: string;
+  timeZone: string;
+  servicesEnabled: Record<string, boolean>;
+  slotDurationMinutes: number;
+  capacityPerSlot: number;
+  leadTimeMinutes: number;
+  lastBookingCutoffMinutes: number;
+  operatingHours: Record<string, { open: string; close: string }>;
+  closedDates: string[];
+  rushSurchargePaise: number;
+  minimumBillPaise: number;
+  cancellationCutoffMinutes: number;
+  counterCheckinMethod: string;
+}
+
+export interface BookingCreateRequest {
+  shopId: string;
+  serviceType: ServiceType;
+  slotStart: string;
+  customerEmail: string;
+  customerPhone?: string;
+  orderId?: string;
+  estimatedPages?: number;
+  copies?: number;
+  options?: PrintOptions;
+  notes?: string;
+}
+
+export interface BookingResponse {
+  id: string;
+  bookingReference: string;
+  shopId: string;
+  serviceType: ServiceType;
+  status: BookingStatus;
+  customerEmail: string;
+  customerPhone?: string;
+  orderId?: string;
+  slotStart: string;
+  slotEnd: string;
+  pickupCode: string;
+  estimatedPages: number;
+  revisedPages?: number;
+  quotedPaise: number;
+  revisedPaise?: number;
+  isPhysicalOriginalsRequired: boolean;
+  humanInstruction: string;
+  staffAssignedId?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReviseEstimateRequest {
+  revisedPages: number;
+  staffId?: string;
+  reason: string;
+}
+
+export interface PhoneCaptureRequest {
+  shopId: string;
+  imagesBase64: string[];
+  rotateDegrees?: number;
+  targetDpi?: number;
+}
+
+export interface PhoneCaptureResponse {
+  assetId: string;
+  pageCount: number;
+  pdfUrl: string;
+  fileSizeBytes: number;
+  legibilityConfirmed: boolean;
+}
+

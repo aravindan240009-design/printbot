@@ -471,3 +471,122 @@ class PhotoLayoutResponse(BaseModel):
     dpi: int
 
 
+# ==============================================================================
+# Phase 5: Timed Xerox, Physical Bookings, Service Catalogue & Scheduling
+# ==============================================================================
+
+class ServiceType(str, Enum):
+    SCHEDULE_PRINT = "SCHEDULE_PRINT"                      # Upload now, prints at scheduled future time
+    READY_BY_SLOT = "READY_BY_SLOT"                        # Reserve guaranteed ready-by/pickup window
+    PHYSICAL_XEROX_BOOKING = "PHYSICAL_XEROX_BOOKING"      # Customer brings physical paper originals to counter
+    TIMED_SELF_SERVICE_COPIER = "TIMED_SELF_SERVICE_COPIER"# Optional kiosk session (Hardware unverified)
+
+
+class BookingStatus(str, Enum):
+    CONFIRMED = "CONFIRMED"
+    CHECKED_IN = "CHECKED_IN"
+    IN_PROGRESS = "IN_PROGRESS"
+    READY = "READY"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+    NO_SHOW = "NO_SHOW"
+    MISSED_SLOT = "MISSED_SLOT"
+
+
+class AvailableSlot(BaseModel):
+    slot_id: str
+    slot_start: datetime
+    slot_end: datetime
+    capacity_total: int
+    capacity_available: int
+    is_rush: bool = False
+    rush_surcharge_paise: int = 0
+
+
+class ShopServiceCatalogue(BaseModel):
+    shop_id: str
+    time_zone: str = "Asia/Kolkata"
+    services_enabled: Dict[str, bool] = Field(
+        default_factory=lambda: {
+            ServiceType.SCHEDULE_PRINT.value: True,
+            ServiceType.READY_BY_SLOT.value: True,
+            ServiceType.PHYSICAL_XEROX_BOOKING.value: True,
+            ServiceType.TIMED_SELF_SERVICE_COPIER.value: False,  # Feature flag disabled until hardware validated
+        }
+    )
+    slot_duration_minutes: int = 15
+    capacity_per_slot: int = 4
+    lead_time_minutes: int = 30
+    last_booking_cutoff_minutes: int = 60
+    operating_hours: Dict[str, Dict[str, str]] = Field(
+        default_factory=lambda: {
+            "monday_to_saturday": {"open": "08:30", "close": "21:30"},
+            "sunday": {"open": "10:00", "close": "18:00"},
+        }
+    )
+    closed_dates: List[str] = Field(default_factory=list)
+    rush_surcharge_paise: int = 2000
+    minimum_bill_paise: int = 1000
+    cancellation_cutoff_minutes: int = 60
+    counter_checkin_method: str = "QR_AND_PIN"
+
+
+class BookingCreateRequest(BaseModel):
+    shop_id: str
+    service_type: ServiceType
+    slot_start: datetime
+    customer_email: EmailStr
+    customer_phone: Optional[str] = None
+    order_id: Optional[str] = None
+    estimated_pages: Optional[int] = 1
+    copies: int = 1
+    options: Optional[PrintOptions] = None
+    notes: Optional[str] = None
+
+
+class BookingResponse(BaseModel):
+    id: str
+    booking_reference: str
+    shop_id: str
+    service_type: ServiceType
+    status: BookingStatus
+    customer_email: str
+    customer_phone: Optional[str] = None
+    order_id: Optional[str] = None
+    slot_start: datetime
+    slot_end: datetime
+    pickup_code: str
+    estimated_pages: int
+    revised_pages: Optional[int] = None
+    quoted_paise: int
+    revised_paise: Optional[int] = None
+    is_physical_originals_required: bool
+    human_instruction: str
+    staff_assigned_id: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ReviseEstimateRequest(BaseModel):
+    revised_pages: int
+    staff_id: str = "staff@shop.com"
+    reason: str = "Staff verified physical count at counter"
+
+
+class PhoneCaptureRequest(BaseModel):
+    shop_id: str
+    images_base64: List[str]
+    rotate_degrees: Optional[int] = 0
+    target_dpi: int = 200
+
+
+class PhoneCaptureResponse(BaseModel):
+    asset_id: str
+    page_count: int
+    pdf_url: str
+    file_size_bytes: int
+    legibility_confirmed: bool = True
+
+
+

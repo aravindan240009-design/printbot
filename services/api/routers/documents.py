@@ -19,6 +19,8 @@ from packages.contracts.models import (
     PhotoLayoutRequest,
     PhotoLayoutResponse,
     PhotoLayoutPreset,
+    PhoneCaptureRequest,
+    PhoneCaptureResponse,
 )
 from services.api.services.conversion_engine import conversion_engine
 from services.api.services.preview_service import preview_service
@@ -184,3 +186,18 @@ async def create_photo_layout(req: PhotoLayoutRequest, request: Request):
         height_px=h,
         dpi=300
     )
+
+
+@router.post("/phone-capture", response_model=PhoneCaptureResponse)
+async def process_phone_camera_capture(req: PhoneCaptureRequest, request: Request):
+    """
+    Normalizes multi-page customer smartphone camera captures into a high-res PDF.
+    Explicitly distinguished from physical counter Xerox:
+    - Customer captures pages with phone camera.
+    - Perspective rotation and high-quality PDF compilation.
+    - Explicit customer legibility check required before print.
+    """
+    from services.api.services.capture_service import capture_service
+    tenant_id = getattr(request.state, "tenant_id", "default-tenant")
+    req.shop_id = tenant_id
+    return capture_service.process_phone_capture(req)
