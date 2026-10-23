@@ -14,7 +14,9 @@ use crate::service::PrintBotService;
 fn print_usage() {
     println!("Print Bot Windows Native Service & Agent v1.0.0 (Phase 3)");
     println!("Usage:");
-    println!("  print-agent run               - Runs the persistent background service loop");
+    println!("  print-agent                   - Launches Desktop Workstation Native Window & background service");
+    println!("  print-agent ui                - Launches Desktop Workstation Native Window & background service");
+    println!("  print-agent run               - Runs the persistent background service loop (headless)");
     println!("  print-agent install           - Registers PrintBotService into Windows SCM");
     println!("  print-agent uninstall         - Unregisters PrintBotService from Windows SCM");
     println!("  print-agent printers          - Enumerates connected Windows printers & capabilities");
@@ -24,12 +26,22 @@ fn print_usage() {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        print_usage();
-        return;
-    }
+    let command = if args.len() < 2 { "ui" } else { args[1].as_str() };
 
-    match args[1].as_str() {
+    match command {
+        "ui" => {
+            println!("[AGENT] Launching Xerox PrintFlow Desktop Workstation Native Window...");
+            let _ = std::process::Command::new("cmd")
+                .args(&["/C", "start", "", "msedge.exe", "--app=http://localhost:5173", "--window-size=1280,840"])
+                .spawn();
+            println!("[SERVICE] Print Bot Windows Native Service started in foreground.");
+            println!("[SERVICE] IPC endpoint active at \\\\.\\pipe\\printbot_service_ipc");
+            let service = PrintBotService::new();
+            service.run();
+        }
+        "--help" | "-h" | "help" => {
+            print_usage();
+        }
         "run" => {
             let service = PrintBotService::new();
             service.run();
