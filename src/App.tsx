@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { getInstallerConfig } from './utils/installer';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
@@ -12,7 +12,7 @@ import { CtaSection } from './components/CtaSection';
 import { Footer } from './components/Footer';
 import { InstallerModal } from './components/InstallerModal';
 
-export function App() {
+export const App: React.FC = () => {
   const installerConfig = useMemo(() => getInstallerConfig(), []);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
