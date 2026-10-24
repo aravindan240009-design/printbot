@@ -246,6 +246,10 @@ export const PilotModal: React.FC<PilotModalProps> = ({
                     </div>
                   </div>
 
+                  <div className="pilot-demo-notice" style={{ background: 'var(--surface)', padding: '0.75rem 1rem', borderRadius: '4px', fontSize: 'var(--step-small)', color: 'var(--muted)', margin: '0.75rem 0', lineHeight: 1.5 }}>
+                    <strong>Static Preview Notice:</strong> In this frontend deployment, applications are staged in local browser storage. For immediate onboarding, you can also contact our team directly at <a href="mailto:pilot@printbot.in?subject=Print%20Bot%20Pilot%20Request" style={{ color: 'var(--accent)', fontWeight: 600 }}>pilot@printbot.in</a>.
+                  </div>
+
                   <div className="pilot-actions">
                     <button type="submit" className="btn-primary" style={{ flex: 1, justifyContent: 'center' }}>
                       Submit Pilot Application
@@ -263,14 +267,17 @@ export const PilotModal: React.FC<PilotModalProps> = ({
                     </svg>
                   </div>
                   <h3 style={{ fontSize: 'var(--step-lead)', fontWeight: 700, margin: '0.5rem 0' }}>
-                    Pilot Application Received
+                    Pilot Application Staged Locally
                   </h3>
                   <p className="small" style={{ lineHeight: 1.6, color: 'var(--ink-body)' }}>
-                    Thank you, <strong>{shopName}</strong> ({city}). Your application for the <strong>{selectedPlan}</strong> pilot has been recorded.
+                    Thank you, <strong>{shopName}</strong> ({city}). Your application for the <strong>{selectedPlan}</strong> pilot has been recorded in your local browser session (ID: PB-PILOT-{contactNumber.slice(-4)}).
                   </p>
-                  <p className="small muted" style={{ lineHeight: 1.6, marginTop: '0.5rem' }}>
-                    Our engineering and counter deployment specialist will reach out to your WhatsApp at <strong>+91 {contactNumber}</strong> to coordinate your remote workstation pairing and hardware configuration.
-                  </p>
+                  <div style={{ background: 'var(--surface)', padding: '0.85rem 1rem', borderRadius: '6px', margin: '1rem 0', textAlign: 'left', fontSize: 'var(--step-small)' }}>
+                    <div style={{ fontWeight: 600, color: 'var(--ink)', marginBottom: '4px' }}>Direct Onboarding Integration:</div>
+                    <div style={{ color: 'var(--muted)', lineHeight: 1.5 }}>
+                      As this static showcase does not run an active backend lead server, please also email your shop details to <a href="mailto:pilot@printbot.in?subject=Print%20Bot%20Pilot%20Application" style={{ color: 'var(--accent)', fontWeight: 600 }}>pilot@printbot.in</a> for direct workstation provisioning.
+                    </div>
+                  </div>
                   <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem', justifyContent: 'center' }}>
                     <button type="button" className="btn-secondary" onClick={resetForm}>
                       Submit Another Shop

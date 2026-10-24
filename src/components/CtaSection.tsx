@@ -13,7 +13,7 @@ export const CtaSection: React.FC<CtaSectionProps> = ({
   onRequestAccessClick,
 }) => {
   return (
-    <section className="section" aria-labelledby="cta-heading">
+    <section id="cta-section" className="section" aria-labelledby="cta-heading">
       <div className="wrap">
         <div className="cta-banner" data-reveal>
           <div className="cta-content-column">

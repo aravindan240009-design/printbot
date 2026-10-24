@@ -59,39 +59,21 @@ export const Features: React.FC = () => {
             </div>
           </div>
 
-          {/* Feature 2: Hardware Fleet & Unlimited Printers with Photo and Video Footage */}
+          {/* Feature 2: Hardware Fleet & Unlimited Printers */}
           <div className="feature-row reversed" data-reveal>
-            <div className="ui-panel" data-ui aria-label="Discovered Windows printer fleet fragment">
-              <div className="ui-header">
-                <div className="ui-title-group">
+            <div className="feature-visual-col">
+              <div className="photo-frame">
+                <img
+                  src="./assets/printer_hardware_fleet.jpg"
+                  alt="High-volume commercial printing hardware fleet including copiers and laser printers"
+                  className="cover"
+                  loading="lazy"
+                  width="1024"
+                  height="576"
+                />
+                <div className="photo-overlay-tag" data-ui>
                   <span className="ui-status-dot" aria-hidden="true" />
-                  <span className="ui-status-label">Discovered Windows Fleet</span>
-                </div>
-                <span className="ui-badge">3 Connected</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--border-card)', padding: '0.85rem', borderRadius: '6px', fontSize: 'var(--step-small)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, color: 'var(--ink)' }}>Canon iR2525 (PCL6)</div>
-                    <div style={{ fontSize: 'var(--step-small)', color: 'var(--muted)' }}>Tray 1: A4 Plain · Duplex Ready</div>
-                  </div>
-                  <span style={{ color: 'var(--status-green)', fontSize: 'var(--step-small)', fontWeight: 600 }}>Online</span>
-                </div>
-
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--border-card)', padding: '0.85rem', borderRadius: '6px', fontSize: 'var(--step-small)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, color: 'var(--ink)' }}>HP LaserJet Pro MFP M428</div>
-                    <div style={{ fontSize: 'var(--step-small)', color: 'var(--muted)' }}>Tray 2: Legal / A4 · High Speed</div>
-                  </div>
-                  <span style={{ color: 'var(--status-green)', fontSize: 'var(--step-small)', fontWeight: 600 }}>Online</span>
-                </div>
-
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--border-card)', padding: '0.85rem', borderRadius: '6px', fontSize: 'var(--step-small)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, color: 'var(--ink)' }}>Epson EcoTank L8050</div>
-                    <div style={{ fontSize: 'var(--step-small)', color: 'var(--muted)' }}>Rear Feed: 4x6 Photo Glossy</div>
-                  </div>
-                  <span style={{ color: 'var(--accent)', fontSize: 'var(--step-small)', fontWeight: 600 }}>Ready</span>
+                  <span>Hardware Fleet · 3 Windows Printers Active</span>
                 </div>
               </div>
             </div>
@@ -101,44 +83,22 @@ export const Features: React.FC = () => {
                 Unlimited Printers Per Shop PC
               </h3>
               <p className="feature-body">
-                Print Bot discovers all USB, network, and Wi-Fi printers installed on your Windows computer through standard Win32 Spooler APIs.
+                Print Bot discovers all USB, network, and Wi-Fi printers installed on your Windows computer through standard Win32 Spooler APIs (<code>winspool.drv</code>).
               </p>
               <div className="feature-points">
                 <div className="feature-point-item">
                   <span className="feature-point-bullet" />
-                  <span><strong>No per-printer licensing fee:</strong> Connect as many laser printers, color inkjets, and copiers as your business needs.</span>
+                  <span><strong>No per-printer licensing fee:</strong> Connect as many laser printers, color inkjets, and copiers as your business needs without device upgrade fees.</span>
                 </div>
                 <div className="feature-point-item">
                   <span className="feature-point-bullet" />
-                  <span><strong>Driver discovery:</strong> Automatically detects supported paper trays, media types, color abilities, and duplex units.</span>
+                  <span><strong>Driver discovery:</strong> Automatically detects supported paper trays, media types, color abilities, and duplex units directly from Windows.</span>
                 </div>
                 <div className="feature-point-item">
                   <span className="feature-point-bullet" />
-                  <span><strong>Printer fallbacks:</strong> Direct jobs to alternate trays or devices if a printer runs out of paper.</span>
+                  <span><strong>Printer fallbacks:</strong> Automatically redirect jobs to alternate trays or devices if a printer runs out of paper or goes offline.</span>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Authentic Fleet Photo of Commercial Printer Hardware */}
-          <div className="photo-feature-block" data-reveal>
-            <div className="photo-frame">
-              <img
-                src="./assets/printer_hardware_fleet.jpg"
-                alt="High-volume commercial printing hardware fleet"
-                className="cover"
-                loading="lazy"
-                width="1024"
-                height="576"
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '0.75rem' }}>
-              <h3 style={{ fontSize: 'var(--step-lead)', fontWeight: 700 }}>
-                Tested across laser, inkjet, and multifunction copiers
-              </h3>
-              <p className="small muted">
-                Our architecture focuses on the hardest mechanical reality: ensuring that rendered page imposition, long-edge duplexing, and margins match the physical capabilities of your actual printer hardware without clipping.
-              </p>
             </div>
           </div>
 
@@ -149,7 +109,7 @@ export const Features: React.FC = () => {
                 Cryptographic PC Pairing &amp; Ephemeral Privacy
               </h3>
               <p className="feature-body">
-                Customer files are sensitive. Print Bot enforces rigorous privacy minimization and machine-level security.
+                Customer files are sensitive. Print Bot enforces hardware-level cryptographic authorization and automatic ephemeral file purging.
               </p>
               <div className="feature-points">
                 <div className="feature-point-item">
@@ -158,7 +118,7 @@ export const Features: React.FC = () => {
                 </div>
                 <div className="feature-point-item">
                   <span className="feature-point-bullet" />
-                  <span><strong>Automated file purge:</strong> Original documents and preview files are stored under short-lived tokens and purged upon order completion.</span>
+                  <span><strong>Automated file purge:</strong> Original documents and preview files stream to memory and are immediately purged from cloud storage and local caches upon printing.</span>
                 </div>
                 <div className="feature-point-item">
                   <span className="feature-point-bullet" />
@@ -175,7 +135,7 @@ export const Features: React.FC = () => {
                 </div>
                 <span className="ui-badge">TPM Authorized</span>
               </div>
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--border-card)', padding: '1rem', borderRadius: '6px', fontSize: 'var(--step-small)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border-card)', padding: '1rem', borderRadius: '6px', fontSize: 'var(--step-small)', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--muted)' }}>Device Key:</span>
                   <span style={{ fontWeight: 600 }}>CNG/TPM Attested (SHA-256)</span>

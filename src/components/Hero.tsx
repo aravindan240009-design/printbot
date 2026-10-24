@@ -57,7 +57,7 @@ export const Hero: React.FC<HeroProps> = ({
   };
 
   return (
-    <section id="hero" className="section" style={{ paddingTop: 'clamp(2rem, 4vw, 3.5rem)' }}>
+    <section id="hero" className="section hero-section">
       <div className="wrap">
         <div className="hero-grid">
           <div className="hero-content">
@@ -147,38 +147,18 @@ export const Hero: React.FC<HeroProps> = ({
 
           {/* Interactive Working Product Simulator Fragment */}
           <div className="ui-visual-wrapper" data-reveal id="simulator-anchor">
-            <div className="hero-float-card card-top" data-ui aria-hidden="true">
-              <div className="float-icon-box green">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              </div>
-              <div>
-                <div className="float-text-title">Order #1042 Verified</div>
-                <div className="float-text-sub">Spooling automatically…</div>
-              </div>
-            </div>
-
-            <div className="hero-float-card card-bottom" data-ui aria-hidden="true">
-              <div className="float-icon-box blue">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
-              </div>
-              <div>
-                <div className="float-text-title">In-Memory Pipeline</div>
-                <div className="float-text-sub">Zero residual customer files on disk</div>
-              </div>
-            </div>
-
             <div className="ui-panel" data-ui aria-label="Interactive Print Bot print configurator and spooler simulator demonstration">
               <div className="ui-header">
                 <div className="ui-title-group">
                   <span className="ui-status-dot" aria-hidden="true" />
-                  <span className="ui-status-label">DEMONSTRATION · SIMULATED SPOOLER</span>
+                  <span className="ui-status-label">Simulated Spooler Demo</span>
                 </div>
-                <span className="ui-badge">Canon imageRUNNER 2525</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span className="ui-badge" style={{ background: 'var(--status-green-soft)', color: 'var(--status-green)' }}>
+                    Order #1042 Verified
+                  </span>
+                  <span className="ui-badge">Canon iR 2525</span>
+                </div>
               </div>
 
               <div className="ui-segmented" role="tablist" aria-label="Printing service preset selection">
@@ -317,7 +297,7 @@ export const Hero: React.FC<HeroProps> = ({
               {/* Real-time Locked Quote & Spooler Simulator */}
               <div className="ui-quote-bar">
                 <div>
-                  <div style={{ fontSize: '11px', color: 'var(--muted)' }}>Illustrative Locked Quote</div>
+                  <div style={{ fontSize: '13px', color: 'var(--muted)', fontWeight: 500 }}>Illustrative Locked Quote</div>
                   <div className="ui-quote-amount">₹{totalPrice}</div>
                 </div>
                 <button
