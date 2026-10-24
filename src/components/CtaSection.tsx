@@ -25,7 +25,7 @@ export const CtaSection: React.FC<CtaSectionProps> = ({
               Transform walk-in phone submissions into verified, automated Windows print jobs with zero customer app downloads and complete tenant privacy.
             </p>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginTop: '1.25rem' }}>
+            <div className="cta-actions">
               <button
                 type="button"
                 className="btn-primary"
