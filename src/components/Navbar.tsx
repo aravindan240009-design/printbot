@@ -4,9 +4,14 @@ import { InstallerConfig } from '../utils/installer';
 interface NavbarProps {
   installerConfig: InstallerConfig;
   onDownloadClick: () => void;
+  onRequestAccessClick: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ installerConfig, onDownloadClick }) => {
+export const Navbar: React.FC<NavbarProps> = ({
+  installerConfig,
+  onDownloadClick,
+  onRequestAccessClick,
+}) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const toggleMenu = () => {
@@ -39,19 +44,29 @@ export const Navbar: React.FC<NavbarProps> = ({ installerConfig, onDownloadClick
         </a>
 
         <nav className="nav-links-desktop" aria-label="Main navigation">
-          <a href="#overview" className="nav-link">Overview</a>
+          <a href="#the-problem" className="nav-link">The Problem</a>
           <a href="#how-it-works" className="nav-link">How It Works</a>
-          <a href="#features" className="nav-link">Features</a>
+          <a href="#features" className="nav-link">Capabilities</a>
+          <a href="#pricing" className="nav-link">Pricing</a>
           <a href="#requirements" className="nav-link">Requirements</a>
-          <a href="#download" className="nav-link">Download</a>
           <a href="#faq" className="nav-link">FAQ</a>
         </nav>
 
         <div className="nav-action-desktop">
           <button
             type="button"
+            className="btn-secondary"
+            onClick={onRequestAccessClick}
+            style={{ paddingInline: '1rem', minHeight: '2.4rem', fontSize: 'var(--step-small)' }}
+          >
+            Request Access
+          </button>
+
+          <button
+            type="button"
             className="btn-primary"
             onClick={onDownloadClick}
+            style={{ paddingInline: '1rem', minHeight: '2.4rem', fontSize: 'var(--step-small)' }}
             aria-label={
               installerConfig.status === 'available'
                 ? 'Download Print Bot for Windows'
@@ -59,8 +74,8 @@ export const Navbar: React.FC<NavbarProps> = ({ installerConfig, onDownloadClick
             }
           >
             <svg
-              width="16"
-              height="16"
+              width="15"
+              height="15"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -75,8 +90,8 @@ export const Navbar: React.FC<NavbarProps> = ({ installerConfig, onDownloadClick
             </svg>
             <span>
               {installerConfig.status === 'available'
-                ? 'Download for Windows'
-                : 'Windows Installer (Pilot)'}
+                ? 'Download'
+                : 'Windows (Pilot)'}
             </span>
           </button>
         </div>
@@ -97,16 +112,29 @@ export const Navbar: React.FC<NavbarProps> = ({ installerConfig, onDownloadClick
         <div className="wrap">
           <nav className="mobile-nav-panel" aria-label="Mobile navigation">
             <a href="#overview" className="mobile-nav-link" onClick={closeMenu}>Overview</a>
+            <a href="#the-problem" className="mobile-nav-link" onClick={closeMenu}>The Problem</a>
             <a href="#how-it-works" className="mobile-nav-link" onClick={closeMenu}>How It Works</a>
-            <a href="#features" className="mobile-nav-link" onClick={closeMenu}>Features</a>
+            <a href="#features" className="mobile-nav-link" onClick={closeMenu}>Capabilities</a>
+            <a href="#pricing" className="mobile-nav-link" onClick={closeMenu}>Pricing</a>
             <a href="#requirements" className="mobile-nav-link" onClick={closeMenu}>Requirements</a>
             <a href="#download" className="mobile-nav-link" onClick={closeMenu}>Download</a>
             <a href="#faq" className="mobile-nav-link" onClick={closeMenu}>FAQ</a>
-            <div style={{ marginTop: '0.5rem' }}>
+            <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ width: '100%', justifyContent: 'center' }}
+                onClick={() => {
+                  closeMenu();
+                  onRequestAccessClick();
+                }}
+              >
+                Request Shop Pilot Access
+              </button>
               <button
                 type="button"
                 className="btn-primary"
-                style={{ width: '100%' }}
+                style={{ width: '100%', justifyContent: 'center' }}
                 onClick={() => {
                   closeMenu();
                   onDownloadClick();

@@ -4,6 +4,7 @@ import { InstallerConfig } from '../utils/installer';
 interface HeroProps {
   installerConfig: InstallerConfig;
   onDownloadClick: () => void;
+  onRequestAccessClick: () => void;
 }
 
 type ServiceType = 'document' | 'photo' | 'id_card';
@@ -11,14 +12,18 @@ type ColorMode = 'grayscale' | 'color';
 type DuplexMode = 'long_edge' | 'single';
 type NUpMode = 1 | 2 | 4;
 
-export const Hero: React.FC<HeroProps> = ({ installerConfig, onDownloadClick }) => {
+export const Hero: React.FC<HeroProps> = ({
+  installerConfig,
+  onDownloadClick,
+  onRequestAccessClick,
+}) => {
   const [service, setService] = useState<ServiceType>('document');
   const [colorMode, setColorMode] = useState<ColorMode>('grayscale');
   const [duplexMode, setDuplexMode] = useState<DuplexMode>('long_edge');
   const [nUp, setNUp] = useState<NUpMode>(2);
   const [copies, setCopies] = useState<number>(1);
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
-  const [simState, setSimState] = useState<string>('CONNECTED');
+  const [simState, setSimState] = useState<string>('CONNECTED (DEMO)');
 
   const sourcePages = service === 'document' ? 6 : service === 'photo' ? 2 : 1;
   const imposedSidesPerCopy = Math.ceil(sourcePages / nUp);
@@ -26,7 +31,7 @@ export const Hero: React.FC<HeroProps> = ({ installerConfig, onDownloadClick }) 
   const totalSheets = sheetsPerCopy * copies;
 
   const costPerSide = colorMode === 'color' ? 7 : 1.5;
-  const totalPrice = Math.max(2, (totalSheets * costPerSide * (duplexMode === 'long_edge' ? 1.8 : 1.0))).toFixed(2);
+  const totalPrice = Math.max(2, totalSheets * costPerSide * (duplexMode === 'long_edge' ? 1.8 : 1.0)).toFixed(2);
 
   const runSpoolSimulation = () => {
     if (isSimulating) return;
@@ -34,7 +39,7 @@ export const Hero: React.FC<HeroProps> = ({ installerConfig, onDownloadClick }) 
     setSimState('VALIDATING_PRINT_PLAN');
 
     setTimeout(() => {
-      setSimState('QUOTE_LOCKED_INR');
+      setSimState('QUOTE_LOCKED_INR (DEMO)');
     }, 450);
 
     setTimeout(() => {
@@ -42,23 +47,23 @@ export const Hero: React.FC<HeroProps> = ({ installerConfig, onDownloadClick }) 
     }, 950);
 
     setTimeout(() => {
-      setSimState('WIN32_SPOOL_SUBMITTED_ID_8042');
+      setSimState('WIN32_SPOOL_INJECTED_#8042');
     }, 1500);
 
     setTimeout(() => {
-      setSimState('PRINT_CONFIRMED_EPHEMERAL_PURGED');
+      setSimState('PRINT_COMPLETED_EPHEMERAL_PURGED');
       setIsSimulating(false);
     }, 2200);
   };
 
   return (
-    <section id="hero" className="section" style={{ paddingTop: 'clamp(1.5rem, 3vw, 2.5rem)' }}>
+    <section id="hero" className="section" style={{ paddingTop: 'clamp(2rem, 4vw, 3.5rem)' }}>
       <div className="wrap">
         <div className="hero-grid">
           <div className="hero-content">
             <h1 className="display headline-masked">
               <span className="headline-line">
-                <span className="headline-text">Mobile print jobs</span>
+                <span className="headline-text">Mobile print orders directly</span>
               </span>
               <span className="headline-line">
                 <span className="headline-text">to shop Windows printers.</span>
@@ -66,14 +71,27 @@ export const Hero: React.FC<HeroProps> = ({ installerConfig, onDownloadClick }) 
             </h1>
 
             <p className="lead" data-reveal>
-              Customers scan your counter QR code to upload documents and configure print options without installing an app. Your shop Windows PC receives verified jobs directly into the local print spooler.
+              The dedicated operating system for photocopy shops and commercial print counters. Customers scan your counter QR to upload and configure jobs in their browser without an app — while your Windows PC receives verified jobs directly into the native print spooler.
             </p>
 
             <div className="hero-actions" data-reveal>
               <button
                 type="button"
                 className="btn-primary"
+                onClick={onRequestAccessClick}
+                style={{ minHeight: '3.2rem', paddingInline: '1.75rem' }}
+              >
+                <span>Request Shop Pilot Access</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
+
+              <button
+                type="button"
+                className="btn-secondary"
                 onClick={onDownloadClick}
+                style={{ minHeight: '3.2rem' }}
                 aria-label={
                   installerConfig.status === 'available'
                     ? 'Download Print Bot for Windows'
@@ -101,10 +119,6 @@ export const Hero: React.FC<HeroProps> = ({ installerConfig, onDownloadClick }) 
                     : 'Windows Installer (Pilot)'}
                 </span>
               </button>
-
-              <a href="#how-it-works" className="btn-secondary">
-                Inspect the workflow
-              </a>
             </div>
 
             <div className="hero-trust-row" data-reveal>
@@ -118,17 +132,21 @@ export const Hero: React.FC<HeroProps> = ({ installerConfig, onDownloadClick }) 
               </span>
               <span className="hero-trust-item">
                 <span className="hero-trust-dot" aria-hidden="true" />
-                <span>100% Ephemeral File Purge</span>
+                <span>Win32 Spooler Integration</span>
+              </span>
+              <span className="hero-trust-item">
+                <span className="hero-trust-dot" aria-hidden="true" />
+                <span>Ephemeral File Purge</span>
               </span>
             </div>
 
             <p className="small muted" data-reveal style={{ marginTop: '0.25rem' }}>
-              Built for Windows 10 and Windows 11 (64-bit). Works with your existing USB and network printers.
+              Engineered for Windows 10 &amp; 11 (64-bit). Works alongside existing USB, Ethernet, and Wi-Fi printers (Canon, HP, Epson, Ricoh).
             </p>
           </div>
 
-          {/* Interactive Working Product Fragment with Floating Status Chips */}
-          <div className="ui-visual-wrapper" data-reveal>
+          {/* Interactive Working Product Simulator Fragment */}
+          <div className="ui-visual-wrapper" data-reveal id="simulator-anchor">
             <div className="hero-float-card card-top" data-ui aria-hidden="true">
               <div className="float-icon-box green">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -136,8 +154,8 @@ export const Hero: React.FC<HeroProps> = ({ installerConfig, onDownloadClick }) 
                 </svg>
               </div>
               <div>
-                <div className="float-text-title">Order #1042 Approved</div>
-                <div className="float-text-sub">Printing automatically…</div>
+                <div className="float-text-title">Order #1042 Verified</div>
+                <div className="float-text-sub">Spooling automatically…</div>
               </div>
             </div>
 
@@ -149,21 +167,21 @@ export const Hero: React.FC<HeroProps> = ({ installerConfig, onDownloadClick }) 
                 </svg>
               </div>
               <div>
-                <div className="float-text-title">Ephemeral Purge</div>
-                <div className="float-text-sub">100% private, zero customer data retained</div>
+                <div className="float-text-title">In-Memory Pipeline</div>
+                <div className="float-text-sub">Zero residual customer files on disk</div>
               </div>
             </div>
 
-            <div className="ui-panel" data-ui aria-label="Interactive Print Bot print configurator and spooler simulator">
+            <div className="ui-panel" data-ui aria-label="Interactive Print Bot print configurator and spooler simulator demonstration">
               <div className="ui-header">
                 <div className="ui-title-group">
                   <span className="ui-status-dot" aria-hidden="true" />
-                  <span className="ui-status-label">Shop Spooler Ready</span>
+                  <span className="ui-status-label">DEMONSTRATION · SIMULATED SPOOLER</span>
                 </div>
                 <span className="ui-badge">Canon imageRUNNER 2525</span>
               </div>
 
-              <div className="ui-segmented" role="tablist" aria-label="Printing service selection">
+              <div className="ui-segmented" role="tablist" aria-label="Printing service preset selection">
                 <button
                   type="button"
                   role="tab"
@@ -203,7 +221,7 @@ export const Hero: React.FC<HeroProps> = ({ installerConfig, onDownloadClick }) 
                     onChange={(e) => setColorMode(e.target.value as ColorMode)}
                   >
                     <option value="grayscale">Black &amp; White (Grayscale)</option>
-                    <option value="color">Full Color</option>
+                    <option value="color">Full CMYK Color</option>
                   </select>
                 </div>
 
@@ -251,7 +269,7 @@ export const Hero: React.FC<HeroProps> = ({ installerConfig, onDownloadClick }) 
               {/* Live Sheet Imposition Preview Canvas */}
               <div className="ui-sheet-stage">
                 <div className="ui-sheet-header">
-                  <span>Imposition Preview: A4 Output</span>
+                  <span>Imposition Preview: A4 Sheet</span>
                   <span>{duplexMode === 'long_edge' ? 'Double Sided' : 'Single Sided'}</span>
                 </div>
 
@@ -299,7 +317,7 @@ export const Hero: React.FC<HeroProps> = ({ installerConfig, onDownloadClick }) 
               {/* Real-time Locked Quote & Spooler Simulator */}
               <div className="ui-quote-bar">
                 <div>
-                  <div style={{ fontSize: '11px', color: 'var(--muted)' }}>Locked Server Quote</div>
+                  <div style={{ fontSize: '11px', color: 'var(--muted)' }}>Illustrative Locked Quote</div>
                   <div className="ui-quote-amount">₹{totalPrice}</div>
                 </div>
                 <button
@@ -308,7 +326,7 @@ export const Hero: React.FC<HeroProps> = ({ installerConfig, onDownloadClick }) 
                   onClick={runSpoolSimulation}
                   disabled={isSimulating}
                 >
-                  {isSimulating ? 'Spooling...' : 'Test print simulation'}
+                  {isSimulating ? 'Spooling...' : 'Simulate print dispatch'}
                 </button>
               </div>
 
@@ -318,8 +336,8 @@ export const Hero: React.FC<HeroProps> = ({ installerConfig, onDownloadClick }) 
                   <span className="ui-journal-state">{simState}</span>
                 </div>
                 <div className="ui-journal-entry" style={{ marginTop: '2px' }}>
-                  <span>Memory Cache Policy:</span>
-                  <span>Immediate Ephemeral Purge on Exit</span>
+                  <span>Demonstration Notice:</span>
+                  <span>Interactive simulation — does not send real paper to physical printers.</span>
                 </div>
               </div>
             </div>
