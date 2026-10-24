@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Production build artifacts
+dist/
+dist-ssr/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Local Taste-skill screenshots and report
+.taste-skill/inspect/
+
+# Logs and OS files
+*.log
+.DS_Store
+Thumbs.db
