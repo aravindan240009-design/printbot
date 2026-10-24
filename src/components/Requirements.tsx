@@ -69,6 +69,44 @@ export const Requirements: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        <div className="hardware-compatibility-block" data-reveal style={{ marginTop: '2.5rem', background: 'var(--surface)', padding: 'clamp(1.5rem, 3vw, 2.5rem)', borderRadius: 'var(--radius)' }}>
+          <h3 style={{ fontSize: 'var(--step-lead)', fontWeight: 700, color: 'var(--ink)' }}>
+            Tested hardware fleets across Indian photocopy &amp; print shops
+          </h3>
+          <p className="muted" style={{ marginTop: '0.5rem', maxWidth: '68ch', fontSize: 'var(--step-body)' }}>
+            Print Bot requires zero proprietary hardware dongles or vendor-locked firmware. The background service communicates through native Windows Spooler APIs (<code>winspool.drv</code>). If Windows can print a test page to your machine, Print Bot can spool to it.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginTop: '1.75rem' }}>
+            <div>
+              <div style={{ fontWeight: 700, color: 'var(--ink)', fontSize: 'var(--step-body)' }}>
+                Commercial Multifunction Copiers
+              </div>
+              <div className="muted" style={{ fontSize: 'var(--step-small)', marginTop: '0.35rem', lineHeight: 1.5 }}>
+                Canon imageRUNNER / iR-ADV, Ricoh Aficio &amp; MP Series, Konica Minolta bizhub, Kyocera TASKalfa, Sharp MX Series.
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontWeight: 700, color: 'var(--ink)', fontSize: 'var(--step-body)' }}>
+                Monochrome Laser Workhorses
+              </div>
+              <div className="muted" style={{ fontSize: 'var(--step-small)', marginTop: '0.35rem', lineHeight: 1.5 }}>
+                HP LaserJet Pro &amp; Enterprise (M428, 1020, MFP M126), Canon LBP (2900B, 6030), Brother DCP &amp; HL Series.
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontWeight: 700, color: 'var(--ink)', fontSize: 'var(--step-body)' }}>
+                High-Capacity Color InkTank
+              </div>
+              <div className="muted" style={{ fontSize: 'var(--step-small)', marginTop: '0.35rem', lineHeight: 1.5 }}>
+                Epson EcoTank (L8050, L3250, L6490, M3170), Canon PIXMA G-Series &amp; MAXIFY, HP Smart Tank (580, 720).
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );
