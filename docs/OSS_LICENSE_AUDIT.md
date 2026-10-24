@@ -291,3 +291,10 @@ provider merchant/settlement approval, patent/export and India privacy counsel r
 2. **Zero Commercial Printing SDKs:** No proprietary ActiveX or licensed DLLs (e.g. Leadtools, Adobe PDF Library) were introduced.
 3. **Segregated Sandbox Workers:** Document conversion requiring LibreOffice is isolated in an isolated, network-disabled container (`worker`) with cgroup CPU/memory caps, satisfying MPL-2.0 obligations without infecting SaaS core code.
 
+
+## UI redesign dependency addition — 23 October 2026
+Motion 14.6.0 and motion-ai 14.2.0 registry metadata declare MIT. Preserve MIT copyright/license notices when redistributing; runtime transitives framer-motion, motion-dom and motion-utils require their notices too. Motion AI free skill installed project-locally with only https://mcp.motion.dev configured; no Motion+ entry. Hosted service terms are separate. This addition does not resolve earlier audit findings.
+
+Manrope variable font bundled unmodified from google/fonts ofl/manrope, retrieved 23 October 2026. SIL OFL 1.1 license and copyright retained alongside font in packages/ui/src/fonts/OFL.txt. Commercial bundling permitted under OFL obligations; font is not sold standalone.
+`nPlayfair Display variable font bundled unmodified from google/fonts ofl/playfairdisplay (23 October 2026). SIL OFL 1.1 copyright and license retained in packages/ui/src/fonts/Playfair-OFL.txt. Preserve notices in distribution.
+`nThree.js 0.170.0 (MIT, registry checked) added for original procedural printer geometry. No third-party model assets. Preserve three/LICENSE in distribution. @types/three 0.170.0 development types added. Renderer code dynamically imported; resources disposed on unmount.

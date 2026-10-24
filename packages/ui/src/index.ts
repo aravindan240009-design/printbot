@@ -4,4 +4,8 @@ export * from './components/Badge';
 export * from './components/Card';
 export * from './components/LivePriceCalculator';
 export * from './motion/transitions';
+export * from './motion/gsap';
 export * from './three/SceneViewport';
+export * from './theme';
+export * from './components/Studio';
+export * from './components/PrinterScene';

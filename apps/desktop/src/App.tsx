@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Printer, Layers, KeyRound, Settings, Search, FileText, Eye, RefreshCw, Volume2, VolumeX, Copy, ArrowUpRight, ShieldCheck, X, AlertTriangle } from 'lucide-react';
+import { ThemeProvider, ThemeSwitch, MotionSurface, PaperScene, PrinterScene, useGsapStagger } from '@xerox/ui';
 
 interface PrintJob {
   id: string;
@@ -10,7 +12,7 @@ interface PrintJob {
   physical_sheets: number;
   options: {
     copies: number;
-    color_mode: string;
+    color_mode: 'color' | 'bw' | 'grayscale';
     paper_size: string;
     duplex_mode: string;
     paper_gsm: number;
@@ -36,24 +38,37 @@ interface ConnectedPrinter {
   supported_sizes: string[];
 }
 
-export default function WorkstationApp() {
-  const [activeTab, setActiveTab] = useState<'queue' | 'printers' | 'pairing' | 'settings'>('queue');
-  const [orderMode, setOrderMode] = useState<'FULL_AUTOMATIC' | 'MANUAL_APPROVAL'>('MANUAL_APPROVAL');
-  const [isIpcConnected, setIsIpcConnected] = useState<boolean>(true);
-  const [isPairingModalOpen, setIsPairingModalOpen] = useState<boolean>(false);
-  const [pairingCode, setPairingCode] = useState<string>('');
-  const [deviceName, setDeviceName] = useState<string>('Counter-PC-01');
-  const [pairingSuccess, setPairingSuccess] = useState<boolean>(true);
+type Tab = 'queue' | 'printers' | 'pairing' | 'settings';
+const statusLabels: Record<PrintJob['status'], string> = { PENDING_APPROVAL: 'Needs approval', QUEUED: 'Ready to dispatch', PRINTING: 'Dispatch simulated', COMPLETED: 'Completed · sample', COMPLETION_UNKNOWN: 'Completion unknown', REJECTED: 'Rejected' };
+function Dialog({title, children, onClose}: {title: string; children: React.ReactNode; onClose: () => void}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => { const previous = document.activeElement as HTMLElement | null; ref.current?.showModal(); return () => { ref.current?.close(); previous?.focus(); }; }, []);
+  return <dialog ref={ref} className="ws-dialog" aria-labelledby="dialog-title" onCancel={e => {e.preventDefault(); onClose();}}><div className="ws-dialog-head"><h2 id="dialog-title">{title}</h2><button aria-label="Close dialog" onClick={onClose}><X size={20}/></button></div>{children}</dialog>;
+}
+function Workstation() {
+  const [activeTab, setActiveTab] = useState<Tab>('queue');
+  const [orderMode, setOrderMode] = useState('MANUAL_APPROVAL');
+  const [isAudioEnabled, setIsAudioEnabled] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [rejectionModalJobId, setRejectionModalJobId] = useState<string | null>(null);
-  const [rejectionReason, setRejectionReason] = useState<string>('Poor image quality or corrupted formatting');
-  const [selectedPrinter, setSelectedPrinter] = useState<string>('prn-canon-ir3530');
-  const [localJournalCount, setLocalJournalCount] = useState<number>(6);
-  const [reconcileResult, setReconcileResult] = useState<string | null>(null);
-
-  const [printers, setPrinters] = useState<ConnectedPrinter[]>([
+  const [rejectionReason, setRejectionReason] = useState('Poor image resolution or blurred scan');
+  const [reconcileId, setReconcileId] = useState<string | null>(null);
+  const [reconcileNote, setReconcileNote] = useState('');
+  const [pairingCode, setPairingCode] = useState('');
+  const [deviceName, setDeviceName] = useState('Counter-PC-01');
+  const [notice, setNotice] = useState('');
+  const [localJournalCount, setLocalJournalCount] = useState(0);
+  const [redact, setRedact] = useState(true);
+  const [background, setBackground] = useState(true);
+  const statsRef = useGsapStagger<HTMLDivElement>({ selector: '.ws-stat', stagger: 0.05, y: 10 });
+  const jobListRef = useGsapStagger<HTMLDivElement>({ selector: '.ws-job', stagger: 0.04, y: 12 });
+  const tone = () => { if (!isAudioEnabled) return; try { const ctx = new AudioContext(); const osc = ctx.createOscillator(); const gain = ctx.createGain(); gain.gain.value = 0.03; osc.connect(gain); gain.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 0.08); osc.onended = () => { void ctx.close(); }; } catch {} };
+  const [printers] = useState<ConnectedPrinter[]>([
     {
       id: 'prn-canon-ir3530',
-      name: 'Canon imageRUNNER ADV C3530i',
+      name: 'Canon imageRUNNER ADV C3530i (Color Production)',
       driver_name: 'Canon Generic Plus UFR II',
       port: '192.168.1.150',
       online: true,
@@ -63,7 +78,7 @@ export default function WorkstationApp() {
     },
     {
       id: 'prn-hp-m404dn',
-      name: 'HP LaserJet Pro M404dn (Mono High-Speed)',
+      name: 'HP LaserJet Pro M404dn (Mono Workhorse)',
       driver_name: 'HP LaserJet Pro M404-M405 PCL-6',
       port: 'USB001',
       online: true,
@@ -73,7 +88,7 @@ export default function WorkstationApp() {
     },
     {
       id: 'prn-virtual-pdf',
-      name: 'Microsoft Print to PDF (Virtual)',
+      name: 'Microsoft Print to PDF (Virtual Native Proof)',
       driver_name: 'Microsoft Print To PDF',
       port: 'PORTPROMPT:',
       online: true,
@@ -114,7 +129,7 @@ export default function WorkstationApp() {
       page_count: 11,
       logical_pages: 11,
       rendered_sides: 22,
-      physical_sheets: 12, // Golden proof: 11 pages x 2 copies duplex = 12 sheets!
+      physical_sheets: 12,
       options: {
         copies: 2,
         color_mode: 'bw',
@@ -130,390 +145,64 @@ export default function WorkstationApp() {
       status: 'QUEUED',
       created_at: new Date(Date.now() - 1000 * 60 * 1).toISOString(),
     },
+    {
+      id: 'job-9843',
+      customer_email: 'kavitha.m@gmail.com',
+      file_name: 'Passport_ID_Front_Back.pdf',
+      page_count: 1,
+      logical_pages: 1,
+      rendered_sides: 1,
+      physical_sheets: 1,
+      options: {
+        copies: 4,
+        color_mode: 'color',
+        paper_size: 'A4',
+        duplex_mode: 'simplex',
+        paper_gsm: 180,
+        binding: 'none',
+        page_range: '1',
+        pages_per_sheet: 4,
+      },
+      calculated_price_paise: 8000,
+      calculated_price_rupees: 80.0,
+      status: 'COMPLETED',
+      created_at: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
+    },
   ]);
 
-  const handleApproveAndPrint = (jobId: string) => {
-    // Transition to PRINTING and persist to local journal
-    setQueue((prev) =>
-      prev.map((j) => (j.id === jobId ? { ...j, status: 'PRINTING' } : j))
-    );
-    setLocalJournalCount((c) => c + 1);
-
-    setTimeout(() => {
-      setQueue((prev) =>
-        prev.map((j) => (j.id === jobId ? { ...j, status: 'COMPLETED' } : j))
-      );
-    }, 2000);
-  };
-
-  const handleRejectJob = () => {
-    if (!rejectionModalJobId) return;
-    setQueue((prev) =>
-      prev.map((j) =>
-        j.id === rejectionModalJobId
-          ? { ...j, status: 'REJECTED', rejection_reason: rejectionReason }
-          : j
-      )
-    );
-    setRejectionModalJobId(null);
-  };
-
-  const handleFlagAmbiguous = (jobId: string) => {
-    // Strict contract invariant: On ambiguous submitted outcomes use COMPLETION_UNKNOWN and supervised reconciliation, NEVER automatic reprint
-    setQueue((prev) =>
-      prev.map((j) => (j.id === jobId ? { ...j, status: 'COMPLETION_UNKNOWN' } : j))
-    );
-    alert(
-      `Job ${jobId} flagged as COMPLETION_UNKNOWN.\nSpooler status ambiguous. Auto-reprint is blocked.\nRequires supervised staff confirmation.`
-    );
-  };
-
-  const handleReconcile = async () => {
-    try {
-      const res = await fetch('http://localhost:8000/api/v1/reconciliation/sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Shop-ID': '11111111-1111-1111-1111-111111111111',
-        },
-        body: JSON.stringify({
-          workstation_id: 'workstation-counter-01',
-          tenant_id: '11111111-1111-1111-1111-111111111111',
-          spooled_job_ids: queue.filter((j) => j.status === 'COMPLETED').map((j) => j.id),
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setReconcileResult(`Reconciled with Cloud! Confirmed: ${data.confirmed_job_ids.length}, Spooled: ${data.re_spool_required_job_ids.length}`);
-      } else {
-        setReconcileResult('Local journal synchronized in offline cache.');
-      }
-    } catch (e: any) {
-      setReconcileResult('Local journal synchronized in offline cache.');
-    }
-  };
-
-  return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0F172A', color: '#F8FAFC', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      {/* Top Header Bar */}
-      <header style={{ height: '56px', background: '#1E293B', borderBottom: '1px solid #334155', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '0.9rem' }}>
-            PB
-          </div>
-          <div>
-            <h1 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800 }}>Print Bot Workstation Station</h1>
-            <p style={{ margin: 0, fontSize: '0.7rem', color: '#94A3B8' }}>
-              Shop: Anna University Quick Xerox • Paired: {deviceName}
-            </p>
-          </div>
-        </div>
-
-        {/* Status Indicators & Mode Toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          {/* Order Mode Switch */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#0F172A', padding: '4px 8px', borderRadius: '8px', border: '1px solid #334155' }}>
-            <span style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 600 }}>Mode:</span>
-            <button
-              onClick={() => setOrderMode(orderMode === 'FULL_AUTOMATIC' ? 'MANUAL_APPROVAL' : 'FULL_AUTOMATIC')}
-              style={{
-                fontSize: '0.75rem',
-                fontWeight: 800,
-                padding: '4px 10px',
-                borderRadius: '6px',
-                border: 'none',
-                background: orderMode === 'FULL_AUTOMATIC' ? '#059669' : '#D97706',
-                color: '#FFFFFF',
-                cursor: 'pointer',
-              }}
-            >
-              {orderMode === 'FULL_AUTOMATIC' ? '⚡ FULL AUTOMATIC' : '✋ MANUAL APPROVAL'}
-            </button>
-          </div>
-
-          {/* Rust Service IPC Status */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', background: '#0F172A', padding: '5px 10px', borderRadius: '8px', border: '1px solid #334155' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: isIpcConnected ? '#10B981' : '#EF4444' }} />
-            <span style={{ color: '#E2E8F0', fontWeight: 600 }}>Rust Service IPC (Named Pipe)</span>
-          </div>
-
-          {/* Subscription Status */}
-          <div style={{ fontSize: '0.75rem', background: '#1E1B4B', color: '#818CF8', border: '1px solid #4338CA', padding: '4px 10px', borderRadius: '8px', fontWeight: 700 }}>
-            All-Inclusive (Unlimited Printers)
-          </div>
-        </div>
-      </header>
-
-      {/* Navigation Tabs */}
-      <div style={{ background: '#1E293B', borderBottom: '1px solid #334155', padding: '0 20px', display: 'flex', gap: '8px' }}>
-        {[
-          { key: 'queue', label: `Dispatch Queue (${queue.filter((j) => j.status !== 'COMPLETED' && j.status !== 'REJECTED').length})` },
-          { key: 'printers', label: `Connected Printers (${printers.length})` },
-          { key: 'pairing', label: 'Device Pairing & TPM' },
-          { key: 'settings', label: 'Workstation Settings' },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key as any)}
-            style={{
-              minHeight: '44px',
-              padding: '0 16px',
-              background: 'transparent',
-              border: 'none',
-              borderBottom: activeTab === tab.key ? '3px solid #2563EB' : '3px solid transparent',
-              color: activeTab === tab.key ? '#FFFFFF' : '#94A3B8',
-              fontWeight: activeTab === tab.key ? 700 : 500,
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Main Body */}
-      <div style={{ flex: 1, padding: '20px', overflowY: 'auto' }}>
-        {/* ================= TAB 1: LIVE PRINT QUEUE ================= */}
-        {activeTab === 'queue' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 800 }}>Live Operational Queue</h2>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  onClick={handleReconcile}
-                  style={{ minHeight: '44px', padding: '0 14px', borderRadius: '8px', background: '#334155', color: '#FFFFFF', border: 'none', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer' }}
-                >
-                  Sync Cloud Ledger ({localJournalCount} WAL Events)
-                </button>
-              </div>
-            </div>
-
-            {reconcileResult && (
-              <div style={{ background: '#064E3B', color: '#A7F3D0', padding: '8px 14px', borderRadius: '8px', fontSize: '0.8rem' }}>
-                {reconcileResult}
-              </div>
-            )}
-
-            {/* Queue Items */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {queue.map((job) => (
-                <div
-                  key={job.id}
-                  style={{
-                    background: '#1E293B',
-                    border: '1px solid #334155',
-                    borderRadius: '12px',
-                    padding: '16px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>{job.file_name}</span>
-                      <span
-                        style={{
-                          fontSize: '0.7rem',
-                          fontWeight: 700,
-                          padding: '2px 8px',
-                          borderRadius: '6px',
-                          background:
-                            job.status === 'COMPLETED'
-                              ? '#064E3B'
-                              : job.status === 'PRINTING'
-                              ? '#1E3A8A'
-                              : job.status === 'COMPLETION_UNKNOWN'
-                              ? '#7F1D1D'
-                              : job.status === 'REJECTED'
-                              ? '#374151'
-                              : '#78350F',
-                          color: '#FFFFFF',
-                        }}
-                      >
-                        {job.status}
-                      </span>
-                    </div>
-
-                    <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>
-                      Customer: <b>{job.customer_email}</b> • {job.options.copies} copies • {job.options.color_mode.toUpperCase()} • {job.options.duplex_mode} • {job.options.paper_size}
-                    </div>
-
-                    <div style={{ fontSize: '0.75rem', color: '#38BDF8' }}>
-                      Accounting: <b>{job.physical_sheets} physical sheets</b> ({job.rendered_sides} sides, {job.logical_pages} pages) • ₹{job.calculated_price_rupees.toFixed(2)}
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    {job.status === 'PENDING_APPROVAL' && (
-                      <>
-                        <button
-                          onClick={() => handleApproveAndPrint(job.id)}
-                          style={{ minHeight: '44px', padding: '0 14px', borderRadius: '8px', background: '#059669', color: '#FFFFFF', border: 'none', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
-                        >
-                          Approve & Spool
-                        </button>
-                        <button
-                          onClick={() => setRejectionModalJobId(job.id)}
-                          style={{ minHeight: '44px', padding: '0 14px', borderRadius: '8px', background: '#DC2626', color: '#FFFFFF', border: 'none', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
-                        >
-                          Reject
-                        </button>
-                      </>
-                    )}
-
-                    {job.status === 'QUEUED' && (
-                      <button
-                        onClick={() => handleApproveAndPrint(job.id)}
-                        style={{ minHeight: '44px', padding: '0 14px', borderRadius: '8px', background: '#2563EB', color: '#FFFFFF', border: 'none', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
-                      >
-                        Dispatch to Spooler
-                      </button>
-                    )}
-
-                    {job.status === 'PRINTING' && (
-                      <button
-                        onClick={() => handleFlagAmbiguous(job.id)}
-                        style={{ minHeight: '44px', padding: '0 14px', borderRadius: '8px', background: '#991B1B', color: '#FFFFFF', border: 'none', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
-                      >
-                        Mark Unknown (Safety)
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ================= TAB 2: CONNECTED PRINTERS ================= */}
-        {activeTab === 'printers' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 800 }}>Discovered Windows Hardware (Unlimited Support)</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '14px' }}>
-              {printers.map((p) => (
-                <div key={p.id} style={{ background: '#1E293B', border: '1px solid #334155', borderRadius: '12px', padding: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                    <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{p.name}</div>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', background: p.online ? '#064E3B' : '#7F1D1D', color: '#FFFFFF' }}>
-                      {p.online ? 'ONLINE' : 'OFFLINE'}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginBottom: '6px' }}>Driver: {p.driver_name}</div>
-                  <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginBottom: '10px' }}>Port: {p.port}</div>
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: '#334155' }}>
-                      {p.supports_color ? 'Color & Mono' : 'Mono Only'}
-                    </span>
-                    <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: '#334155' }}>
-                      {p.supports_duplex ? 'Duplex Supported' : 'Simplex Only'}
-                    </span>
-                    <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: '#334155' }}>
-                      Sizes: {p.supported_sizes.join(', ')}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ================= TAB 3: DEVICE PAIRING & TPM ================= */}
-        {activeTab === 'pairing' && (
-          <div style={{ maxWidth: '480px', background: '#1E293B', border: '1px solid #334155', borderRadius: '14px', padding: '20px' }}>
-            <h2 style={{ margin: '0 0 10px 0', fontSize: '1rem', fontWeight: 800 }}>Device Enrollment & Cryptographic Identity</h2>
-            <p style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '16px' }}>
-              Workstation authenticates to the cloud via asymmetric TPM-backed Ed25519 challenge-response keys.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', display: 'block', marginBottom: '4px' }}>Device Name</label>
-                <input
-                  type="text"
-                  value={deviceName}
-                  onChange={(e) => setDeviceName(e.target.value)}
-                  style={{ minHeight: '44px', width: '100%', borderRadius: '8px', border: '1px solid #475569', background: '#0F172A', color: '#FFFFFF', padding: '0 10px', fontSize: '0.85rem' }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', display: 'block', marginBottom: '4px' }}>Pairing Code (from Shop Web)</label>
-                <input
-                  type="text"
-                  placeholder="Enter 6-char pairing code"
-                  value={pairingCode}
-                  onChange={(e) => setPairingCode(e.target.value)}
-                  style={{ minHeight: '44px', width: '100%', borderRadius: '8px', border: '1px solid #475569', background: '#0F172A', color: '#FFFFFF', padding: '0 10px', fontSize: '0.85rem' }}
-                />
-              </div>
-              <button
-                onClick={() => {
-                  setPairingSuccess(true);
-                  alert('Device pairing handshake completed successfully! Asymmetric JWT bound to TPM public key.');
-                }}
-                style={{ minHeight: '44px', borderRadius: '8px', border: 'none', background: '#2563EB', color: '#FFFFFF', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', marginTop: '8px' }}
-              >
-                Perform Asymmetric Handshake
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ================= TAB 4: SETTINGS ================= */}
-        {activeTab === 'settings' && (
-          <div style={{ maxWidth: '480px', background: '#1E293B', border: '1px solid #334155', borderRadius: '14px', padding: '20px' }}>
-            <h2 style={{ margin: '0 0 14px 0', fontSize: '1rem', fontWeight: 800 }}>Workstation Preferences</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.85rem' }}>Auto-start Service on Boot</span>
-                <input type="checkbox" defaultChecked style={{ width: '20px', height: '20px', accentColor: '#2563EB' }} />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.85rem' }}>Suppress Sensitive Document Paths in OS Toasts</span>
-                <input type="checkbox" defaultChecked style={{ width: '20px', height: '20px', accentColor: '#2563EB' }} />
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Rejection Modal Dialog */}
-      {rejectionModalJobId && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 100 }}>
-          <div style={{ background: '#1E293B', borderRadius: '16px', border: '1px solid #475569', padding: '24px', maxWidth: '420px', width: '100%' }}>
-            <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: '#EF4444' }}>Reject Job #{rejectionModalJobId}</h3>
-            <p style={{ fontSize: '0.8rem', color: '#94A3B8', marginBottom: '14px' }}>
-              Please select or enter the reason for rejecting this job. The customer will see this message.
-            </p>
-            <select
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-              style={{ minHeight: '44px', width: '100%', borderRadius: '8px', border: '1px solid #475569', background: '#0F172A', color: '#FFFFFF', padding: '0 10px', fontSize: '0.85rem', marginBottom: '16px' }}
-            >
-              <option value="Poor image resolution or blurred scan">Poor image resolution or blurred scan</option>
-              <option value="Requested paper size currently out of stock">Requested paper size currently out of stock</option>
-              <option value="Corrupted or unreadable PDF text">Corrupted or unreadable PDF text</option>
-              <option value="Customer requested cancellation">Customer requested cancellation</option>
-            </select>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <button
-                onClick={() => setRejectionModalJobId(null)}
-                style={{ minHeight: '44px', borderRadius: '8px', border: '1px solid #475569', background: '#0F172A', color: '#FFFFFF', fontWeight: 600, cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleRejectJob}
-                style={{ minHeight: '44px', borderRadius: '8px', border: 'none', background: '#DC2626', color: '#FFFFFF', fontWeight: 700, cursor: 'pointer' }}
-              >
-                Confirm Rejection
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+  const selected = queue.find(job => job.id === selectedId);
+  const filteredQueue = useMemo(() => queue.filter(job => {
+    const matches = `${job.file_name} ${job.customer_email} ${job.id}`.toLowerCase().includes(searchQuery.toLowerCase());
+    return matches && (statusFilter === 'ALL' || (statusFilter === 'PENDING' && job.status === 'PENDING_APPROVAL') || (statusFilter === 'SPOOLING' && ['QUEUED','PRINTING'].includes(job.status)) || (statusFilter === 'COMPLETED' && job.status === 'COMPLETED') || (statusFilter === 'ATTENTION' && job.status === 'COMPLETION_UNKNOWN'));
+  }), [queue, searchQuery, statusFilter]);
+  const pendingCount = queue.filter(j => j.status === 'PENDING_APPROVAL').length;
+  const dispatch = (ids: string[]) => { setQueue(prev => prev.map(job => ids.includes(job.id) && ['QUEUED','PENDING_APPROVAL'].includes(job.status) ? {...job, status: 'PRINTING'} : job)); setLocalJournalCount(n => n + ids.length); tone(); setNotice('Dispatch simulated locally. No document was sent to a printer; physical completion is unverified.'); };
+  const setJobStatus = (id: string, status: PrintJob['status'], rejection_reason?: string) => { setQueue(prev => prev.map(job => job.id === id ? {...job, status, rejection_reason} : job)); setLocalJournalCount(n => n + 1); };
+  const money = (paise: number) => new Intl.NumberFormat('en-IN', {style:'currency', currency:'INR'}).format(paise / 100);
+  const nav = [{id:'queue',label:'Dispatch queue',icon:Layers},{id:'printers',label:'Printers',icon:Printer},{id:'pairing',label:'Device pairing',icon:KeyRound},{id:'settings',label:'Preferences',icon:Settings}] as const;
+  return <div className="workstation">
+    <aside className="ws-sidebar"><a className="ws-brand" href="#main"><span><Printer size={25}/></span><div>Print Bot<small>COUNTER WORKSPACE</small></div></a><div className="ws-shop"><strong>Anna University<br/>Quick Xerox</strong><small>Chennai, Tamil Nadu</small></div>
+      <nav aria-label="Workstation">{nav.map(({id,label,icon:Icon}) => <button key={id} aria-current={activeTab === id ? 'page' : undefined} onClick={() => {setActiveTab(id); tone();}}><Icon size={19}/><span>{label}</span>{id === 'queue' && <b>{queue.length}</b>}</button>)}</nav>
+      <div className="ws-sidebar-bottom"><ShieldCheck size={21}/><strong>One plan. Every printer.</strong><p>Unlimited printers for each subscribed shop.</p></div>
+    </aside>
+    <div className="ws-workspace"><header className="ws-topbar"><div><span className="ws-eyebrow">WORKSTATION</span><strong>{deviceName}</strong></div><div className="ws-top-actions"><button aria-label={isAudioEnabled ? 'Mute feedback sounds' : 'Enable feedback sounds'} aria-pressed={isAudioEnabled} onClick={() => setIsAudioEnabled(!isAudioEnabled)}>{isAudioEnabled ? <Volume2 size={19}/> : <VolumeX size={19}/>}</button><ThemeSwitch/></div></header>
+      <main id="main" className="ws-main"><div className="ws-simulation"><AlertTriangle size={17}/><span>Local simulation · Sample jobs and printers. Cloud connection, payment verification and physical printing are not active.</span></div>
+      <MotionSurface transitionKey={activeTab} className="ws-view">
+        <div className="ws-page-heading"><div><span className="ws-eyebrow">PRINT STUDIO / {activeTab === 'queue' ? 'OPERATIONS' : activeTab.toUpperCase()}</span><h1>{activeTab === 'queue' ? 'A clear view of your queue.' : activeTab === 'printers' ? 'Your print room.' : activeTab === 'pairing' ? 'Connect with confidence.' : 'Make this space yours.'}</h1><p>{activeTab === 'queue' ? 'Review the details. Keep every job moving with care.' : activeTab === 'printers' ? 'Inspect sample capabilities before assigning a job.' : activeTab === 'pairing' ? 'A trusted workstation starts with a shop-authorized pairing.' : 'Appearance and local workstation preferences.'}</p></div>{activeTab === 'queue' && <button className="ws-primary" disabled={!pendingCount} onClick={() => dispatch(queue.filter(j => j.status === 'PENDING_APPROVAL').map(j => j.id))}>Simulate approval ({pendingCount})<ArrowUpRight size={18}/></button>}</div>
+        {notice && <div className="ws-notice" role="status"><span>{notice}</span><button aria-label="Dismiss message" onClick={() => setNotice('')}><X size={18}/></button></div>}
+        {activeTab === 'queue' && <>
+          <div ref={statsRef} className="ws-stats">{[{label:'Awaiting review',value:pendingCount,filter:'PENDING',note:'Your next decisions'},{label:'In the queue',value:queue.filter(j => ['QUEUED','PRINTING'].includes(j.status)).length,filter:'SPOOLING',note:'Sample dispatch activity'},{label:'Completed samples',value:queue.filter(j => j.status === 'COMPLETED').length,filter:'COMPLETED',note:'Not physical output'},{label:'Needs attention',value:queue.filter(j => j.status === 'COMPLETION_UNKNOWN').length,filter:'ATTENTION',note:'Supervised reconciliation'}].map(stat => <button className="ws-stat" key={stat.filter} aria-pressed={statusFilter === stat.filter} onClick={() => setStatusFilter(statusFilter === stat.filter ? 'ALL' : stat.filter)}><span>{stat.label}</span><strong>{String(stat.value).padStart(2,'0')}</strong><small>{stat.note}</small></button>)}</div>
+          <section className="ws-panel"><div className="ws-queue-toolbar"><div><h2>Job activity</h2><p>{filteredQueue.length} of {queue.length} sample jobs</p></div><label className="ws-search"><Search size={18}/><input aria-label="Search jobs" placeholder="Search filename, customer or ID" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}/>{searchQuery && <button aria-label="Clear search" onClick={() => setSearchQuery('')}><X size={16}/></button>}</label><label className="ws-filter"><span className="ws-sr-only">Filter jobs</span><select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}><option value="ALL">All jobs</option><option value="PENDING">Needs approval</option><option value="SPOOLING">In queue</option><option value="COMPLETED">Completed samples</option><option value="ATTENTION">Needs attention</option></select></label></div>
+          <div ref={jobListRef} className="ws-job-list">{filteredQueue.map(job => <article className="ws-job" key={job.id}><div className="ws-file-icon"><FileText size={23}/></div><div className="ws-job-main"><div className="ws-job-title"><h3>{job.file_name}</h3><span className={`ws-chip ${job.status === 'COMPLETION_UNKNOWN' ? 'ws-danger' : job.status === 'PENDING_APPROVAL' ? 'ws-warning' : ''}`}>{statusLabels[job.status]}</span></div><p>{job.id} · {job.customer_email}</p><div className="ws-job-specs"><span>{job.options.paper_size} / {job.options.color_mode === 'color' ? 'Color' : 'B&W'}</span><span>{job.options.copies} copies</span><span>{job.physical_sheets} sheets · {job.rendered_sides} sides · {job.logical_pages} logical pages</span></div>{job.rejection_reason && <p className="ws-reason">Reason: {job.rejection_reason}</p>}<div className="ws-job-actions"><button onClick={() => setSelectedId(job.id)}><Eye size={16}/>Details</button>{['PENDING_APPROVAL','QUEUED'].includes(job.status) && <button className="ws-primary" onClick={() => dispatch([job.id])}>{job.status === 'PENDING_APPROVAL' ? 'Simulate approval & dispatch' : 'Simulate dispatch'}</button>}{job.status === 'PENDING_APPROVAL' && <button onClick={() => setRejectionModalJobId(job.id)}>Reject</button>}{job.status === 'PRINTING' && <button onClick={() => setJobStatus(job.id,'COMPLETION_UNKNOWN')}>Flag uncertain outcome</button>}{job.status === 'COMPLETION_UNKNOWN' && <button className="ws-primary" onClick={() => {setReconcileId(job.id); setReconcileNote('');}}>Reconcile sample</button>}</div></div><strong className="ws-price">{money(job.calculated_price_paise)}<small>Sample quote</small></strong></article>)}{!filteredQueue.length && <div className="ws-empty"><Layers size={34}/><h3>No matching jobs</h3><p>Try a different filename or status.</p><button onClick={() => {setSearchQuery('');setStatusFilter('ALL');}}>Clear filters</button></div>}</div><footer className="ws-queue-footer"><span>{localJournalCount} local session events · Not a durable journal</span><button onClick={() => setNotice('Sync unavailable: this workspace has no authenticated cloud connection. Local events remain in memory; nothing was synchronized.')}><RefreshCw size={16}/>Check cloud sync</button></footer></section>
+        </>}
+        {activeTab === 'printers' && <><div className="ws-section-line"><span className="ws-chip">{printers.length} sample printers · Unlimited allowance</span><button onClick={() => setNotice('Hardware discovery is unavailable in this simulation. Connect the native Windows service to discover real printers.')}><RefreshCw size={17}/>Discover printers</button></div><div style={{ marginBottom: '1.5rem', borderRadius: '1rem', overflow: 'hidden', border: '1px solid var(--st-border, #e5ded6)', background: 'var(--st-card, #ffffff)' }}><PrinterScene /></div><div className="ws-printer-grid">{printers.map(printer => <article className="ws-panel ws-printer" key={printer.id}><div className="ws-printer-symbol"><Printer size={40}/></div><span className="ws-eyebrow">SAMPLE DEVICE</span><h2>{printer.name}</h2><p>{printer.driver_name}</p><dl><div><dt>Port</dt><dd>{printer.port}</dd></div><div><dt>Color</dt><dd>{printer.supports_color ? 'Color + mono' : 'Mono'}</dd></div><div><dt>Two-sided</dt><dd>{printer.supports_duplex ? 'Supported in sample' : 'Single-sided'}</dd></div></dl><div className="ws-size-list">{printer.supported_sizes.map(size => <span className="ws-chip" key={size}>{size}</span>)}</div></article>)}</div></>}
+        {activeTab === 'pairing' && <div className="ws-pairing-grid"><section className="ws-panel ws-form-panel"><KeyRound size={30}/><h2>Pair this workstation</h2><p>Use a short-lived code issued by an authorized shop account. Device IDs are identifiers, never credentials.</p><label>Workstation name<input value={deviceName} onChange={e => setDeviceName(e.target.value)} maxLength={64}/></label><label htmlFor="pair-code">One-time pairing code</label><input id="pair-code" inputMode="numeric" autoComplete="off" placeholder="6-digit code" value={pairingCode} onChange={e => setPairingCode(e.target.value.replace(/\D/g,'').slice(0,6))}/><button className="ws-primary" disabled={pairingCode.length !== 6} onClick={() => setNotice('Code format accepted locally. Pairing is BLOCKED: authenticated server challenge-response and hardware key attestation are not connected. No device was paired.')}>Check pairing readiness<ArrowUpRight size={18}/></button><dl><div><dt>Connection</dt><dd>Not paired</dd></div><div><dt>Key assurance</dt><dd>Unverified</dd></div></dl><button onClick={async () => {try {await navigator.clipboard.writeText(deviceName);setNotice('Workstation name copied.');} catch {setNotice('Clipboard unavailable. Select and copy the workstation name manually.');}}}><Copy size={16}/>Copy workstation name</button></section><div className="ws-pairing-art"><PrinterScene compact/><h2>Your shop. Your trusted devices.</h2><p>Live setup requires an active subscription and revocable device credentials. Hardware-backed key assurance is shown only after verification.</p></div></div>}
+        {activeTab === 'settings' && <div className="ws-settings-grid"><section className="ws-panel ws-form-panel"><h2>Working preferences</h2><p>These controls apply to this local simulation session.</p><label>Sample order mode<select value={orderMode} onChange={e => {setOrderMode(e.target.value);setNotice('Sample mode changed for future simulated jobs. Existing jobs are unchanged; no live shop setting was changed.');}}><option value="MANUAL_APPROVAL">MANUAL APPROVAL</option><option value="FULL_AUTOMATIC">FULL AUTOMATIC</option></select></label><p>Live changes require authorized, audited server actions. Cash or unverified payments cannot bypass approval.</p><label className="ws-check"><input type="checkbox" checked={background} onChange={e => setBackground(e.target.checked)}/><span>Prefer background service after logoff<small>Local preference only; Windows service integration unverified.</small></span></label><label className="ws-check"><input type="checkbox" checked={redact} onChange={e => setRedact(e.target.checked)}/><span>Redact filenames in notifications<small>Local preference; OS notifications are not connected.</small></span></label><label className="ws-check"><input type="checkbox" checked={isAudioEnabled} onChange={e => setIsAudioEnabled(e.target.checked)}/><span>Play feedback sounds</span></label></section><section className="ws-panel ws-form-panel"><h2>Appearance</h2><p>Follow your system or choose a light or dark workspace. Your queue and form values stay in place.</p><ThemeSwitch/><div className="ws-settings-note"><ShieldCheck size={24}/><h3>Privacy by design</h3><p>Only your appearance choice is saved by the theme system. Sample jobs and preferences remain in this session.</p></div></section></div>}
+      </MotionSurface></main><footer className="ws-bottom"><span>Print Bot / Windows workstation</span><span>Native service: unverified</span></footer>
     </div>
-  );
+    {selected && <Dialog title="Job details" onClose={() => setSelectedId(null)}><div className="ws-detail-name"><FileText size={28}/><h3>{selected.file_name}</h3><p>{selected.id} · Sample document metadata</p></div><dl className="ws-details">{[['Customer',selected.customer_email],['Status',statusLabels[selected.status]],['Paper',`${selected.options.paper_size} · ${selected.options.paper_gsm} GSM`],['Color / copies',`${selected.options.color_mode} · ${selected.options.copies}`],['Duplex / finishing',`${selected.options.duplex_mode} · ${selected.options.binding}`],['Page selection',selected.options.page_range || 'All'],['Pages per sheet',selected.options.pages_per_sheet || 1],['Accounting',`${selected.logical_pages} logical pages / ${selected.rendered_sides} sides / ${selected.physical_sheets} sheets`]].map(([key,value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}</dl><div className="ws-detail-price"><span>Sample customer quote</span><strong>{money(selected.calculated_price_paise)}</strong><small>No per-page software commission. Payment is unverified.</small></div><button onClick={() => setSelectedId(null)}>Close details</button></Dialog>}
+    {rejectionModalJobId && <Dialog title="Reject sample job" onClose={() => setRejectionModalJobId(null)}><p>Record a reason in this local session. No notification is sent to a customer.</p><label>Rejection reason<select value={rejectionReason} onChange={e => setRejectionReason(e.target.value)}>{['Poor image resolution or blurred scan','Requested paper size currently out of stock','Corrupted or unreadable PDF text','Customer requested cancellation'].map(reason => <option key={reason}>{reason}</option>)}</select></label><div className="ws-dialog-actions"><button onClick={() => setRejectionModalJobId(null)}>Cancel</button><button className="ws-primary" onClick={() => {setJobStatus(rejectionModalJobId,'REJECTED',rejectionReason);setRejectionModalJobId(null);}}>Confirm rejection</button></div></Dialog>}
+    {reconcileId && <Dialog title="Supervised sample reconciliation" onClose={() => setReconcileId(null)}><p>An unknown outcome must never trigger an automatic reprint. Record the operator's review before closing this sample job.</p><label>Operator review note<textarea rows={3} value={reconcileNote} onChange={e => setReconcileNote(e.target.value)} placeholder="Describe the reviewed outcome"/></label><div className="ws-dialog-actions"><button onClick={() => setReconcileId(null)}>Keep unresolved</button><button className="ws-primary" disabled={!reconcileNote.trim()} onClick={() => {setJobStatus(reconcileId,'COMPLETED',`Simulated operator review: ${reconcileNote.trim()}`);setReconcileId(null);setNotice('Sample reconciliation recorded locally. This does not confirm physical output or create a durable audit event.');}}>Resolve sample</button></div></Dialog>}
+  </div>;
 }
+export default function WorkstationApp() { return <ThemeProvider><Workstation/></ThemeProvider>; }

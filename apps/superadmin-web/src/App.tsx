@@ -1,285 +1,46 @@
-import React, { useState } from 'react';
-import { 
-  Building2, 
-  ShieldCheck, 
-  Sliders, 
-  Activity, 
-  AlertTriangle, 
-  CheckCircle2, 
-  Lock, 
-  FileText,
-  Search
-} from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Building2, LayoutDashboard, Activity, Shield, Search, ArrowUpRight, Printer, Lock } from 'lucide-react';
+import { ThemeProvider, MotionSurface, StudioHeader, PrinterScene, useGsapStagger } from '@xerox/ui';
+import '@xerox/ui/src/studio.css';
 
-interface ShopEntry {
-  id: string;
-  name: string;
-  city: string;
-  subscriptionStatus: 'active' | 'trial' | 'past_due' | 'grace' | 'suspended' | 'canceled';
-  printersCount: number;
-  bandwidthUsageGb: number;
-  bandwidthCeilingGb: number;
-  adminOverride: boolean;
-  adminOverrideReason?: string;
+type Shop = { id: string; name: string; city: string; status: string; printers: number; gb: number; override?: string };
+const initialShops: Shop[] = [
+  { id: 'shop-anna-1111', name: 'Anna University Quick Xerox', city: 'Chennai', status: 'Active', printers: 4, gb: 12.4 },
+  { id: 'shop-bharat-2222', name: 'Bharat Fast Prints', city: 'Madurai', status: 'Grace period', printers: 7, gb: 34.2 },
+  { id: 'shop-kovai-3333', name: 'Kovai Tech Copiers', city: 'Coimbatore', status: 'Suspended', printers: 2, gb: 5.1 },
+];
+function Console() {
+  const [tab, setTab] = useState('Shops');
+  const [shops, setShops] = useState(initialShops);
+  const [selected, setSelected] = useState(initialShops[0].id);
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState('All statuses');
+  const [reason, setReason] = useState('');
+  const [events, setEvents] = useState<string[]>([]);
+  const [notice, setNotice] = useState('');
+  const metricsRef = useGsapStagger<HTMLDivElement>({ stagger: 0.06, y: 12 });
+  const recordListRef = useGsapStagger<HTMLDivElement>({ selector: '.record', stagger: 0.05, y: 10 });
+  const dialog = useRef<HTMLDialogElement>(null);
+  const shop = shops.find(s => s.id === selected)!;
+  const visible = shops.filter(s => `${s.name} ${s.city} ${s.id}`.toLowerCase().includes(query.toLowerCase()) && (filter === 'All statuses' || s.status === filter));
+  function apply() {
+    if (!reason.trim()) return;
+    setShops(items => items.map(s => s.id === selected ? { ...s, override: reason.trim() } : s));
+    setEvents(items => [`${new Date().toLocaleTimeString()} · ${shop.id} · Local override preview: ${reason.trim()}`, ...items]);
+    setNotice(`Override preview recorded for ${shop.name}. Server entitlement and subscription status are unchanged.`);
+    dialog.current?.close();
+  }
+  return <div className="console-shell"><a className="skip-link" href="#main">Skip to main content</a>
+    <aside className="console-rail"><div className="brand"><Printer size={26}/><span>Print Bot<small>PLATFORM STUDIO</small></span></div><nav aria-label="Platform navigation">{[{ title: 'Shops', icon: Building2 }, { title: 'Activity', icon: Activity }, { title: 'Access policy', icon: Shield }].map(({ title, icon: Icon }) => <button key={title} className={tab === title ? 'nav-active' : ''} aria-current={tab === title ? 'page' : undefined} onClick={() => setTab(title)}><Icon size={19}/>{title}</button>)}</nav><div className="rail-bottom"><span className="eyebrow">PLATFORM OPERATIONS</span><strong>One connected platform.</strong><p>Independent shops.<br/>Separate customer data.</p><span className="badge">Preview environment</span></div></aside>
+    <div className="console-body"><StudioHeader title="Platform operations" subtitle="Print Bot · Administrative workspace"/><main id="main"><div className="preview-notice"><Shield size={18}/><span><strong>Interactive preview</strong> · Seeded shops, local actions. Authentication, MFA and live entitlements are not connected.</span></div><div className="page-heading"><div><span className="eyebrow">THE BIG PICTURE</span><h1>{tab === 'Shops' ? 'Every shop. Its own story.' : tab === 'Activity' ? 'A clear record of each action.' : 'Support with boundaries.'}</h1><p>{tab === 'Shops' ? 'A focused workspace for subscriptions and shop operations.' : 'Preview the controls that keep platform operations accountable.'}</p></div><span className="badge">One all-inclusive plan</span></div>{notice && <p className="feedback" role="status">{notice}</p>}
+      <MotionSurface transitionKey={tab}>
+      {tab === 'Shops' && <><div ref={metricsRef} className="metrics"><div><span>Sample shops</span><strong>03</strong><small>Independent workspaces</small></div><div><span>Require attention</span><strong>02</strong><small>Grace period or suspension</small></div><div><span>Printer policy</span><strong className="metric-word">Unlimited</strong><small>One plan · monthly or annual</small></div></div><div className="work-grid"><section className="panel"><div className="section-title"><h2>Shop directory</h2><span className="muted">{visible.length} shown</span></div><div className="filters"><label className="search"><Search size={18}/><input aria-label="Search shops" placeholder="Search shop, city or ID…" value={query} onChange={e => setQuery(e.target.value)}/></label><select aria-label="Filter subscription status" value={filter} onChange={e => setFilter(e.target.value)}>{['All statuses', 'Active', 'Grace period', 'Suspended'].map(s => <option key={s}>{s}</option>)}</select></div><div ref={recordListRef} className="record-list">{visible.map(s => <button key={s.id} className={`record ${selected === s.id ? 'selected' : ''}`} aria-pressed={selected === s.id} onClick={() => setSelected(s.id)}><span className="record-icon"><Building2 size={23}/></span><span className="record-info"><small>{s.city}</small><strong>{s.name}</strong><span>{s.printers} sample printers · {s.override ? 'Override preview saved' : 'All-inclusive plan'}</span></span><span className="record-end"><span className={`badge ${s.status === 'Active' ? '' : s.status === 'Suspended' ? 'danger' : 'warning'}`}>{s.status}</span><ArrowUpRight size={19}/></span></button>)}{!visible.length && <div className="empty"><Search/><h3>No shops found</h3><p>Try a name, city or a different subscription status.</p><button onClick={() => { setQuery(''); setFilter('All statuses'); }}>Clear filters</button></div>}</div></section>
+      <section className="panel detail" aria-label="Selected shop details"><span className="eyebrow">SHOP DETAILS · SAMPLE</span><h2>{shop.name}</h2><p className="detail-name">{shop.id}</p><dl><div><dt>City</dt><dd>{shop.city}</dd></div><div><dt>Subscription</dt><dd>{shop.status}</dd></div><div><dt>Printers</dt><dd>{shop.printers} · Unlimited allowed</dd></div><div><dt>Sample transfer</dt><dd>{shop.gb} GB</dd></div></dl><p className="note">Transfer is sample operational usage, not a paid feature tier or a per-printer limit.</p>{shop.override && <p className="feedback"><strong>Local override note</strong><br/>{shop.override}</p>}<button className="primary" onClick={() => { setReason(''); dialog.current?.showModal(); }}>Preview administrative override</button><p className="muted">No customer documents are exposed here. Live actions need an authorized, audited server request.</p></section></div></>}
+      {tab === 'Activity' && <div className="work-grid"><section className="panel"><div className="section-title"><h2>Local preview activity</h2><span className="badge">{events.length} events</span></div><p>Events below describe only changes made in this browser session. They reset on reload.</p>{events.length ? <ol className="events">{events.map((event, i) => <li key={i}><Activity size={18}/><span>{event}</span></li>)}</ol> : <div className="empty"><Activity size={32}/><h3>A clean slate</h3><p>Preview a shop override to see its local event here.</p><button onClick={() => setTab('Shops')}>Browse sample shops</button></div>}</section><section className="panel"><Lock size={28}/><h2>Production audit trail</h2><p>Durable server events must capture the actor, shop scope, reason and outcome of elevated operations.</p><button disabled>Load server audit events</button><p className="note">Unavailable until an authenticated audit endpoint is connected. This activity list is not a durable audit log.</p></section></div>}
+      {tab === 'Access policy' && <div className="work-grid"><section className="panel"><Shield size={30}/><h2>Elevated access, deliberately scoped</h2><p>Super-admin operations require MFA and audited elevated scopes. Support access must not become blanket document browsing.</p><div className="policy-item"><strong>Tenant boundaries</strong><p>Queries, storage and background jobs must remain shop-scoped. This interface does not verify backend isolation.</p></div><div className="policy-item"><strong>Safe resolution</strong><p>Already-paid orders need a safe resolution or refund path after subscription expiry. Overrides must not trigger automatic reprints.</p></div><div className="policy-item"><strong>Device identities</strong><p>Authorized device policies are separate from the unlimited-printer subscription. No one-PC limit is implied.</p></div></section><section className="panel"><span className="eyebrow">LIVE ACCESS & HARDWARE</span><h2>Hardware Telemetry & Model</h2><p>Inspect the connected Xerox production fleet and mutual asymmetric key attestation.</p><PrinterScene compact/><button disabled>Open elevated support session</button><p className="note">Connect authentication, MFA and scoped authorization before enabling support actions.</p></section></div>}
+      </MotionSurface></main><footer>Print Bot / Platform studio <span>Local interactive preview · resets on reload</span></footer></div>
+      <dialog ref={dialog} aria-labelledby="override-title"><form onSubmit={e => { e.preventDefault(); apply(); }}><span className="eyebrow">PREVIEW CONFIRMATION</span><h2 id="override-title">Preview an override?</h2><p><strong>{shop.name}</strong></p><p>Record a local override note. No subscription status, entitlement or live print permission will change.</p><label htmlFor="override-reason">Administrative reason (required)</label><textarea id="override-reason" rows={4} maxLength={500} required value={reason} onChange={e => setReason(e.target.value)} placeholder="Describe why this action would be needed…"/><div className="actions"><button type="button" onClick={() => dialog.current?.close()}>Cancel</button><button className="primary" disabled={!reason.trim()}>Confirm local preview</button></div></form></dialog>
+    </div>;
 }
+export default function App() { return <ThemeProvider><Console/></ThemeProvider>; }
 
-export default function SuperadminApp() {
-  const [shops, setShops] = useState<ShopEntry[]>([
-    {
-      id: 'shop-anna-1111',
-      name: 'Anna University Quick Xerox',
-      city: 'Chennai',
-      subscriptionStatus: 'active',
-      printersCount: 4,
-      bandwidthUsageGb: 12.4,
-      bandwidthCeilingGb: 100,
-      adminOverride: false,
-    },
-    {
-      id: 'shop-bharat-2222',
-      name: 'Bharat Fast Prints',
-      city: 'Madurai',
-      subscriptionStatus: 'grace',
-      printersCount: 7,
-      bandwidthUsageGb: 34.2,
-      bandwidthCeilingGb: 100,
-      adminOverride: false,
-    },
-    {
-      id: 'shop-kovai-3333',
-      name: 'Kovai Tech Copiers',
-      city: 'Coimbatore',
-      subscriptionStatus: 'suspended',
-      printersCount: 2,
-      bandwidthUsageGb: 5.1,
-      bandwidthCeilingGb: 100,
-      adminOverride: false,
-    },
-  ]);
-
-  const [selectedShop, setSelectedShop] = useState<ShopEntry | null>(null);
-  const [overrideReason, setOverrideReason] = useState<string>('');
-  const [auditLogs, setAuditLogs] = useState<string[]>([
-    '2026-10-22 14:30:00 — [AUTH] Superadmin MFA session established (TOTP)',
-    '2026-10-22 14:28:12 — [SUBSCRIPTION] shop-bharat-2222 entered grace period (7 days remaining)',
-    '2026-10-22 14:15:00 — [DEVICE] shop-anna-1111 paired Windows device ws-chennai-1 (Ed25519)',
-  ]);
-
-  const handleApplyOverride = () => {
-    if (!selectedShop || !overrideReason.trim()) return;
-
-    setShops((prev) =>
-      prev.map((s) =>
-        s.id === selectedShop.id
-          ? {
-              ...s,
-              adminOverride: true,
-              adminOverrideReason: overrideReason,
-              subscriptionStatus: 'active',
-            }
-          : s
-      )
-    );
-
-    const logEntry = `${new Date().toISOString()} — [OVERRIDE] Superadmin granted administrative override for ${selectedShop.name} (${selectedShop.id}). Reason: "${overrideReason}"`;
-    setAuditLogs((prev) => [logEntry, ...prev]);
-
-    setSelectedShop(null);
-    setOverrideReason('');
-  };
-
-  return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#090d16' }}>
-      {/* Superadmin Header */}
-      <header style={{ background: '#0f172a', borderBottom: '1px solid #1e293b', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Building2 size={28} color="#38bdf8" />
-          <div>
-            <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#f8fafc' }}>
-              Print Bot — Superadmin Platform Operations
-            </h1>
-            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Multi-Tenant SaaS Control Plane • Single All-Inclusive Plan</span>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#14532d', color: '#4ade80', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600 }}>
-            <ShieldCheck size={16} />
-            <span>MFA Active (TOTP RFC 6238)</span>
-          </div>
-          <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>superadmin@printbot.in</span>
-        </div>
-      </header>
-
-      {/* Main Grid */}
-      <main style={{ flex: 1, padding: '24px', maxWidth: '1400px', margin: '0 auto', width: '100%', display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
-        {/* Shops Table */}
-        <section style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#f8fafc' }}>
-              Subscribed Printing Shops ({shops.length})
-            </h2>
-            <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-              Plan: <strong style={{ color: '#38bdf8' }}>All-Inclusive (₹999/mo)</strong> • Unlimited Printers
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {shops.map((s) => (
-              <div
-                key={s.id}
-                style={{
-                  background: '#1e293b',
-                  border: s.adminOverride ? '1px solid #0284c7' : '1px solid #334155',
-                  borderRadius: '8px',
-                  padding: '16px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <strong style={{ fontSize: '1rem', color: '#f8fafc' }}>{s.name}</strong>
-                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>({s.city})</span>
-                    {s.adminOverride && (
-                      <span style={{ background: '#0369a1', color: '#ffffff', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
-                        AUDITED OVERRIDE
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '4px' }}>
-                    Printers: {s.printersCount} (Unlimited) • Quota: {s.bandwidthUsageGb} / {s.bandwidthCeilingGb} GB
-                  </div>
-                  {s.adminOverrideReason && (
-                    <div style={{ fontSize: '0.75rem', color: '#38bdf8', marginTop: '2px' }}>
-                      Override note: "{s.adminOverrideReason}"
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: '6px',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      background:
-                        s.subscriptionStatus === 'active'
-                          ? '#14532d'
-                          : s.subscriptionStatus === 'grace'
-                          ? '#78350f'
-                          : '#7f1d1d',
-                      color:
-                        s.subscriptionStatus === 'active'
-                          ? '#4ade80'
-                          : s.subscriptionStatus === 'grace'
-                          ? '#fbbf24'
-                          : '#f87171',
-                    }}
-                  >
-                    {s.subscriptionStatus.toUpperCase()}
-                  </span>
-
-                  <button
-                    onClick={() => setSelectedShop(s)}
-                    style={{
-                      background: '#334155',
-                      color: '#f8fafc',
-                      border: 'none',
-                      padding: '6px 12px',
-                      borderRadius: '6px',
-                      fontSize: '0.8rem',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Override
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Right Column: Audit Log & Impersonation */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Audit Event Stream */}
-          <section style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '20px', flex: 1 }}>
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Activity size={18} color="#38bdf8" />
-              Platform Audit Events
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '360px', overflowY: 'auto' }}>
-              {auditLogs.map((log, idx) => (
-                <div key={idx} style={{ fontSize: '0.75rem', color: '#cbd5e1', padding: '8px', background: '#1e293b', borderRadius: '6px', borderLeft: '3px solid #38bdf8' }}>
-                  {log}
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Support Impersonation Policy Notice */}
-          <section style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              <Lock size={18} color="#eab308" />
-              <strong style={{ fontSize: '0.9rem', color: '#f8fafc' }}>Tenant Isolation Policy</strong>
-            </div>
-            <p style={{ margin: 0, fontSize: '0.8rem', color: '#94a3b8', lineHeight: 1.5 }}>
-              PostgreSQL RLS is forced on all tenant tables. Support impersonation sessions require explicit justification and strictly block customer document downloads by default.
-            </p>
-          </section>
-        </div>
-      </main>
-
-      {/* Override Modal */}
-      {selectedShop && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-          <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '12px', padding: '24px', maxWidth: '480px', width: '100%' }}>
-            <h3 style={{ margin: '0 0 8px 0', color: '#f8fafc' }}>
-              Administrative Override: {selectedShop.name}
-            </h3>
-            <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '16px' }}>
-              This action overrides subscription suspension or grace state, allowing all print operations to continue. A formal audit justification is mandatory.
-            </p>
-
-            <label style={{ display: 'block', fontSize: '0.85rem', color: '#cbd5e1', marginBottom: '6px' }}>
-              Mandatory Audit Reason:
-            </label>
-            <textarea
-              rows={3}
-              value={overrideReason}
-              onChange={(e) => setOverrideReason(e.target.value)}
-              placeholder="e.g., Bank NEFT settlement verification pending; approved by platform lead."
-              style={{ width: '100%', padding: '8px', borderRadius: '6px', background: '#1e293b', border: '1px solid #475569', color: '#f8fafc', marginBottom: '16px' }}
-            />
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button
-                onClick={() => setSelectedShop(null)}
-                style={{ background: 'transparent', border: '1px solid #475569', color: '#94a3b8', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleApplyOverride}
-                disabled={!overrideReason.trim()}
-                style={{
-                  background: overrideReason.trim() ? '#0284c7' : '#334155',
-                  color: '#ffffff',
-                  border: 'none',
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  fontWeight: 600,
-                  cursor: overrideReason.trim() ? 'pointer' : 'not-allowed',
-                }}
-              >
-                Apply Audited Override
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}

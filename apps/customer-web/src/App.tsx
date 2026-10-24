@@ -1,837 +1,92 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Upload, Camera, FileText, Trash2, ArrowUp, ArrowDown, ArrowRight, ShieldCheck, SlidersHorizontal, LockKeyhole, Printer } from 'lucide-react';
+import { MotionSurface, PaperScene, PrinterScene, StudioHeader, useGsapStagger } from '@xerox/ui';
 import { translations, Language } from './locales';
-import {
-  Upload,
-  Camera,
-  FileText,
-  CheckCircle2,
-  RefreshCw,
-  Printer,
-  ShieldCheck,
-  Trash2,
-  Lock,
-  ChevronRight,
-  Clock,
-  Layers,
-  Sparkles,
-  QrCode
-} from 'lucide-react';
 
-interface UploadedDoc {
-  id: string;
-  name: string;
-  size: string;
-  pages: number;
-  format: string;
-  isEncrypted?: boolean;
-  options: {
-    copies: number;
-    colorMode: 'bw' | 'color';
-    paperSize: 'A4' | 'A3' | 'Legal' | 'Letter';
-    duplex: 'simplex' | 'duplex_long' | 'duplex_short';
-    pageRange: string;
-    nup: number;
-    photoPreset: 'standard' | 'passport_8up' | 'id_front_back';
-  };
+
+interface Options { copies: number; colorMode: 'bw' | 'color' | 'grayscale'; finishing: string; paperSize: string; duplex: string; pageRange: string; nup: number; photoPreset: string }
+interface DocumentSelection { id: string; name: string; size: string; format: string; options: Options }
+const defaults: Options = { copies: 1, finishing: 'none', colorMode: 'bw', paperSize: 'A4', duplex: 'simplex', pageRange: 'all', nup: 1, photoPreset: 'standard' };
+const copy = {
+ en: { welcome: 'A little less waiting. A lot more doing.', intro: 'Your documents, your way. Choose a file, set the details, and get ready for your next print.', preview: 'Interactive preview', notice: 'Files stay in this tab. Upload, server preview, pricing, payment and printing are not connected.', select: 'Choose your documents', selected: 'Selected files', configure: 'Make it yours.', review: 'Review your choices.', advanced: 'More print options', next: 'Continue', back: 'Back', pending: 'Awaiting a server quote', unavailable: 'Checkout unavailable', pendingInfo: 'A connected shop session must validate your files and options, return a preview and lock a price before checkout.', workflow: 'What happens next', workflowInfo: 'After a verified order, status updates will appear here. No order has been created.', options: 'Print preferences', payment: 'Preferred payment method', empty: 'No files selected yet', fileInfo: 'PDF, PNG, JPG, DOCX, XLSX, PPTX · 100 MB per file', unknown: 'Page count needs server validation', rangeHelp: 'Use all, odd, even or a range such as 1-3,5,8-. The server must validate page bounds.', example: 'Example shop · Anna Xerox, Guindy', privacy: 'No account needed for the customer flow', clear: 'Clear selection', estimate: 'Price and sheet count pending', illustration: 'Illustration only. This is not a preview of your file.' },
+ ta: { welcome: 'காத்திருப்பது குறைவு. செய்வது அதிகம்.', intro: 'உங்கள் ஆவணங்கள், உங்கள் விருப்பம். கோப்பைத் தேர்ந்தெடுத்து அச்சிடும் அமைப்புகளை மாற்றவும்.', preview: 'ஊடாடும் முன்னோட்டம்', notice: 'கோப்புகள் இந்தத் தாவலில் மட்டுமே உள்ளன. பதிவேற்றம், விலை, கட்டணம் மற்றும் அச்சிடுதல் இணைக்கப்படவில்லை.', select: 'உங்கள் ஆவணங்களைத் தேர்ந்தெடுக்கவும்', selected: 'தேர்ந்தெடுத்த கோப்புகள்', configure: 'உங்கள் விருப்பப்படி.', review: 'விருப்பங்களைச் சரிபார்க்கவும்.', advanced: 'கூடுதல் அச்சிடும் விருப்பங்கள்', next: 'தொடரவும்', back: 'பின்செல்', pending: 'சேவையக விலை நிலுவையில்', unavailable: 'கட்டணம் இப்போது கிடைக்கவில்லை', pendingInfo: 'இணைக்கப்பட்ட கடை அமர்வு கோப்புகளைச் சரிபார்த்து முன்னோட்டம் மற்றும் உறுதியான விலையை வழங்க வேண்டும்.', workflow: 'அடுத்து என்ன நடக்கும்', workflowInfo: 'உறுதிசெய்த ஆர்டருக்குப் பிறகு நிலை இங்கே தெரியும். ஆர்டர் உருவாக்கப்படவில்லை.', options: 'அச்சிடும் விருப்பங்கள்', payment: 'விருப்பமான கட்டண முறை', empty: 'கோப்புகள் தேர்ந்தெடுக்கப்படவில்லை', fileInfo: 'PDF, PNG, JPG, DOCX, XLSX, PPTX · கோப்புக்கு 100 MB', unknown: 'பக்க எண்ணிக்கைக்கு சேவையகச் சரிபார்ப்பு தேவை', rangeHelp: 'all, odd, even அல்லது 1-3,5,8- போன்ற வரம்பைப் பயன்படுத்தவும். சேவையகம் சரிபார்க்க வேண்டும்.', example: 'மாதிரிக் கடை · அண்ணா ஜெராக்ஸ், கிண்டி', privacy: 'வாடிக்கையாளருக்குக் கணக்கு தேவையில்லை', clear: 'தேர்வை அழிக்கவும்', estimate: 'விலையும் தாள் எண்ணிக்கையும் நிலுவையில்', illustration: 'விளக்கப்படம் மட்டுமே. உங்கள் கோப்பின் முன்னோட்டம் அல்ல.' },
+ hi: { welcome: 'कम इंतज़ार। ज़्यादा काम।', intro: 'आपके दस्तावेज़, आपकी पसंद। फ़ाइल चुनें और प्रिंट विकल्प तय करें।', preview: 'इंटरैक्टिव पूर्वावलोकन', notice: 'फ़ाइलें केवल इस टैब में हैं। अपलोड, कीमत, भुगतान और प्रिंटिंग जुड़े नहीं हैं।', select: 'अपने दस्तावेज़ चुनें', selected: 'चुनी गई फ़ाइलें', configure: 'अपनी पसंद चुनें।', review: 'अपने विकल्प देखें।', advanced: 'और प्रिंट विकल्प', next: 'आगे बढ़ें', back: 'वापस', pending: 'सर्वर की कीमत का इंतज़ार', unavailable: 'चेकआउट उपलब्ध नहीं', pendingInfo: 'जुड़े हुए दुकान सत्र को फ़ाइलें जाँचकर पूर्वावलोकन और तय कीमत देनी होगी।', workflow: 'आगे क्या होगा', workflowInfo: 'सत्यापित ऑर्डर के बाद स्थिति यहाँ दिखेगी। कोई ऑर्डर नहीं बना है।', options: 'प्रिंट प्राथमिकताएँ', payment: 'पसंदीदा भुगतान तरीका', empty: 'अभी कोई फ़ाइल नहीं चुनी गई', fileInfo: 'PDF, PNG, JPG, DOCX, XLSX, PPTX · प्रति फ़ाइल 100 MB', unknown: 'पृष्ठों की संख्या सर्वर जाँच के बाद मिलेगी', rangeHelp: 'all, odd, even या 1-3,5,8- जैसी रेंज चुनें। सर्वर पृष्ठ सीमा जाँचेगा।', example: 'उदाहरण दुकान · अन्ना ज़ेरॉक्स, गिंडी', privacy: 'ग्राहक को खाते की ज़रूरत नहीं', clear: 'चयन हटाएँ', estimate: 'कीमत और शीट संख्या बाकी हैं', illustration: 'केवल चित्रण। यह आपकी फ़ाइल का पूर्वावलोकन नहीं है।' },
+};
+
+function CustomerFlow() {
+ const [lang, setLang] = useState<Language>('en');
+ const [step, setStep] = useState(1);
+ const [files, setFiles] = useState<DocumentSelection[]>([]);
+ const [activeId, setActiveId] = useState('');
+ const [applyAll, setApplyAll] = useState(true);
+ const [payment, setPayment] = useState('upi');
+ const [error, setError] = useState('');
+ const fileListRef = useGsapStagger<HTMLUListElement>({ selector: 'li', stagger: 0.05, y: 10 });
+ const t = translations[lang]; const c = copy[lang];
+ const active = files.find(f => f.id === activeId) || files[0];
+ useEffect(() => { document.documentElement.lang = lang; }, [lang]);
+ useEffect(() => { try { localStorage.removeItem('printbot_customer_session'); } catch { /* No customer metadata is persisted. */ } }, []);
+ const selectFiles = (selected: FileList | null) => {
+  if (!selected) return;
+  const accepted: DocumentSelection[] = []; const rejected: string[] = [];
+  Array.from(selected).forEach(file => {
+   if (!/\.(pdf|png|jpe?g|docx|xlsx|pptx)$/i.test(file.name) || file.size > 100 * 1024 * 1024 || file.size === 0) { rejected.push(file.name); return; }
+   accepted.push({ id: crypto.randomUUID(), name: file.name, size: `${(file.size / 1024 / 1024).toFixed(2)} MB`, format: file.name.split('.').pop()!.toUpperCase(), options: { ...(applyAll && active ? active.options : defaults) } });
+  });
+  setFiles(previous => [...previous, ...accepted]);
+  setError(rejected.length ? `Unsupported, empty or over 100 MB: ${rejected.join(', ')}` : '');
+ };
+ const update = (patch: Partial<Options>) => setFiles(previous => previous.map(file => applyAll || file.id === active?.id ? { ...file, options: { ...file.options, ...patch } } : file));
+ const remove = (id: string) => { setFiles(previous => previous.filter(f => f.id !== id)); if (files.length === 1) setStep(1); };
+ const move = (index: number, direction: number) => setFiles(previous => { const result = [...previous]; [result[index], result[index + direction]] = [result[index + direction], result[index]]; return result; });
+ const rangeValid = files.every(file => /^(all|odd|even|[1-9]\d*(?:-(?:[1-9]\d*)?)?(?:\s*,\s*[1-9]\d*(?:-(?:[1-9]\d*)?)?)*)$/.test(file.options.pageRange));
+ return <div className="customer-app">
+  <StudioHeader title={t.title} subtitle={c.example}>
+   <label className="customer-language"><span className="sr-only">Language</span><select value={lang} onChange={e => setLang(e.target.value as Language)}><option value="en">English</option><option value="ta">தமிழ்</option><option value="hi">हिन्दी</option></select></label>
+  </StudioHeader>
+  <div className="customer-layout">
+   <aside className="customer-welcome"><span className="customer-eyebrow"><Printer size={16}/> YOUR NEIGHBOURHOOD PRINT STUDIO</span><h1>{c.welcome}</h1><p>{c.intro}</p><PrinterScene compact /><div className="customer-trust"><ShieldCheck size={20}/><span>{c.privacy}</span></div><div className="customer-side-note"><strong>01 — 02 — 03</strong><p>{t.step1_upload} → {t.step2_config} → {t.step3_pay}</p></div></aside>
+   <main className="customer-main" id="main">
+    
+    <nav className="customer-steps" aria-label="Order steps">{[t.step1_upload, t.step2_config, t.step3_pay].map((label, i) => <button key={i} disabled={i > 0 && (!files.length || (i === 2 && !rangeValid))} aria-current={step === i + 1 ? 'step' : undefined} onClick={() => setStep(i + 1)}><span>{String(i + 1).padStart(2, '0')}</span>{label.replace(/^\d\.\s*/, '')}</button>)}</nav>
+    <MotionSurface transitionKey={step} className="customer-step">
+     <div className="customer-section-heading"><h2>{step === 1 ? c.select : step === 2 ? c.configure : c.review}</h2></div>
+     {step === 1 && <>
+      <label className="customer-upload"><input aria-label={t.upload_cta} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx,.pptx" onChange={e => { selectFiles(e.target.files); e.target.value = ''; }}/><span className="customer-upload-icon"><Upload size={30}/></span><strong>{t.upload_cta}</strong><span>{c.fileInfo}</span></label>
+      <label className="customer-camera"><Camera size={20}/>{t.camera_cta}<input aria-label={t.camera_cta} type="file" accept="image/png,image/jpeg" capture="environment" onChange={e => { selectFiles(e.target.files); e.target.value = ''; }}/></label>
+      {error && <p role="alert" className="customer-error">{error}</p>}
+      <div className="customer-files-heading"><h3>{c.selected} <span>{files.length.toString().padStart(2, '0')}</span></h3>{files.length > 0 && <button onClick={() => setFiles([])}>{c.clear}</button>}</div>
+      {!files.length && <p className="customer-empty"><FileText size={24}/>{c.empty}</p>}
+      <ul ref={fileListRef} className="customer-file-list">{files.map((file, index) => <li key={file.id}><FileText size={24}/><div><strong>{file.name}</strong><span>{file.format} · {file.size}</span></div><div className="customer-file-actions"><button aria-label={`Move ${file.name} up`} disabled={index === 0} onClick={() => move(index, -1)}><ArrowUp size={17}/></button><button aria-label={`Move ${file.name} down`} disabled={index === files.length - 1} onClick={() => move(index, 1)}><ArrowDown size={17}/></button><button aria-label={`Remove ${file.name}`} onClick={() => remove(file.id)}><Trash2 size={18}/></button></div></li>)}</ul>
+     </>}
+     {step === 2 && active && <>
+      <label className="customer-field">{c.selected}<select value={active.id} onChange={e => setActiveId(e.target.value)}>{files.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label>
+      {files.length > 1 && <label className="customer-check"><input type="checkbox" checked={applyAll} onChange={e => { const checked = e.target.checked; setApplyAll(checked); if (checked) setFiles(previous => previous.map(file => ({ ...file, options: { ...active.options } }))); }}/>{t.apply_to_all}</label>}
+      <div className="customer-configuration">
+       <fieldset><legend>{t.color_mode}</legend><div className="customer-choice-row">{(['bw', 'color', 'grayscale'] as const).map(mode => <button aria-pressed={active.options.colorMode === mode} key={mode} onClick={() => update({ colorMode: mode })}><span className={`customer-color-dot ${mode}`}/>{mode === 'grayscale' ? (lang === 'ta' ? 'சாம்பல் நிறம்' : lang === 'hi' ? 'ग्रेस्केल' : 'Grayscale') : t[mode].replace(/\s*\(₹[^)]*\)/, '')}</button>)}</div></fieldset>
+       <label className="customer-field">{t.duplex}<select value={active.options.duplex} onChange={e => update({ duplex: e.target.value })}><option value="simplex">{t.single_sided}</option><option value="duplex_long">{t.double_sided_long}</option><option value="duplex_short">{t.double_sided_short}</option></select></label>
+       <div className="customer-two-columns"><label className="customer-field">{t.copies}<input type="number" min={1} max={999} value={active.options.copies} onChange={e => update({ copies: Math.max(1, Math.min(999, Number(e.target.value) || 1)) })}/></label><label className="customer-field">{t.paper_size}<select value={active.options.paperSize} onChange={e => update({ paperSize: e.target.value })}>{['A4', 'A3', 'A5', 'Legal', 'Letter'].map(size => <option key={size}>{size}</option>)}</select></label></div>
+       <details className="customer-advanced"><summary><SlidersHorizontal size={19}/>{c.advanced}</summary><div className="customer-advanced-content">
+        <label className="customer-field">{t.page_range}<input value={active.options.pageRange} aria-invalid={!rangeValid} aria-describedby="range-help" onChange={e => update({ pageRange: e.target.value })}/></label><p id="range-help" className={rangeValid ? 'customer-hint' : 'customer-error'}>{c.rangeHelp}</p>
+        <div className="customer-range-presets">{[['all', t.all_pages], ['odd', t.odd_only], ['even', t.even_only]].map(([value, label]) => <button key={value} aria-pressed={active.options.pageRange === value} onClick={() => update({ pageRange: value })}>{label}</button>)}</div>
+        <label className="customer-field">{t.nup}<select value={active.options.nup} onChange={e => update({ nup: Number(e.target.value) })}>{[1, 2, 4, 6, 9, 16].map(n => <option key={n} value={n}>{n}</option>)}</select></label>
+        <label className="customer-field">{lang === 'ta' ? 'பைண்டிங் விருப்பம்' : lang === 'hi' ? 'बाइंडिंग प्राथमिकता' : 'Finishing preference'}<select value={active.options.finishing} onChange={e => update({ finishing: e.target.value })}><option value="none">{lang === 'ta' ? 'இல்லை' : lang === 'hi' ? 'नहीं' : 'None'}</option><option value="staple">{lang === 'ta' ? 'ஸ்டேப்ளர்' : lang === 'hi' ? 'स्टेपल' : 'Corner staple'}</option><option value="spiral">{lang === 'ta' ? 'ஸ்பைரல் பைண்டிங்' : lang === 'hi' ? 'स्पाइरल' : 'Spiral coil'}</option><option value="hard_bind">{lang === 'ta' ? 'ஹார்ட் பைண்ட்' : lang === 'hi' ? 'हार्ड बाइंड' : 'Hard bound'}</option></select></label><label className="customer-field">{t.photo_preset}<select value={active.options.photoPreset} onChange={e => update({ photoPreset: e.target.value })}><option value="standard">{t.standard_layout}</option><option value="passport_8up">{t.passport_8up}</option><option value="id_front_back">{t.id_front_back}</option></select></label>
+       </div></details>
+      </div><div className="customer-server-note"><FileText size={22}/><div><strong>{c.unknown}</strong><p>{c.pendingInfo}</p></div></div>
+     </>}
+     {step === 3 && <>
+      <div className="customer-summary">{files.map(file => <div key={file.id}><FileText size={21}/><div><strong>{file.name}</strong><p>{file.options.copies} × {file.options.paperSize} · {file.options.colorMode === 'grayscale' ? (lang === 'ta' ? 'சாம்பல் நிறம்' : lang === 'hi' ? 'ग्रेस्केल' : 'Grayscale') : file.options.colorMode === 'bw' ? t.bw.replace(/\s*\(₹[^)]*\)/, '') : t.color.replace(/\s*\(₹[^)]*\)/, '')} · {file.options.pageRange}</p></div></div>)}</div>
+      <div className="customer-quote"><LockKeyhole size={25}/><h3>{c.pending}</h3><p>{c.pendingInfo}</p><dl>{[t.logical_pages, t.rendered_sides, t.physical_sheets, t.price_total].map(label => <div key={label}><dt>{label}</dt><dd>—</dd></div>)}</dl></div>
+      <fieldset><legend>{c.payment}</legend><div className="customer-choice-row"><button aria-pressed={payment === 'upi'} onClick={() => setPayment('upi')}>{t.pay_upi}</button><button aria-pressed={payment === 'cash'} onClick={() => setPayment('cash')}>{t.pay_cash}</button></div></fieldset>
+      <div className="customer-server-note"><Printer size={24}/><div><strong>{c.workflow}</strong><p>{c.workflowInfo}</p></div></div>
+     </>}
+    </MotionSurface>
+    {files.length > 0 && <footer className="customer-action-bar"><div><strong>{files.length} {c.selected.toLowerCase()}</strong><span>{c.estimate}</span></div><div className="customer-footer-buttons">{step > 1 && <button onClick={() => setStep(step - 1)}>{c.back}</button>}<button className="customer-primary" disabled={step === 3 || !rangeValid} onClick={() => setStep(step + 1)}>{step === 3 ? c.unavailable : c.next}{step < 3 && <ArrowRight size={18}/>}</button></div></footer>}
+   </main>
+  </div>
+ </div>;
 }
+export default CustomerFlow;
 
-export default function App() {
-  const [lang, setLang] = useState<Language>('en');
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [files, setFiles] = useState<UploadedDoc[]>([]);
-  const [activeFileIndex, setActiveFileIndex] = useState<number>(0);
-  const [applyToAll, setApplyToAll] = useState<boolean>(true);
-  const [paymentMethod, setPaymentMethod] = useState<'upi' | 'cash'>('upi');
-  const [orderStatus, setOrderStatus] = useState<'received' | 'approved' | 'printing' | 'ready'>('received');
-  const [quoteHash, setQuoteHash] = useState<string>('c83f9e12a4b7d081');
-  const [quoteSecondsLeft, setQuoteSecondsLeft] = useState<number>(900); // 15 mins
-  const [showPasswordModal, setShowPasswordModal] = useState<boolean>(false);
-  const [enteredPassword, setEnteredPassword] = useState<string>('');
-  const [previewPage, setPreviewPage] = useState<number>(1);
-  const [trackingId] = useState<string>(() => `TRK-${Math.floor(100000 + Math.random() * 900000)}`);
 
-  const t = translations[lang];
 
-  // Load persisted session on initial mount
-  useEffect(() => {
-    const saved = localStorage.getItem('printbot_customer_session');
-    if (saved) {
-      try {
-        const data = JSON.parse(saved);
-        if (data.files && data.files.length > 0) {
-          setFiles(data.files);
-          setStep(data.step || 1);
-        }
-      } catch (e) {
-        // Ignore parse error
-      }
-    }
-  }, []);
-
-  // Save session to localStorage
-  useEffect(() => {
-    localStorage.setItem(
-      'printbot_customer_session',
-      JSON.stringify({ files, step, lang })
-    );
-  }, [files, step, lang]);
-
-  // Quote timer countdown
-  useEffect(() => {
-    if (step === 3 && quoteSecondsLeft > 0) {
-      const timer = setInterval(() => {
-        setQuoteSecondsLeft((prev) => (prev > 0 ? prev - 1 : 0));
-      }, 1000);
-      return () => clearInterval(timer);
-    }
-  }, [step, quoteSecondsLeft]);
-
-  // Compute exact deterministic price and physical sheets
-  const computeAccounting = () => {
-    let totalLogical = 0;
-    let totalRendered = 0;
-    let totalSheets = 0;
-    let totalPaise = 0;
-
-    files.forEach((f) => {
-      const opts = applyToAll && files[0] ? files[0].options : f.options;
-      const copies = opts.copies;
-      const nup = opts.nup;
-      const pages = f.pages;
-
-      // Range resolution heuristic
-      let logical = pages;
-      if (opts.pageRange === 'odd') logical = Math.ceil(pages / 2);
-      else if (opts.pageRange === 'even') logical = Math.floor(pages / 2);
-
-      const renderedPerCopy = Math.ceil(logical / nup);
-      const isDuplex = opts.duplex !== 'simplex';
-      const sheetsPerCopy = isDuplex ? Math.ceil(renderedPerCopy / 2) : renderedPerCopy;
-      const sheets = sheetsPerCopy * copies;
-
-      const baseRatePaise = opts.colorMode === 'color' ? 1000 : 150;
-      const discountFactor = isDuplex ? 0.85 : 1.0;
-      const costPerCopyPaise = isDuplex
-        ? (sheetsPerCopy * baseRatePaise) + ((renderedPerCopy - sheetsPerCopy) * baseRatePaise * discountFactor)
-        : (renderedPerCopy * baseRatePaise);
-
-      const sizeMultiplier = opts.paperSize === 'A3' ? 2.0 : 1.0;
-      const filePaise = Math.round(costPerCopyPaise * sizeMultiplier * copies);
-
-      totalLogical += logical * copies;
-      totalRendered += renderedPerCopy * copies;
-      totalSheets += sheets;
-      totalPaise += filePaise;
-    });
-
-    return {
-      totalLogical,
-      totalRendered,
-      totalSheets,
-      totalPaise,
-      totalRupees: (totalPaise / 100).toFixed(2),
-    };
-  };
-
-  const accounting = computeAccounting();
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const newDocs: UploadedDoc[] = Array.from(e.target.files).map((file, idx) => ({
-        id: `doc-${Date.now()}-${idx}`,
-        name: file.name,
-        size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
-        pages: file.name.toLowerCase().endsWith('.pdf') ? 8 : 1,
-        format: file.name.split('.').pop()?.toUpperCase() || 'PDF',
-        isEncrypted: file.name.toLowerCase().includes('protected'),
-        options: {
-          copies: 1,
-          colorMode: 'bw',
-          paperSize: 'A4',
-          duplex: 'simplex',
-          pageRange: 'all',
-          nup: 1,
-          photoPreset: 'standard',
-        },
-      }));
-
-      setFiles((prev) => [...prev, ...newDocs]);
-      if (newDocs[0]?.isEncrypted) {
-        setShowPasswordModal(true);
-      } else {
-        setStep(2);
-      }
-    }
-  };
-
-  const currentFile = files[activeFileIndex] || files[0];
-
-  const updateCurrentOptions = (patch: Partial<UploadedDoc['options']>) => {
-    setFiles((prev) =>
-      prev.map((f, idx) => {
-        if (applyToAll || idx === activeFileIndex) {
-          return { ...f, options: { ...f.options, ...patch } };
-        }
-        return f;
-      })
-    );
-  };
-
-  return (
-    <div style={{ maxWidth: '520px', margin: '0 auto', minHeight: '100vh', padding: '16px 16px 90px 16px', display: 'flex', flexDirection: 'column', background: '#F8FAFC', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      {/* Header with Shop Details and Language Selector */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', padding: '12px 16px', background: '#FFFFFF', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Printer size={22} color="#2563EB" />
-            {t.title}
-          </h1>
-          <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Clock size={12} /> Anna Xerox Guindy • Open until 9:00 PM
-          </p>
-        </div>
-        {/* Language buttons */}
-        <div style={{ display: 'flex', gap: '4px' }}>
-          {(['en', 'ta', 'hi'] as Language[]).map((l) => (
-            <button
-              key={l}
-              onClick={() => setLang(l)}
-              style={{
-                minHeight: '44px',
-                minWidth: '44px',
-                padding: '6px 10px',
-                borderRadius: '8px',
-                border: lang === l ? '2px solid #2563EB' : '1px solid #E2E8F0',
-                background: lang === l ? '#EFF6FF' : '#FFFFFF',
-                fontWeight: lang === l ? 700 : 500,
-                color: lang === l ? '#1D4ED8' : '#64748B',
-                cursor: 'pointer',
-              }}
-            >
-              {l === 'en' ? 'EN' : l === 'ta' ? 'தமிழ்' : 'हिन्दी'}
-            </button>
-          ))}
-        </div>
-      </header>
-
-      {/* 3-Step Navigation Tabs */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '16px' }}>
-        {[
-          { num: 1, label: t.step1_upload },
-          { num: 2, label: t.step2_config },
-          { num: 3, label: t.step3_pay },
-        ].map((s) => (
-          <button
-            key={s.num}
-            onClick={() => setStep(s.num as any)}
-            disabled={s.num > 1 && files.length === 0}
-            style={{
-              minHeight: '44px',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              borderRadius: '8px',
-              border: 'none',
-              background: step === s.num ? '#2563EB' : '#FFFFFF',
-              color: step === s.num ? '#FFFFFF' : files.length > 0 ? '#334155' : '#94A3B8',
-              cursor: files.length > 0 ? 'pointer' : 'not-allowed',
-              boxShadow: step === s.num ? '0 2px 4px rgba(37,99,235,0.2)' : 'none',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '6px 4px',
-              textAlign: 'center',
-            }}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
-
-      {/* ================= SCREEN 1: UPLOAD & SHOP ================= */}
-      {step === 1 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {/* Main Drag/Tap Upload Card */}
-          <div
-            style={{
-              border: '2px dashed #93C5FD',
-              borderRadius: '16px',
-              padding: '32px 16px',
-              textAlign: 'center',
-              background: '#EFF6FF',
-              cursor: 'pointer',
-              position: 'relative',
-            }}
-          >
-            <input
-              type="file"
-              multiple
-              accept="application/pdf,image/*,.docx,.xlsx,.pptx"
-              onChange={handleFileUpload}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                opacity: 0,
-                cursor: 'pointer',
-              }}
-            />
-            <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px auto' }}>
-              <Upload size={28} color="#2563EB" />
-            </div>
-            <h3 style={{ margin: '0 0 6px 0', fontSize: '1rem', color: '#1E293B' }}>{t.upload_cta}</h3>
-            <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748B' }}>PDF, PNG, JPG, Word, Excel • Up to 100MB</p>
-          </div>
-
-          {/* Camera Capture Button */}
-          <label
-            style={{
-              minHeight: '48px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              background: '#FFFFFF',
-              border: '1px solid #CBD5E1',
-              borderRadius: '12px',
-              padding: '12px',
-              fontWeight: 600,
-              color: '#334155',
-              cursor: 'pointer',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-            }}
-          >
-            <Camera size={20} color="#2563EB" />
-            {t.camera_cta}
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={handleFileUpload}
-              style={{ display: 'none' }}
-            />
-          </label>
-
-          {/* Uploaded Files List */}
-          {files.length > 0 && (
-            <div style={{ background: '#FFFFFF', borderRadius: '12px', padding: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-              <h4 style={{ margin: '0 0 10px 0', fontSize: '0.85rem', color: '#475569' }}>Uploaded Files ({files.length})</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {files.map((f, idx) => (
-                  <div
-                    key={f.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '10px 12px',
-                      background: '#F8FAFC',
-                      borderRadius: '8px',
-                      border: '1px solid #E2E8F0',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <FileText size={20} color="#2563EB" />
-                      <div>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1E293B' }}>{f.name}</div>
-                        <div style={{ fontSize: '0.7rem', color: '#64748B' }}>
-                          {f.pages} pages • {f.size} • <span style={{ color: '#2563EB', fontWeight: 600 }}>{f.format}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setFiles(files.filter((_, i) => i !== idx))}
-                      style={{ minWidth: '44px', minHeight: '44px', background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ================= SCREEN 2: CONFIGURE & LIVE PREVIEW ================= */}
-      {step === 2 && currentFile && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {/* Apply-to-all toggle */}
-          {files.length > 1 && (
-            <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '10px', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1E40AF' }}>{t.apply_to_all}</span>
-              <input
-                type="checkbox"
-                checked={applyToAll}
-                onChange={(e) => setApplyToAll(e.target.checked)}
-                style={{ width: '20px', height: '20px', accentColor: '#2563EB' }}
-              />
-            </div>
-          )}
-
-          {/* Interactive Visual Preview Canvas */}
-          <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', textAlign: 'center' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B' }}>LIVE PREVIEW (300 DPI ENGINE)</span>
-              <span style={{ fontSize: '0.75rem', background: '#F1F5F9', padding: '3px 8px', borderRadius: '6px', fontWeight: 600 }}>
-                Page {previewPage} of {currentFile.pages}
-              </span>
-            </div>
-
-            {/* Visual Page Representation */}
-            <div
-              style={{
-                width: '180px',
-                height: '240px',
-                margin: '0 auto 12px auto',
-                background: '#FFFFFF',
-                border: '2px solid #CBD5E1',
-                borderRadius: '8px',
-                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
-                padding: '12px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-              }}
-            >
-              <div style={{ height: '14px', background: currentFile.options.colorMode === 'color' ? '#2563EB' : '#475569', borderRadius: '3px' }} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <div style={{ height: '6px', background: '#E2E8F0', borderRadius: '2px', width: '90%' }} />
-                <div style={{ height: '6px', background: '#E2E8F0', borderRadius: '2px', width: '75%' }} />
-                <div style={{ height: '6px', background: '#E2E8F0', borderRadius: '2px', width: '85%' }} />
-              </div>
-              <div style={{ fontSize: '0.65rem', color: '#64748B', borderTop: '1px solid #F1F5F9', paddingTop: '4px' }}>
-                {currentFile.options.duplex === 'simplex' ? 'Single Side' : 'Double Side'} • {currentFile.options.paperSize}
-              </div>
-            </div>
-
-            {/* Page navigation controls */}
-            {currentFile.pages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                <button
-                  disabled={previewPage <= 1}
-                  onClick={() => setPreviewPage((p) => Math.max(1, p - 1))}
-                  style={{ minHeight: '44px', minWidth: '44px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#FFFFFF', cursor: 'pointer' }}
-                >
-                  ←
-                </button>
-                <button
-                  disabled={previewPage >= currentFile.pages}
-                  onClick={() => setPreviewPage((p) => Math.min(currentFile.pages, p + 1))}
-                  style={{ minHeight: '44px', minWidth: '44px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#FFFFFF', cursor: 'pointer' }}
-                >
-                  →
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Quick Preset: Photo / Passport Layout */}
-          <div style={{ background: '#FFFFFF', borderRadius: '12px', padding: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-              <Sparkles size={16} color="#2563EB" />
-              {t.photo_preset}
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <button
-                onClick={() => updateCurrentOptions({ photoPreset: 'standard' })}
-                style={{
-                  minHeight: '44px',
-                  padding: '8px',
-                  borderRadius: '8px',
-                  border: currentFile.options.photoPreset === 'standard' ? '2px solid #2563EB' : '1px solid #CBD5E1',
-                  background: currentFile.options.photoPreset === 'standard' ? '#EFF6FF' : '#FFFFFF',
-                  fontWeight: 600,
-                  fontSize: '0.75rem',
-                  cursor: 'pointer',
-                }}
-              >
-                {t.standard_layout}
-              </button>
-              <button
-                onClick={() => updateCurrentOptions({ photoPreset: 'passport_8up' })}
-                style={{
-                  minHeight: '44px',
-                  padding: '8px',
-                  borderRadius: '8px',
-                  border: currentFile.options.photoPreset === 'passport_8up' ? '2px solid #2563EB' : '1px solid #CBD5E1',
-                  background: currentFile.options.photoPreset === 'passport_8up' ? '#EFF6FF' : '#FFFFFF',
-                  fontWeight: 600,
-                  fontSize: '0.75rem',
-                  cursor: 'pointer',
-                }}
-              >
-                {t.passport_8up}
-              </button>
-            </div>
-          </div>
-
-          {/* Print Options Form */}
-          <div style={{ background: '#FFFFFF', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            {/* Color Mode */}
-            <div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>{t.color_mode}</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <button
-                  onClick={() => updateCurrentOptions({ colorMode: 'bw' })}
-                  style={{
-                    minHeight: '44px',
-                    borderRadius: '8px',
-                    border: currentFile.options.colorMode === 'bw' ? '2px solid #2563EB' : '1px solid #CBD5E1',
-                    background: currentFile.options.colorMode === 'bw' ? '#EFF6FF' : '#FFFFFF',
-                    fontWeight: 600,
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {t.bw}
-                </button>
-                <button
-                  onClick={() => updateCurrentOptions({ colorMode: 'color' })}
-                  style={{
-                    minHeight: '44px',
-                    borderRadius: '8px',
-                    border: currentFile.options.colorMode === 'color' ? '2px solid #2563EB' : '1px solid #CBD5E1',
-                    background: currentFile.options.colorMode === 'color' ? '#EFF6FF' : '#FFFFFF',
-                    fontWeight: 600,
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {t.color}
-                </button>
-              </div>
-            </div>
-
-            {/* Duplex (Sides) */}
-            <div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>{t.duplex}</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <button
-                  onClick={() => updateCurrentOptions({ duplex: 'simplex' })}
-                  style={{
-                    minHeight: '44px',
-                    borderRadius: '8px',
-                    border: currentFile.options.duplex === 'simplex' ? '2px solid #2563EB' : '1px solid #CBD5E1',
-                    background: currentFile.options.duplex === 'simplex' ? '#EFF6FF' : '#FFFFFF',
-                    fontWeight: 600,
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {t.single_sided}
-                </button>
-                <button
-                  onClick={() => updateCurrentOptions({ duplex: 'duplex_long' })}
-                  style={{
-                    minHeight: '44px',
-                    borderRadius: '8px',
-                    border: currentFile.options.duplex === 'duplex_long' ? '2px solid #2563EB' : '1px solid #CBD5E1',
-                    background: currentFile.options.duplex === 'duplex_long' ? '#EFF6FF' : '#FFFFFF',
-                    fontWeight: 600,
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {t.double_sided_long}
-                </button>
-              </div>
-            </div>
-
-            {/* Copies */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>{t.copies}</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <button
-                  onClick={() => updateCurrentOptions({ copies: Math.max(1, currentFile.options.copies - 1) })}
-                  style={{ minHeight: '44px', minWidth: '44px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#F1F5F9', fontWeight: 700, cursor: 'pointer' }}
-                >
-                  -
-                </button>
-                <span style={{ fontSize: '1.1rem', fontWeight: 800, minWidth: '32px', textAlign: 'center' }}>{currentFile.options.copies}</span>
-                <button
-                  onClick={() => updateCurrentOptions({ copies: currentFile.options.copies + 1 })}
-                  style={{ minHeight: '44px', minWidth: '44px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#F1F5F9', fontWeight: 700, cursor: 'pointer' }}
-                >
-                  +
-                </button>
-              </div>
-            </div>
-
-            {/* Paper Size & N-up */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '4px' }}>{t.paper_size}</label>
-                <select
-                  value={currentFile.options.paperSize}
-                  onChange={(e) => updateCurrentOptions({ paperSize: e.target.value as any })}
-                  style={{ minHeight: '44px', width: '100%', borderRadius: '8px', border: '1px solid #CBD5E1', padding: '0 8px', fontSize: '0.85rem' }}
-                >
-                  <option value="A4">A4 (Standard)</option>
-                  <option value="A3">A3 (Large)</option>
-                  <option value="Legal">Legal</option>
-                  <option value="Letter">Letter</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '4px' }}>{t.nup}</label>
-                <select
-                  value={currentFile.options.nup}
-                  onChange={(e) => updateCurrentOptions({ nup: parseInt(e.target.value) })}
-                  style={{ minHeight: '44px', width: '100%', borderRadius: '8px', border: '1px solid #CBD5E1', padding: '0 8px', fontSize: '0.85rem' }}
-                >
-                  <option value={1}>1 Page / Sheet</option>
-                  <option value={2}>2 Pages / Sheet</option>
-                  <option value={4}>4 Pages / Sheet</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ================= SCREEN 3: PAY & TRACKING ================= */}
-      {step === 3 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Locked Quote Card with Hash and Expiration */}
-          <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #E2E8F0' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <ShieldCheck size={16} /> Locked Quote ({quoteHash.slice(0, 8)})
-              </span>
-              <span style={{ fontSize: '0.75rem', color: '#64748B' }}>
-                {t.quote_expires}: <b>{Math.floor(quoteSecondsLeft / 60)}:{String(quoteSecondsLeft % 60).padStart(2, '0')}</b>
-              </span>
-            </div>
-
-            {/* Breakdown table */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8rem', color: '#475569', paddingBottom: '12px', borderBottom: '1px solid #F1F5F9' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>{t.logical_pages}:</span>
-                <b>{accounting.totalLogical}</b>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>{t.rendered_sides}:</span>
-                <b>{accounting.totalRendered}</b>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>{t.physical_sheets}:</span>
-                <b>{accounting.totalSheets} sheets</b>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
-              <span style={{ fontSize: '1rem', fontWeight: 700, color: '#0F172A' }}>{t.price_total}</span>
-              <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#2563EB' }}>₹{accounting.totalRupees}</span>
-            </div>
-          </div>
-
-          {/* Payment Method Selector */}
-          <div style={{ background: '#FFFFFF', borderRadius: '12px', padding: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '10px' }}>Select Payment Choice</label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <button
-                onClick={() => setPaymentMethod('upi')}
-                style={{
-                  minHeight: '48px',
-                  borderRadius: '10px',
-                  border: paymentMethod === 'upi' ? '2px solid #2563EB' : '1px solid #CBD5E1',
-                  background: paymentMethod === 'upi' ? '#EFF6FF' : '#FFFFFF',
-                  fontWeight: 700,
-                  fontSize: '0.8rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  cursor: 'pointer',
-                }}
-              >
-                <QrCode size={18} color="#2563EB" />
-                {t.pay_upi}
-              </button>
-              <button
-                onClick={() => setPaymentMethod('cash')}
-                style={{
-                  minHeight: '48px',
-                  borderRadius: '10px',
-                  border: paymentMethod === 'cash' ? '2px solid #2563EB' : '1px solid #CBD5E1',
-                  background: paymentMethod === 'cash' ? '#EFF6FF' : '#FFFFFF',
-                  fontWeight: 700,
-                  fontSize: '0.8rem',
-                  cursor: 'pointer',
-                }}
-              >
-                {t.pay_cash}
-              </button>
-            </div>
-          </div>
-
-          {/* Live Order Tracking Stepper */}
-          <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0F172A' }}>{t.order_status}</span>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, background: '#EFF6FF', color: '#2563EB', padding: '4px 8px', borderRadius: '6px' }}>
-                {t.tracking_id}: {trackingId}
-              </span>
-            </div>
-
-            {/* Stepper Steps */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {[
-                { key: 'received', label: t.order_received, done: true },
-                { key: 'approved', label: t.order_approved, done: orderStatus !== 'received' },
-                { key: 'printing', label: t.printing, done: orderStatus === 'printing' || orderStatus === 'ready' },
-                { key: 'ready', label: t.ready, done: orderStatus === 'ready' },
-              ].map((st, i) => (
-                <div key={st.key} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div
-                    style={{
-                      width: '26px',
-                      height: '26px',
-                      borderRadius: '50%',
-                      background: st.done ? '#10B981' : '#E2E8F0',
-                      color: st.done ? '#FFFFFF' : '#94A3B8',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                    }}
-                  >
-                    {st.done ? '✓' : i + 1}
-                  </div>
-                  <span style={{ fontSize: '0.85rem', fontWeight: st.done ? 600 : 400, color: st.done ? '#0F172A' : '#94A3B8' }}>{st.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Sticky Bottom Checkout Footer */}
-      {files.length > 0 && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            background: '#FFFFFF',
-            borderTop: '1px solid #E2E8F0',
-            padding: '12px 16px',
-            boxShadow: '0 -4px 6px -1px rgba(0,0,0,0.05)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            maxWidth: '520px',
-            margin: '0 auto',
-            zIndex: 50,
-          }}
-        >
-          <div>
-            <div style={{ fontSize: '0.7rem', color: '#64748B' }}>{accounting.totalSheets} sheets ({accounting.totalLogical} pages)</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#2563EB' }}>₹{accounting.totalRupees}</div>
-          </div>
-
-          {step === 1 && (
-            <button
-              onClick={() => setStep(2)}
-              style={{
-                minHeight: '48px',
-                padding: '0 24px',
-                borderRadius: '10px',
-                background: '#2563EB',
-                color: '#FFFFFF',
-                fontWeight: 700,
-                border: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-              }}
-            >
-              Next: Configure <ChevronRight size={18} />
-            </button>
-          )}
-
-          {step === 2 && (
-            <button
-              onClick={() => setStep(3)}
-              style={{
-                minHeight: '48px',
-                padding: '0 24px',
-                borderRadius: '10px',
-                background: '#2563EB',
-                color: '#FFFFFF',
-                fontWeight: 700,
-                border: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-              }}
-            >
-              Next: Pay & Confirm <ChevronRight size={18} />
-            </button>
-          )}
-
-          {step === 3 && (
-            <button
-              onClick={() => setOrderStatus('printing')}
-              style={{
-                minHeight: '48px',
-                padding: '0 24px',
-                borderRadius: '10px',
-                background: '#10B981',
-                color: '#FFFFFF',
-                fontWeight: 700,
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              Confirm & Dispatch
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Password Prompt Modal for Protected PDFs */}
-      {showPasswordModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 100 }}>
-          <div style={{ background: '#FFFFFF', borderRadius: '16px', padding: '24px', maxWidth: '400px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
-            <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px auto' }}>
-              <Lock size={24} color="#D97706" />
-            </div>
-            <h3 style={{ margin: '0 0 6px 0', fontSize: '1.1rem', textAlign: 'center', color: '#1E293B' }}>{t.unlock_title}</h3>
-            <p style={{ margin: '0 0 16px 0', fontSize: '0.8rem', color: '#64748B', textAlign: 'center' }}>{t.unlock_desc}</p>
-            <input
-              type="password"
-              placeholder="Enter document password"
-              value={enteredPassword}
-              onChange={(e) => setEnteredPassword(e.target.value)}
-              style={{ minHeight: '44px', width: '100%', borderRadius: '8px', border: '1px solid #CBD5E1', padding: '0 12px', fontSize: '0.9rem', marginBottom: '14px' }}
-            />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <button
-                onClick={() => setShowPasswordModal(false)}
-                style={{ minHeight: '44px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#FFFFFF', fontWeight: 600, cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  setShowPasswordModal(false);
-                  setStep(2);
-                }}
-                style={{ minHeight: '44px', borderRadius: '8px', border: 'none', background: '#2563EB', color: '#FFFFFF', fontWeight: 700, cursor: 'pointer' }}
-              >
-                {t.unlock_btn}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}

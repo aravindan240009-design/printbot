@@ -1,324 +1,58 @@
-import React, { useState } from 'react';
-import { 
-  Printer, 
-  Settings, 
-  QrCode, 
-  Check, 
-  X, 
-  Key, 
-  Laptop, 
-  Sparkles, 
-  Clock, 
-  ShieldCheck, 
-  AlertCircle 
-} from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Printer, LayoutDashboard, Settings, Laptop, ArrowUpRight, FileText, Search, Shield, QrCode } from 'lucide-react';
+import { ThemeProvider, MotionSurface, PrinterScene, StudioHeader, useGsapStagger } from '@xerox/ui';
+import '@xerox/ui/src/studio.css';
 
-interface Order {
-  id: string;
-  fileName: string;
-  pages: number;
-  copies: number;
-  colorMode: 'bw' | 'color';
-  totalPaise: number;
-  status: 'PENDING_APPROVAL' | 'QUEUED' | 'PRINTING' | 'REJECTED';
-  customer: string;
-  createdAt: string;
-}
-
-export default function ShopApp() {
-  const [orderMode, setOrderMode] = useState<'FULL_AUTOMATIC' | 'MANUAL_APPROVAL'>('FULL_AUTOMATIC');
-  const [pairingCode, setPairingCode] = useState<string | null>(null);
-  const [codeTtl, setCodeTtl] = useState<number>(600);
-  const [orders, setOrders] = useState<Order[]>([
-    {
-      id: 'ord-101',
-      fileName: 'Anna_Univ_Project_Report.pdf',
-      pages: 42,
-      copies: 2,
-      colorMode: 'bw',
-      totalPaise: 6300,
-      status: 'QUEUED',
-      customer: '+91 98765 43210',
-      createdAt: '2 mins ago',
-    },
-    {
-      id: 'ord-102',
-      fileName: 'Aadhar_Card_Front_Back.pdf',
-      pages: 2,
-      copies: 1,
-      colorMode: 'color',
-      totalPaise: 2000,
-      status: 'PENDING_APPROVAL',
-      customer: '+91 94440 12345',
-      createdAt: 'Just now',
-    },
-  ]);
-
-  const [printers] = useState([
-    { id: 'pr-1', name: 'Canon imageRUNNER ADVANCE C3530i', status: 'Online', default: true },
-    { id: 'pr-2', name: 'HP LaserJet Pro M404dn', status: 'Online', default: false },
-    { id: 'pr-3', name: 'Epson EcoTank L3250', status: 'Online', default: false },
-  ]);
-
-  const handleApprove = (id: string) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === id ? { ...o, status: 'QUEUED' } : o))
-    );
-  };
-
-  const handleReject = (id: string) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === id ? { ...o, status: 'REJECTED' } : o))
-    );
-  };
-
-  const generatePairingCode = () => {
-    // 6-character random uppercase alphanumeric
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-    setPairingCode(code);
-    setCodeTtl(600);
-  };
-
-  return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Top Navbar */}
-      <nav style={{ background: '#0f172a', color: '#ffffff', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Printer size={28} color="#38bdf8" />
-          <div>
-            <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>Anna Xerox & Stationery</h1>
-            <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Shop ID: shop-anna-chennai • Chennai Guindy</span>
-          </div>
-        </div>
-
-        {/* Subscription Pill */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '8px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Sparkles size={16} color="#38bdf8" />
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#f8fafc' }}>All-Inclusive Plan: Active</span>
-            <span style={{ background: '#0284c7', color: '#ffffff', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>UNLIMITED PRINTERS</span>
-          </div>
-
-          {/* Mode Switcher */}
-          <div style={{ display: 'flex', alignItems: 'center', background: '#1e293b', borderRadius: '8px', padding: '4px' }}>
-            <button
-              onClick={() => setOrderMode('FULL_AUTOMATIC')}
-              style={{
-                border: 'none',
-                background: orderMode === 'FULL_AUTOMATIC' ? '#16a34a' : 'transparent',
-                color: '#ffffff',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Full Automatic
-            </button>
-            <button
-              onClick={() => setOrderMode('MANUAL_APPROVAL')}
-              style={{
-                border: 'none',
-                background: orderMode === 'MANUAL_APPROVAL' ? '#d97706' : 'transparent',
-                color: '#ffffff',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Manual Approval
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      {/* Main Container */}
-      <div style={{ flex: 1, padding: '24px', maxWidth: '1400px', margin: '0 auto', width: '100%', display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
-        {/* Left Column: Live Queue */}
-        <section style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <div>
-              <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>Live Print Queue</h2>
-              <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                Mode: {orderMode === 'FULL_AUTOMATIC' ? 'Full Auto (Paid jobs auto-dispatch)' : 'Manual Approval Required'}
-              </span>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {orders.map((o) => (
-              <div
-                key={o.id}
-                style={{
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '8px',
-                  padding: '16px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '1rem', color: '#0f172a' }}>{o.fileName}</div>
-                  <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '4px' }}>
-                    {o.pages} pages • {o.copies} copies • {o.colorMode.toUpperCase()} • ₹{(o.totalPaise / 100).toFixed(2)}
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>
-                    Customer: {o.customer} • {o.createdAt}
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: '6px',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      background:
-                        o.status === 'QUEUED'
-                          ? '#dcfce7'
-                          : o.status === 'PENDING_APPROVAL'
-                          ? '#fef3c7'
-                          : '#fee2e2',
-                      color:
-                        o.status === 'QUEUED'
-                          ? '#15803d'
-                          : o.status === 'PENDING_APPROVAL'
-                          ? '#b45309'
-                          : '#b91c1c',
-                    }}
-                  >
-                    {o.status}
-                  </span>
-
-                  {o.status === 'PENDING_APPROVAL' && (
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button
-                        onClick={() => handleApprove(o.id)}
-                        style={{
-                          background: '#16a34a',
-                          color: '#ffffff',
-                          border: 'none',
-                          padding: '6px 10px',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '0.8rem',
-                          fontWeight: 600,
-                        }}
-                      >
-                        <Check size={14} /> Approve
-                      </button>
-                      <button
-                        onClick={() => handleReject(o.id)}
-                        style={{
-                          background: '#dc2626',
-                          color: '#ffffff',
-                          border: 'none',
-                          padding: '6px 10px',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '0.8rem',
-                          fontWeight: 600,
-                        }}
-                      >
-                        <X size={14} /> Reject
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Right Column: Devices, Printers, QR Stand */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Windows Device Pairing */}
-          <section style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '20px' }}>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Laptop size={18} color="#2563eb" />
-              Windows Workstation Pairing
-            </h3>
-            <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0 0 16px 0' }}>
-              Connect counter Windows PC print service using cryptographically signed asymmetric keys.
-            </p>
-
-            {pairingCode ? (
-              <div style={{ background: '#f8fafc', border: '2px dashed #cbd5e1', padding: '16px', borderRadius: '8px', textAlign: 'center' }}>
-                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>ONE-TIME PAIRING CODE (TTL: 10 MIN)</span>
-                <div style={{ fontSize: '2rem', fontWeight: 800, letterSpacing: '4px', color: '#1e293b', margin: '8px 0' }}>
-                  {pairingCode}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.75rem', color: '#16a34a' }}>
-                  <ShieldCheck size={14} />
-                  <span>Ed25519 asymmetric challenge ready</span>
-                </div>
-              </div>
-            ) : (
-              <button
-                onClick={generatePairingCode}
-                style={{
-                  width: '100%',
-                  background: '#2563eb',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '10px 16px',
-                  fontWeight: 600,
-                  fontSize: '0.9rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                }}
-              >
-                <Key size={16} /> Generate Device Pairing Code
-              </button>
-            )}
-          </section>
-
-          {/* Unlimited Printers */}
-          <section style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Printer size={18} color="#16a34a" />
-                Connected Printers ({printers.length})
-              </h3>
-              <span style={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: 700 }}>UNLIMITED TIER</span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {printers.map((p) => (
-                <div key={p.id} style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <strong style={{ fontSize: '0.85rem' }}>{p.name}</strong>
-                    {p.default && <span style={{ marginLeft: '6px', fontSize: '0.65rem', background: '#e2e8f0', padding: '2px 4px', borderRadius: '4px' }}>Default</span>}
-                  </div>
-                  <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600 }}>{p.status}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Shop QR Stand */}
-          <section style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '20px', textAlign: 'center' }}>
-            <QrCode size={36} color="#0f172a" style={{ margin: '0 auto 8px auto' }} />
-            <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem' }}>Shop Counter QR Stand</h4>
-            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>printbot.in/qr/anna-chennai</span>
-          </section>
-        </div>
-      </div>
+type Mode = 'FULL_AUTOMATIC' | 'MANUAL_APPROVAL';
+type Order = { id: string; name: string; pages: number; copies: number; color: string; paise: number; status: string; payment: string; mode: Mode };
+const initialOrders: Order[] = [
+  { id: 'PB-101', name: 'Project report.pdf', pages: 42, copies: 2, color: 'Black & white', paise: 6300, status: 'Queued', payment: 'Verified payment (sample)', mode: 'FULL_AUTOMATIC' },
+  { id: 'PB-102', name: 'ID front and back.pdf', pages: 2, copies: 1, color: 'Color', paise: 2000, status: 'Needs approval', payment: 'Unverified — payment hold', mode: 'MANUAL_APPROVAL' },
+];
+const printers = ['Canon imageRUNNER ADVANCE C3530i', 'HP LaserJet Pro M404dn', 'Epson EcoTank L3250'];
+function Console() {
+  const [tab, setTab] = useState('Queue');
+  const [orders, setOrders] = useState(initialOrders);
+  const [selected, setSelected] = useState('PB-102');
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState('All orders');
+  const [mode, setMode] = useState<Mode>('FULL_AUTOMATIC');
+  const [pending, setPending] = useState<{ type: 'mode' | 'approve' | 'reject'; mode?: Mode } | null>(null);
+  const [reason, setReason] = useState('');
+  const [notice, setNotice] = useState('');
+  const metricsRef = useGsapStagger<HTMLDivElement>({ stagger: 0.06, y: 12 });
+  const recordListRef = useGsapStagger<HTMLDivElement>({ selector: '.record', stagger: 0.05, y: 10 });
+  const dialog = useRef<HTMLDialogElement>(null);
+  const order = orders.find(o => o.id === selected)!;
+  const visible = orders.filter(o => `${o.name} ${o.id}`.toLowerCase().includes(query.toLowerCase()) && (filter === 'All orders' || o.status === filter));
+  function confirm(type: 'mode' | 'approve' | 'reject', nextMode?: Mode) { setPending({ type, mode: nextMode }); setReason(''); dialog.current?.showModal(); }
+  function apply() {
+    if (!pending || !reason.trim()) return;
+    if (pending.type === 'mode') { setMode(pending.mode!); setNotice('Preview mode updated. Existing sample orders retain their accepted mode.'); }
+    else { setOrders(items => items.map(o => o.id === selected ? { ...o, status: pending.type === 'reject' ? 'Rejected' : 'Payment hold' } : o)); setNotice(`${selected}: local ${pending.type === 'reject' ? 'rejection' : 'approval'} recorded. No payment or print dispatch occurred.`); }
+    dialog.current?.close(); setPending(null);
+  }
+  return <div className="console-shell">
+    <a className="skip-link" href="#main">Skip to main content</a>
+    <aside className="console-rail"><div className="brand"><Printer size={26}/><span>Print Bot<small>SHOP STUDIO</small></span></div>
+      <nav aria-label="Shop navigation">{[{ title: 'Queue', icon: LayoutDashboard }, { title: 'Printers & devices', icon: Laptop }, { title: 'Shop settings', icon: Settings }].map(({ title, icon: Icon }) => <button key={title} className={tab === title ? 'nav-active' : ''} aria-current={tab === title ? 'page' : undefined} onClick={() => setTab(title)}><Icon size={19}/>{title}</button>)}</nav>
+      <div className="rail-bottom"><span className="eyebrow">ONE PLAN. EVERY PRINTER.</span><strong>All-inclusive</strong><p>Unlimited printers.<br/>Monthly or annual billing.</p></div>
+    </aside>
+    <div className="console-body"><StudioHeader title="Anna Xerox & Stationery" subtitle="Shop studio · Chennai, Guindy"/>
+      <main id="main"><div className="preview-notice"><Shield size={18}/><span><strong>Interactive preview</strong> · Sample data and local actions only. Live account, payment and device connections are unavailable.</span></div>
+        <div className="page-heading"><div><span className="eyebrow">YOUR COUNTER, CONNECTED</span><h1>{tab === 'Queue' ? 'A little order. A lot of possibility.' : tab}</h1><p>{tab === 'Queue' ? 'Keep the next job in focus, from approval to collection.' : 'A clear view of the tools behind your counter.'}</p></div><span className="badge">Anna · sample workspace</span></div>
+        {notice && <p className="feedback" role="status">{notice}</p>}
+        <MotionSurface transitionKey={tab}>
+        {tab === 'Queue' && <><div ref={metricsRef} className="metrics"><div><span>Sample orders</span><strong>{orders.length.toString().padStart(2, '0')}</strong><small>In this preview</small></div><div><span>Needs attention</span><strong>{orders.filter(o => ['Needs approval', 'Payment hold'].includes(o.status)).length.toString().padStart(2, '0')}</strong><small>Approval or payment hold</small></div><div><span>Order mode</span><strong className="metric-word">{mode === 'FULL_AUTOMATIC' ? 'Full automatic' : 'Manual approval'}</strong><small>Applies to new sample orders</small></div></div>
+          <div className="work-grid"><section className="panel"><div className="section-title"><h2>Order workspace</h2><span className="muted">{visible.length} shown</span></div><div className="filters"><label className="search"><Search size={18}/><input aria-label="Search orders" placeholder="Search order or file…" value={query} onChange={e => setQuery(e.target.value)}/></label><select aria-label="Filter order status" value={filter} onChange={e => setFilter(e.target.value)}>{['All orders', 'Needs approval', 'Queued', 'Payment hold', 'Rejected'].map(s => <option key={s}>{s}</option>)}</select></div><div ref={recordListRef} className="record-list">{visible.map(o => <button key={o.id} className={`record ${selected === o.id ? 'selected' : ''}`} onClick={() => setSelected(o.id)} aria-pressed={selected === o.id}><span className="record-icon"><FileText size={23}/></span><span className="record-info"><small>{o.id} · Sample order</small><strong>{o.name}</strong><span>{o.pages} logical pages · {o.copies} {o.copies === 1 ? 'copy' : 'copies'}</span></span><span className="record-end"><span className={`badge ${o.status === 'Needs approval' || o.status === 'Payment hold' ? 'warning' : ''}`}>{o.status}</span><strong>₹{(o.paise / 100).toFixed(2)}</strong></span></button>)}{!visible.length && <div className="empty"><Search/><h3>No matching orders</h3><p>Try a different file name or status.</p><button onClick={() => { setQuery(''); setFilter('All orders'); }}>Clear filters</button></div>}</div></section>
+          <section className="panel detail" aria-label="Selected order details"><span className="eyebrow">SELECTED ORDER</span><h2>{order.id}</h2><p className="detail-name">{order.name}</p><dl><div><dt>Print style</dt><dd>{order.color}</dd></div><div><dt>Logical pages / copies</dt><dd>{order.pages} / {order.copies}</dd></div><div><dt>Sample price</dt><dd>₹{(order.paise / 100).toFixed(2)}</dd></div><div><dt>Accepted mode</dt><dd>{order.mode === 'FULL_AUTOMATIC' ? 'Full automatic' : 'Manual approval'}</dd></div><div><dt>Payment</dt><dd>{order.payment}</dd></div></dl><p className="note">Physical sheets and rendered sides require the server PrintPlan. No document is loaded in this preview.</p>{order.status === 'Needs approval' && <div className="actions"><button className="primary" onClick={() => confirm('approve')}>Preview approval</button><button onClick={() => confirm('reject')}>Preview rejection</button></div>}<p className="muted">Cash and unverified payments remain on hold. No automatic reprint after an uncertain outcome.</p></section></div></>}
+        {tab === 'Printers & devices' && <div className="work-grid"><section className="panel"><div className="section-title"><h2>Your printer fleet</h2><span className="badge">Unlimited printers</span></div><p className="muted">Sample inventory · connectivity has not been checked.</p>{printers.map((name, i) => <div className="inventory" key={name}><Printer/><div><strong>{name}</strong><p>{i === 0 ? 'Sample default printer' : 'Sample printer'} · Status unverified</p></div></div>)}</section><section className="panel"><Laptop size={28}/><h2>Windows workstation</h2><p>Pair an authorized installation with a short-lived server-issued code and revocable device credentials.</p><button disabled>Generate pairing code</button><p className="note">Unavailable in this preview. Connect authenticated shop and device services to issue a real code.</p><PrinterScene compact/></section></div>}
+        {tab === 'Shop settings' && <div className="work-grid"><section className="panel"><span className="eyebrow">ORDER POLICY</span><h2>Choose how work enters your queue</h2><p>These controls simulate the policy for new orders. Accepted orders keep their original policy.</p><div className="mode-options">{(['FULL_AUTOMATIC', 'MANUAL_APPROVAL'] as Mode[]).map(m => <button key={m} aria-pressed={mode === m} className={mode === m ? 'selected' : ''} onClick={() => { if (m !== mode) confirm('mode', m); }}><strong>{m === 'FULL_AUTOMATIC' ? 'Full automatic' : 'Manual approval'}</strong><span>{m === 'FULL_AUTOMATIC' ? 'Eligible, verified-paid and compatible jobs only.' : 'Staff approve or reject every submitted job.'}</span>{mode === m && <span className="badge">Selected in preview</span>}</button>)}</div><p className="note">Live mode changes require authorization and durable audit logging. Browser state is not an audit record.</p></section><section className="panel"><QrCode size={30}/><h2>A front door for your shop</h2><p>Your shop-specific QR will open the mobile upload, configure and collect experience.</p><button disabled>Download counter QR</button><p className="note">Unavailable until an authenticated, shop-bound link is returned by the server.</p><div className="plan-summary"><span className="eyebrow">ALL-INCLUSIVE PLAN</span><h3>Room for every printer.</h3><p>One plan, monthly or annual. Device authorization is managed separately.</p></div></section></div>}
+        </MotionSurface>
+      </main><footer>Print Bot / Shop studio <span>Local interactive preview · resets on reload</span></footer>
     </div>
-  );
+    <dialog ref={dialog} aria-labelledby="confirm-title" onCancel={() => setPending(null)}><form onSubmit={e => { e.preventDefault(); apply(); }}><span className="eyebrow">PREVIEW CONFIRMATION</span><h2 id="confirm-title">{pending?.type === 'mode' ? 'Change sample order mode?' : pending?.type === 'reject' ? `Reject ${selected} in preview?` : `Approve ${selected} in preview?`}</h2><p>{pending?.type === 'mode' ? 'Only future sample orders use this mode. No live shop policy changes.' : 'This changes local sample state only. An unverified payment still prevents dispatch.'}</p><label htmlFor="action-reason">Reason (required)</label><textarea id="action-reason" required maxLength={500} rows={3} value={reason} onChange={e => setReason(e.target.value)}/><div className="actions"><button type="button" onClick={() => { dialog.current?.close(); setPending(null); }}>Cancel</button><button className="primary" disabled={!reason.trim()}>Confirm local preview</button></div></form></dialog>
+  </div>;
 }
+export default function App() { return <ThemeProvider><Console/></ThemeProvider>; }
+
