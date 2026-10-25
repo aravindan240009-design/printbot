@@ -1,9 +1,58 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Printer, Layers, KeyRound, Settings, Search, FileText, Eye, RefreshCw, Volume2, VolumeX, Copy, ArrowUpRight, ShieldCheck, X, AlertTriangle } from 'lucide-react';
+import {
+  Printer,
+  Layers,
+  KeyRound,
+  Settings,
+  Search,
+  FileText,
+  Eye,
+  RefreshCw,
+  Volume2,
+  VolumeX,
+  Copy,
+  ArrowUpRight,
+  ShieldCheck,
+  X,
+  AlertTriangle,
+  Lock,
+  Unlock,
+  CheckCircle2,
+  UserCheck,
+  PlusCircle,
+  Building,
+  Phone,
+  QrCode,
+  DollarSign,
+  LogOut,
+  Sliders,
+  ChevronRight,
+  Sparkles
+} from 'lucide-react';
 import { ThemeProvider, ThemeSwitch, MotionSurface, PaperScene, PrinterScene, useGsapStagger } from '@xerox/ui';
 import { discoverPrinters, type NativePrinterInfo } from './native';
 
-interface PrintJob {
+// --- Models & Contracts ---
+
+export interface ShopLicense {
+  username: string;
+  licenseKey: string;
+  shopName: string;
+  location: string;
+  phone: string;
+  upiId: string;
+  rates: {
+    bwPerSideRupees: number;
+    colorPerSideRupees: number;
+    duplexDiscountPercent: number;
+  };
+  orderMode: 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC';
+  status: 'ACTIVE' | 'REVOKED';
+  expiresAt: string;
+  isConfigured: boolean;
+}
+
+export interface PrintJob {
   id: string;
   customer_email: string;
   file_name: string;
@@ -28,7 +77,7 @@ interface PrintJob {
   created_at: string;
 }
 
-interface ConnectedPrinter {
+export interface ConnectedPrinter {
   id: string;
   name: string;
   driver_name: string;
@@ -39,35 +88,251 @@ interface ConnectedPrinter {
   supported_sizes: string[];
 }
 
+// Pre-seeded licenses
+const INITIAL_LICENSES: Record<string, ShopLicense> = {
+  shopowner: {
+    username: 'shopowner',
+    licenseKey: 'PB-KEY-2026-XEROX',
+    shopName: 'Anna University Quick Xerox',
+    location: 'Guindy Counter 01, Chennai',
+    phone: '+91 98401 23456',
+    upiId: 'quickxerox@okaxis',
+    rates: {
+      bwPerSideRupees: 1.5,
+      colorPerSideRupees: 10.0,
+      duplexDiscountPercent: 15,
+    },
+    orderMode: 'MANUAL_APPROVAL',
+    status: 'ACTIVE',
+    expiresAt: '2027-12-31',
+    isConfigured: true,
+  },
+};
+
+type AppScreen = 'LOCK_SCREEN' | 'SETUP_WIZARD' | 'WORKSTATION' | 'ADMIN_PORTAL';
 type Tab = 'queue' | 'printers' | 'pairing' | 'settings';
-const statusLabels: Record<PrintJob['status'], string> = { PENDING_APPROVAL: 'Needs approval', QUEUED: 'Ready to dispatch', PRINTING: 'Dispatch simulated', COMPLETED: 'Completed · sample', COMPLETION_UNKNOWN: 'Completion unknown', REJECTED: 'Rejected' };
-function Dialog({title, children, onClose}: {title: string; children: React.ReactNode; onClose: () => void}) {
+
+function Dialog({
+  title,
+  children,
+  onClose,
+}: {
+  title: string;
+  children: React.ReactNode;
+  onClose: () => void;
+}) {
   const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => { const previous = document.activeElement as HTMLElement | null; ref.current?.showModal(); return () => { ref.current?.close(); previous?.focus(); }; }, []);
-  return <dialog ref={ref} className="ws-dialog" aria-labelledby="dialog-title" onCancel={e => {e.preventDefault(); onClose();}}><div className="ws-dialog-head"><h2 id="dialog-title">{title}</h2><button aria-label="Close dialog" onClick={onClose}><X size={20}/></button></div>{children}</dialog>;
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    ref.current?.showModal();
+    return () => {
+      ref.current?.close();
+      previous?.focus();
+    };
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      className="ws-dialog"
+      aria-labelledby="dialog-title"
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+    >
+      <div className="ws-dialog-head">
+        <h2 id="dialog-title">{title}</h2>
+        <button aria-label="Close dialog" onClick={onClose}>
+          <X size={20} />
+        </button>
+      </div>
+      {children}
+    </dialog>
+  );
 }
-function Workstation() {
+
+export default function App() {
+  // --- Persistent Storage State ---
+  const [licenses, setLicenses] = useState<Record<string, ShopLicense>>(() => {
+    try {
+      const saved = localStorage.getItem('printbot_licenses');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return INITIAL_LICENSES;
+  });
+
+  const [activeSession, setActiveSession] = useState<{
+    role: 'SHOP_OWNER' | 'ADMIN';
+    username: string;
+  } | null>(() => {
+    try {
+      const saved = localStorage.getItem('printbot_session');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return null;
+  });
+
+  // Current Screen
+  const screen: AppScreen = useMemo(() => {
+    if (!activeSession) return 'LOCK_SCREEN';
+    if (activeSession.role === 'ADMIN') return 'ADMIN_PORTAL';
+    const shop = licenses[activeSession.username];
+    if (shop && !shop.isConfigured) return 'SETUP_WIZARD';
+    return 'WORKSTATION';
+  }, [activeSession, licenses]);
+
+  // Save changes
+  useEffect(() => {
+    localStorage.setItem('printbot_licenses', JSON.stringify(licenses));
+  }, [licenses]);
+
+  useEffect(() => {
+    if (activeSession) {
+      localStorage.setItem('printbot_session', JSON.stringify(activeSession));
+    } else {
+      localStorage.removeItem('printbot_session');
+    }
+  }, [activeSession]);
+
+  // Current Shop Data
+  const currentShop: ShopLicense | undefined =
+    activeSession?.role === 'SHOP_OWNER' ? licenses[activeSession.username] : undefined;
+
+  // --- Lock Screen Form State ---
+  const [loginMode, setLoginMode] = useState<'SHOP_OWNER' | 'ADMIN'>('SHOP_OWNER');
+  const [ownerUsername, setOwnerUsername] = useState('');
+  const [ownerKey, setOwnerKey] = useState('');
+  const [adminUsername, setAdminUsername] = useState('');
+  const [adminKey, setAdminKey] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  const handleShopLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+    const u = ownerUsername.trim().toLowerCase();
+    const k = ownerKey.trim().toUpperCase();
+
+    const license = licenses[u];
+    if (!license || license.licenseKey !== k) {
+      setLoginError('Invalid Username or License Key. Please check with your Admin.');
+      return;
+    }
+
+    if (license.status === 'REVOKED') {
+      setLoginError('This license key has been revoked by the Admin.');
+      return;
+    }
+
+    setActiveSession({ role: 'SHOP_OWNER', username: u });
+  };
+
+  const handleAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+    if (adminUsername.trim() === 'admin' && adminKey.trim() === 'admin@123') {
+      setActiveSession({ role: 'ADMIN', username: 'admin' });
+    } else {
+      setLoginError('Invalid Admin credentials. Use admin and admin@123');
+    }
+  };
+
+  const handleLogout = () => {
+    setActiveSession(null);
+    setLoginError('');
+  };
+
+  // --- Setup Wizard State (Fill Details) ---
+  const [setupShopName, setSetupShopName] = useState(currentShop?.shopName || '');
+  const [setupLocation, setSetupLocation] = useState(currentShop?.location || '');
+  const [setupPhone, setSetupPhone] = useState(currentShop?.phone || '');
+  const [setupUpi, setSetupUpi] = useState(currentShop?.upiId || '');
+  const [setupBwRate, setSetupBwRate] = useState(currentShop?.rates.bwPerSideRupees || 1.5);
+  const [setupColorRate, setSetupColorRate] = useState(currentShop?.rates.colorPerSideRupees || 10.0);
+  const [setupOrderMode, setSetupOrderMode] = useState<'MANUAL_APPROVAL' | 'FULL_AUTOMATIC'>(
+    currentShop?.orderMode || 'MANUAL_APPROVAL'
+  );
+
+  const handleSaveSetup = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeSession) return;
+    const u = activeSession.username;
+    setLicenses((prev) => ({
+      ...prev,
+      [u]: {
+        ...prev[u],
+        shopName: setupShopName || 'My Xerox Shop',
+        location: setupLocation || 'Counter 01',
+        phone: setupPhone || '+91 99999 99999',
+        upiId: setupUpi || 'shop@upi',
+        rates: {
+          bwPerSideRupees: Number(setupBwRate) || 1.5,
+          colorPerSideRupees: Number(setupColorRate) || 10.0,
+          duplexDiscountPercent: 15,
+        },
+        orderMode: setupOrderMode,
+        isConfigured: true,
+      },
+    }));
+  };
+
+  // --- Admin Portal State (Key Generator) ---
+  const [newShopName, setNewShopName] = useState('');
+  const [newUsername, setNewUsername] = useState('');
+  const [newDuration, setNewDuration] = useState('1 Year');
+  const [generatedKey, setGeneratedKey] = useState<string | null>(null);
+
+  const handleGenerateKey = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newShopName.trim() || !newUsername.trim()) return;
+
+    const u = newUsername.trim().toLowerCase();
+    const randomHex = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const randomHex2 = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const key = `PB-KEY-${randomHex}-${randomHex2}`;
+
+    const newLicense: ShopLicense = {
+      username: u,
+      licenseKey: key,
+      shopName: newShopName.trim(),
+      location: 'Branch Counter 01',
+      phone: '+91 90000 00000',
+      upiId: 'shop@upi',
+      rates: {
+        bwPerSideRupees: 1.5,
+        colorPerSideRupees: 10.0,
+        duplexDiscountPercent: 15,
+      },
+      orderMode: 'MANUAL_APPROVAL',
+      status: 'ACTIVE',
+      expiresAt: '2027-12-31',
+      isConfigured: false,
+    };
+
+    setLicenses((prev) => ({ ...prev, [u]: newLicense }));
+    setGeneratedKey(key);
+    setNewShopName('');
+    setNewUsername('');
+  };
+
+  const handleRevokeKey = (username: string) => {
+    setLicenses((prev) => ({
+      ...prev,
+      [username]: { ...prev[username], status: prev[username].status === 'ACTIVE' ? 'REVOKED' : 'ACTIVE' },
+    }));
+  };
+
+  // --- Workstation Queue State ---
   const [activeTab, setActiveTab] = useState<Tab>('queue');
-  const [orderMode, setOrderMode] = useState('MANUAL_APPROVAL');
   const [isAudioEnabled, setIsAudioEnabled] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [rejectionModalJobId, setRejectionModalJobId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('Poor image resolution or blurred scan');
-  const [reconcileId, setReconcileId] = useState<string | null>(null);
-  const [reconcileNote, setReconcileNote] = useState('');
-  const [pairingCode, setPairingCode] = useState('');
-  const [deviceName, setDeviceName] = useState('Counter-PC-01');
   const [notice, setNotice] = useState('');
   const [nativePrinters, setNativePrinters] = useState<NativePrinterInfo[] | null>(null);
-  const [localJournalCount, setLocalJournalCount] = useState(0);
-  const [redact, setRedact] = useState(true);
-  const [background, setBackground] = useState(true);
-  const statsRef = useGsapStagger<HTMLDivElement>({ selector: '.ws-stat', stagger: 0.05, y: 10 });
-  const jobListRef = useGsapStagger<HTMLDivElement>({ selector: '.ws-job', stagger: 0.04, y: 12 });
-  const tone = () => { if (!isAudioEnabled) return; try { const ctx = new AudioContext(); const osc = ctx.createOscillator(); const gain = ctx.createGain(); gain.gain.value = 0.03; osc.connect(gain); gain.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 0.08); osc.onended = () => { void ctx.close(); }; } catch {} };
-  const [printers, setPrinters] = useState<ConnectedPrinter[]>([
+
+  const [printers] = useState<ConnectedPrinter[]>([
     {
       id: 'prn-canon-ir3530',
       name: 'Canon imageRUNNER ADV C3530i (Color Production)',
@@ -100,7 +365,7 @@ function Workstation() {
     },
   ]);
 
-  const [queue, setQueue] = useState<PrintJob[]>([
+  const [jobs, setJobs] = useState<PrintJob[]>([
     {
       id: 'job-9841',
       customer_email: 'ramesh.kumar@annauniv.edu',
@@ -114,115 +379,1258 @@ function Workstation() {
         color_mode: 'color',
         paper_size: 'A3',
         duplex_mode: 'simplex',
-        paper_gsm: 100,
-        binding: 'spiral',
-        page_range: '1-8',
-        pages_per_sheet: 1,
+        paper_gsm: 80,
+        binding: 'none',
       },
       calculated_price_paise: 20000,
       calculated_price_rupees: 200.0,
-      status: 'PENDING_APPROVAL',
-      created_at: new Date(Date.now() - 1000 * 60 * 3).toISOString(),
+      status: 'REJECTED',
+      rejection_reason: 'Poor image resolution or blurred scan',
+      created_at: '2026-10-25 10:14',
     },
     {
       id: 'job-9842',
-      customer_email: 'priya.sharma@startup.in',
-      file_name: 'Legal_Agreement_Draft.pdf',
-      page_count: 11,
-      logical_pages: 11,
-      rendered_sides: 22,
-      physical_sheets: 12,
+      customer_email: 'priya.s@annauniv.edu',
+      file_name: 'Semester_Project_Report_Final.pdf',
+      page_count: 42,
+      logical_pages: 42,
+      rendered_sides: 42,
+      physical_sheets: 21,
+      options: {
+        copies: 1,
+        color_mode: 'bw',
+        paper_size: 'A4',
+        duplex_mode: 'duplex_long',
+        paper_gsm: 75,
+        binding: 'spiral',
+      },
+      calculated_price_paise: 9550,
+      calculated_price_rupees: 95.5,
+      status: 'QUEUED',
+      created_at: '2026-10-25 10:30',
+    },
+    {
+      id: 'job-9843',
+      customer_email: 'walkin.karthik@gmail.com',
+      file_name: 'ak_resume.pdf',
+      page_count: 2,
+      logical_pages: 4,
+      rendered_sides: 4,
+      physical_sheets: 4,
       options: {
         copies: 2,
         color_mode: 'bw',
         paper_size: 'A4',
-        duplex_mode: 'duplex_long',
-        paper_gsm: 80,
-        binding: 'staple',
-        page_range: '1-11',
-        pages_per_sheet: 1,
-      },
-      calculated_price_paise: 3075,
-      calculated_price_rupees: 30.75,
-      status: 'QUEUED',
-      created_at: new Date(Date.now() - 1000 * 60 * 1).toISOString(),
-    },
-    {
-      id: 'job-9843',
-      customer_email: 'kavitha.m@gmail.com',
-      file_name: 'Passport_ID_Front_Back.pdf',
-      page_count: 1,
-      logical_pages: 1,
-      rendered_sides: 1,
-      physical_sheets: 1,
-      options: {
-        copies: 4,
-        color_mode: 'color',
-        paper_size: 'A4',
         duplex_mode: 'simplex',
-        paper_gsm: 180,
+        paper_gsm: 75,
         binding: 'none',
-        page_range: '1',
-        pages_per_sheet: 4,
       },
-      calculated_price_paise: 8000,
-      calculated_price_rupees: 80.0,
-      status: 'COMPLETED',
-      created_at: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
+      calculated_price_paise: 600,
+      calculated_price_rupees: 6.0,
+      status: 'PENDING_APPROVAL',
+      created_at: '2026-10-25 10:45',
     },
   ]);
 
+  // Fetch native Windows spooler printers if available
   useEffect(() => {
-    void discoverPrinters().then(found => {
-      setNativePrinters(found);
-      setPrinters(found.map((printer, index) => ({
-        id: `native-${index}-${printer.name}`,
-        name: printer.name,
-        driver_name: 'Windows print spooler',
-        port: 'Native queue',
-        online: printer.is_online,
-        supports_color: printer.supports_color,
-        supports_duplex: printer.supports_duplex,
-        supported_sizes: printer.supported_paper_sizes,
-      })));
-    }).catch(error => {
-      setNativePrinters(null);
-      setNotice(`Native printer discovery unavailable: ${error.message}. The screen is showing simulation data.`);
-    });
+    discoverPrinters()
+      .then(setNativePrinters)
+      .catch(() => setNativePrinters(null));
   }, []);
-  const selected = queue.find(job => job.id === selectedId);
-  const filteredQueue = useMemo(() => queue.filter(job => {
-    const matches = `${job.file_name} ${job.customer_email} ${job.id}`.toLowerCase().includes(searchQuery.toLowerCase());
-    return matches && (statusFilter === 'ALL' || (statusFilter === 'PENDING' && job.status === 'PENDING_APPROVAL') || (statusFilter === 'SPOOLING' && ['QUEUED','PRINTING'].includes(job.status)) || (statusFilter === 'COMPLETED' && job.status === 'COMPLETED') || (statusFilter === 'ATTENTION' && job.status === 'COMPLETION_UNKNOWN'));
-  }), [queue, searchQuery, statusFilter]);
-  const pendingCount = queue.filter(j => j.status === 'PENDING_APPROVAL').length;
-  const dispatch = (_ids: string[]) => { tone(); setNotice(nativePrinters ? 'Dispatch is blocked until the server-authorized job contains a paired shop, verified document path, printer capability match, and native acknowledgement. No job was marked printing.' : 'Native printer discovery is unavailable, so dispatch remains blocked. No job was marked printing.'); };
-  const setJobStatus = (id: string, status: PrintJob['status'], rejection_reason?: string) => { setQueue(prev => prev.map(job => job.id === id ? {...job, status, rejection_reason} : job)); setLocalJournalCount(n => n + 1); };
-  const money = (paise: number) => new Intl.NumberFormat('en-IN', {style:'currency', currency:'INR'}).format(paise / 100);
-  const nav = [{id:'queue',label:'Dispatch queue',icon:Layers},{id:'printers',label:'Printers',icon:Printer},{id:'pairing',label:'Device pairing',icon:KeyRound},{id:'settings',label:'Preferences',icon:Settings}] as const;
-  return <div className="workstation">
-    <aside className="ws-sidebar"><a className="ws-brand" href="#main"><span><Printer size={25}/></span><div>Print Bot<small>COUNTER WORKSPACE</small></div></a><div className="ws-shop"><strong>Anna University<br/>Quick Xerox</strong><small>Chennai, Tamil Nadu</small></div>
-      <nav aria-label="Workstation">{nav.map(({id,label,icon:Icon}) => <button key={id} aria-current={activeTab === id ? 'page' : undefined} onClick={() => {setActiveTab(id); tone();}}><Icon size={19}/><span>{label}</span>{id === 'queue' && <b>{queue.length}</b>}</button>)}</nav>
-      <div className="ws-sidebar-bottom"><ShieldCheck size={21}/><strong>One plan. Every printer.</strong><p>Unlimited printers for each subscribed shop.</p></div>
-    </aside>
-    <div className="ws-workspace"><header className="ws-topbar"><div><span className="ws-eyebrow">WORKSTATION</span><strong>{deviceName}</strong></div><div className="ws-top-actions"><button aria-label={isAudioEnabled ? 'Mute feedback sounds' : 'Enable feedback sounds'} aria-pressed={isAudioEnabled} onClick={() => setIsAudioEnabled(!isAudioEnabled)}>{isAudioEnabled ? <Volume2 size={19}/> : <VolumeX size={19}/>}</button><ThemeSwitch/></div></header>
-      <main id="main" className="ws-main"><div className="ws-simulation"><AlertTriangle size={17}/><span>Local simulation · Sample jobs and printers. Cloud connection, payment verification and physical printing are not active.</span></div>
-      <MotionSurface transitionKey={activeTab} className="ws-view">
-        <div className="ws-page-heading"><div><span className="ws-eyebrow">PRINT STUDIO / {activeTab === 'queue' ? 'OPERATIONS' : activeTab.toUpperCase()}</span><h1>{activeTab === 'queue' ? 'A clear view of your queue.' : activeTab === 'printers' ? 'Your print room.' : activeTab === 'pairing' ? 'Connect with confidence.' : 'Make this space yours.'}</h1><p>{activeTab === 'queue' ? 'Review the details. Keep every job moving with care.' : activeTab === 'printers' ? 'Inspect sample capabilities before assigning a job.' : activeTab === 'pairing' ? 'A trusted workstation starts with a shop-authorized pairing.' : 'Appearance and local workstation preferences.'}</p></div>{activeTab === 'queue' && <button className="ws-primary" disabled={!pendingCount} onClick={() => dispatch(queue.filter(j => j.status === 'PENDING_APPROVAL').map(j => j.id))}>Simulate approval ({pendingCount})<ArrowUpRight size={18}/></button>}</div>
-        {notice && <div className="ws-notice" role="status"><span>{notice}</span><button aria-label="Dismiss message" onClick={() => setNotice('')}><X size={18}/></button></div>}
-        {activeTab === 'queue' && <>
-          <div ref={statsRef} className="ws-stats">{[{label:'Awaiting review',value:pendingCount,filter:'PENDING',note:'Your next decisions'},{label:'In the queue',value:queue.filter(j => ['QUEUED','PRINTING'].includes(j.status)).length,filter:'SPOOLING',note:'Sample dispatch activity'},{label:'Completed samples',value:queue.filter(j => j.status === 'COMPLETED').length,filter:'COMPLETED',note:'Not physical output'},{label:'Needs attention',value:queue.filter(j => j.status === 'COMPLETION_UNKNOWN').length,filter:'ATTENTION',note:'Supervised reconciliation'}].map(stat => <button className="ws-stat" key={stat.filter} aria-pressed={statusFilter === stat.filter} onClick={() => setStatusFilter(statusFilter === stat.filter ? 'ALL' : stat.filter)}><span>{stat.label}</span><strong>{String(stat.value).padStart(2,'0')}</strong><small>{stat.note}</small></button>)}</div>
-          <section className="ws-panel"><div className="ws-queue-toolbar"><div><h2>Job activity</h2><p>{filteredQueue.length} of {queue.length} sample jobs</p></div><label className="ws-search"><Search size={18}/><input aria-label="Search jobs" placeholder="Search filename, customer or ID" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}/>{searchQuery && <button aria-label="Clear search" onClick={() => setSearchQuery('')}><X size={16}/></button>}</label><label className="ws-filter"><span className="ws-sr-only">Filter jobs</span><select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}><option value="ALL">All jobs</option><option value="PENDING">Needs approval</option><option value="SPOOLING">In queue</option><option value="COMPLETED">Completed samples</option><option value="ATTENTION">Needs attention</option></select></label></div>
-          <div ref={jobListRef} className="ws-job-list">{filteredQueue.map(job => <article className="ws-job" key={job.id}><div className="ws-file-icon"><FileText size={23}/></div><div className="ws-job-main"><div className="ws-job-title"><h3>{job.file_name}</h3><span className={`ws-chip ${job.status === 'COMPLETION_UNKNOWN' ? 'ws-danger' : job.status === 'PENDING_APPROVAL' ? 'ws-warning' : ''}`}>{statusLabels[job.status]}</span></div><p>{job.id} · {job.customer_email}</p><div className="ws-job-specs"><span>{job.options.paper_size} / {job.options.color_mode === 'color' ? 'Color' : 'B&W'}</span><span>{job.options.copies} copies</span><span>{job.physical_sheets} sheets · {job.rendered_sides} sides · {job.logical_pages} logical pages</span></div>{job.rejection_reason && <p className="ws-reason">Reason: {job.rejection_reason}</p>}<div className="ws-job-actions"><button onClick={() => setSelectedId(job.id)}><Eye size={16}/>Details</button>{['PENDING_APPROVAL','QUEUED'].includes(job.status) && <button className="ws-primary" onClick={() => dispatch([job.id])}>{job.status === 'PENDING_APPROVAL' ? 'Simulate approval & dispatch' : 'Simulate dispatch'}</button>}{job.status === 'PENDING_APPROVAL' && <button onClick={() => setRejectionModalJobId(job.id)}>Reject</button>}{job.status === 'PRINTING' && <button onClick={() => setJobStatus(job.id,'COMPLETION_UNKNOWN')}>Flag uncertain outcome</button>}{job.status === 'COMPLETION_UNKNOWN' && <button className="ws-primary" onClick={() => {setReconcileId(job.id); setReconcileNote('');}}>Reconcile sample</button>}</div></div><strong className="ws-price">{money(job.calculated_price_paise)}<small>Sample quote</small></strong></article>)}{!filteredQueue.length && <div className="ws-empty"><Layers size={34}/><h3>No matching jobs</h3><p>Try a different filename or status.</p><button onClick={() => {setSearchQuery('');setStatusFilter('ALL');}}>Clear filters</button></div>}</div><footer className="ws-queue-footer"><span>{localJournalCount} local session events · Not a durable journal</span><button onClick={() => setNotice('Sync unavailable: this workspace has no authenticated cloud connection. Local events remain in memory; nothing was synchronized.')}><RefreshCw size={16}/>Check cloud sync</button></footer></section>
-        </>}
-        {activeTab === 'printers' && <><div className="ws-section-line"><span className="ws-chip">{printers.length} sample printers · Unlimited allowance</span><button onClick={() => setNotice('Hardware discovery is unavailable in this simulation. Connect the native Windows service to discover real printers.')}><RefreshCw size={17}/>Discover printers</button></div><div style={{ marginBottom: '1.5rem', borderRadius: '1rem', overflow: 'hidden', border: '1px solid var(--st-border, #e5ded6)', background: 'var(--st-card, #ffffff)' }}><PrinterScene /></div><div className="ws-printer-grid">{printers.map(printer => <article className="ws-panel ws-printer" key={printer.id}><div className="ws-printer-symbol"><Printer size={40}/></div><span className="ws-eyebrow">SAMPLE DEVICE</span><h2>{printer.name}</h2><p>{printer.driver_name}</p><dl><div><dt>Port</dt><dd>{printer.port}</dd></div><div><dt>Color</dt><dd>{printer.supports_color ? 'Color + mono' : 'Mono'}</dd></div><div><dt>Two-sided</dt><dd>{printer.supports_duplex ? 'Supported in sample' : 'Single-sided'}</dd></div></dl><div className="ws-size-list">{printer.supported_sizes.map(size => <span className="ws-chip" key={size}>{size}</span>)}</div></article>)}</div></>}
-        {activeTab === 'pairing' && <div className="ws-pairing-grid"><section className="ws-panel ws-form-panel"><KeyRound size={30}/><h2>Pair this workstation</h2><p>Use a short-lived code issued by an authorized shop account. Device IDs are identifiers, never credentials.</p><label>Workstation name<input value={deviceName} onChange={e => setDeviceName(e.target.value)} maxLength={64}/></label><label htmlFor="pair-code">One-time pairing code</label><input id="pair-code" inputMode="numeric" autoComplete="off" placeholder="6-digit code" value={pairingCode} onChange={e => setPairingCode(e.target.value.replace(/\D/g,'').slice(0,6))}/><button className="ws-primary" disabled={pairingCode.length !== 6} onClick={() => setNotice('Code format accepted locally. Pairing is BLOCKED: authenticated server challenge-response and hardware key attestation are not connected. No device was paired.')}>Check pairing readiness<ArrowUpRight size={18}/></button><dl><div><dt>Connection</dt><dd>Not paired</dd></div><div><dt>Key assurance</dt><dd>Unverified</dd></div></dl><button onClick={async () => {try {await navigator.clipboard.writeText(deviceName);setNotice('Workstation name copied.');} catch {setNotice('Clipboard unavailable. Select and copy the workstation name manually.');}}}><Copy size={16}/>Copy workstation name</button></section><div className="ws-pairing-art"><PrinterScene compact/><h2>Your shop. Your trusted devices.</h2><p>Live setup requires an active subscription and revocable device credentials. Hardware-backed key assurance is shown only after verification.</p></div></div>}
-        {activeTab === 'settings' && <div className="ws-settings-grid"><section className="ws-panel ws-form-panel"><h2>Working preferences</h2><p>These controls apply to this local simulation session.</p><label>Sample order mode<select value={orderMode} onChange={e => {setOrderMode(e.target.value);setNotice('Sample mode changed for future simulated jobs. Existing jobs are unchanged; no live shop setting was changed.');}}><option value="MANUAL_APPROVAL">MANUAL APPROVAL</option><option value="FULL_AUTOMATIC">FULL AUTOMATIC</option></select></label><p>Live changes require authorized, audited server actions. Cash or unverified payments cannot bypass approval.</p><label className="ws-check"><input type="checkbox" checked={background} onChange={e => setBackground(e.target.checked)}/><span>Prefer background service after logoff<small>Local preference only; Windows service integration unverified.</small></span></label><label className="ws-check"><input type="checkbox" checked={redact} onChange={e => setRedact(e.target.checked)}/><span>Redact filenames in notifications<small>Local preference; OS notifications are not connected.</small></span></label><label className="ws-check"><input type="checkbox" checked={isAudioEnabled} onChange={e => setIsAudioEnabled(e.target.checked)}/><span>Play feedback sounds</span></label></section><section className="ws-panel ws-form-panel"><h2>Appearance</h2><p>Follow your system or choose a light or dark workspace. Your queue and form values stay in place.</p><ThemeSwitch/><div className="ws-settings-note"><ShieldCheck size={24}/><h3>Privacy by design</h3><p>Only your appearance choice is saved by the theme system. Sample jobs and preferences remain in this session.</p></div></section></div>}
-      </MotionSurface></main><footer className="ws-bottom"><span>Print Bot / Windows workstation</span><span>Native service: unverified</span></footer>
+
+  const handleApproveJob = (jobId: string) => {
+    setJobs((prev) =>
+      prev.map((j) => (j.id === jobId ? { ...j, status: 'QUEUED' } : j))
+    );
+    setNotice(`Job ${jobId} approved and dispatched to printer spooler.`);
+  };
+
+  const handleRejectJob = () => {
+    if (!rejectionModalJobId) return;
+    setJobs((prev) =>
+      prev.map((j) =>
+        j.id === rejectionModalJobId
+          ? { ...j, status: 'REJECTED', rejection_reason: rejectionReason }
+          : j
+      )
+    );
+    setNotice(`Job ${rejectionModalJobId} rejected.`);
+    setRejectionModalJobId(null);
+  };
+
+  const handleSimulateNewCustomerJob = () => {
+    const randomId = 'job-' + Math.floor(1000 + Math.random() * 9000);
+    const newJob: PrintJob = {
+      id: randomId,
+      customer_email: 'walkin.customer@mobile.in',
+      file_name: 'Passport_and_ID_Card.pdf',
+      page_count: 2,
+      logical_pages: 2,
+      rendered_sides: 2,
+      physical_sheets: 2,
+      options: {
+        copies: 1,
+        color_mode: 'color',
+        paper_size: 'A4',
+        duplex_mode: 'simplex',
+        paper_gsm: 75,
+        binding: 'none',
+      },
+      calculated_price_paise: 2000,
+      calculated_price_rupees: 20.0,
+      status: currentShop?.orderMode === 'FULL_AUTOMATIC' ? 'QUEUED' : 'PENDING_APPROVAL',
+      created_at: 'Just now',
+    };
+    setJobs((prev) => [newJob, ...prev]);
+    setNotice(`New incoming QR customer order ${randomId} received!`);
+  };
+
+  // ==========================================
+  // RENDER SCREEN 1: LOCKED / LICENSE LOGIN
+  // ==========================================
+  if (screen === 'LOCK_SCREEN') {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'grid',
+          placeItems: 'center',
+          background: 'var(--pb-bg)',
+          color: 'var(--pb-text)',
+          padding: '24px',
+        }}
+      >
+        <div
+          style={{
+            width: 'min(460px, 100%)',
+            background: 'var(--pb-surface)',
+            border: '1px solid var(--pb-border)',
+            borderRadius: '20px',
+            padding: '36px 32px',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.06)',
+          }}
+        >
+          {/* Logo & Header */}
+          <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+            <div
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '16px',
+                background: 'var(--pb-accent)',
+                color: 'var(--pb-on-accent)',
+                display: 'grid',
+                placeItems: 'center',
+                margin: '0 auto 16px',
+              }}
+            >
+              <Lock size={28} />
+            </div>
+            <h1 style={{ fontSize: '26px', fontWeight: 800, margin: 0, letterSpacing: '-0.5px' }}>
+              Print Bot
+            </h1>
+            <p style={{ color: 'var(--pb-muted)', fontSize: '13px', marginTop: '6px' }}>
+              Counter Operating System · License Activation
+            </p>
+          </div>
+
+          {/* Mode Switch Tabs */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '6px',
+              background: 'var(--pb-raised)',
+              padding: '4px',
+              borderRadius: '10px',
+              marginBottom: '24px',
+            }}
+          >
+            <button
+              style={{
+                border: 0,
+                background: loginMode === 'SHOP_OWNER' ? 'var(--pb-surface)' : 'transparent',
+                color: loginMode === 'SHOP_OWNER' ? 'var(--pb-text)' : 'var(--pb-muted)',
+                boxShadow: loginMode === 'SHOP_OWNER' ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
+                minHeight: '38px',
+                fontSize: '13px',
+                fontWeight: 650,
+                borderRadius: '8px',
+              }}
+              onClick={() => {
+                setLoginMode('SHOP_OWNER');
+                setLoginError('');
+              }}
+            >
+              Shop Owner
+            </button>
+            <button
+              style={{
+                border: 0,
+                background: loginMode === 'ADMIN' ? 'var(--pb-surface)' : 'transparent',
+                color: loginMode === 'ADMIN' ? 'var(--pb-text)' : 'var(--pb-muted)',
+                boxShadow: loginMode === 'ADMIN' ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
+                minHeight: '38px',
+                fontSize: '13px',
+                fontWeight: 650,
+                borderRadius: '8px',
+              }}
+              onClick={() => {
+                setLoginMode('ADMIN');
+                setLoginError('');
+              }}
+            >
+              Platform Admin
+            </button>
+          </div>
+
+          {loginError && (
+            <div
+              style={{
+                padding: '12px 14px',
+                borderRadius: '8px',
+                background: '#fef2f2',
+                color: '#991b1b',
+                border: '1px solid #fecaca',
+                fontSize: '12px',
+                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <AlertTriangle size={16} />
+              <span>{loginError}</span>
+            </div>
+          )}
+
+          {/* Shop Owner Login Form */}
+          {loginMode === 'SHOP_OWNER' && (
+            <form onSubmit={handleShopLogin} style={{ display: 'grid', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                  Shop Owner Username
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. shopowner"
+                  value={ownerUsername}
+                  onChange={(e) => setOwnerUsername(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                  Activation / License Key
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. PB-KEY-2026-XEROX"
+                  value={ownerKey}
+                  onChange={(e) => setOwnerKey(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div
+                style={{
+                  background: 'var(--pb-raised)',
+                  border: '1px solid var(--pb-border)',
+                  borderRadius: '10px',
+                  padding: '12px',
+                  fontSize: '11px',
+                  color: 'var(--pb-muted)',
+                  lineHeight: '1.5',
+                }}
+              >
+                <strong>Pre-configured Demo Shop Key:</strong>
+                <br />
+                Username: <code>shopowner</code> | Key: <code>PB-KEY-2026-XEROX</code>
+              </div>
+
+              <button
+                type="submit"
+                className="ws-primary"
+                style={{
+                  width: '100%',
+                  minHeight: '46px',
+                  marginTop: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  fontSize: '14px',
+                }}
+              >
+                <Unlock size={18} />
+                Unlock Print Bot Software
+              </button>
+            </form>
+          )}
+
+          {/* Platform Admin Login Form */}
+          {loginMode === 'ADMIN' && (
+            <form onSubmit={handleAdminLogin} style={{ display: 'grid', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                  Admin Username
+                </label>
+                <input
+                  type="text"
+                  placeholder="admin"
+                  value={adminUsername}
+                  onChange={(e) => setAdminUsername(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                  Admin Key / Password
+                </label>
+                <input
+                  type="password"
+                  placeholder="admin@123"
+                  value={adminKey}
+                  onChange={(e) => setAdminKey(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div
+                style={{
+                  background: 'var(--pb-raised)',
+                  border: '1px solid var(--pb-border)',
+                  borderRadius: '10px',
+                  padding: '12px',
+                  fontSize: '11px',
+                  color: 'var(--pb-muted)',
+                }}
+              >
+                Super Admin credentials: <code>admin</code> / <code>admin@123</code>
+              </div>
+
+              <button
+                type="submit"
+                className="ws-primary"
+                style={{
+                  width: '100%',
+                  minHeight: '46px',
+                  marginTop: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  fontSize: '14px',
+                }}
+              >
+                <ShieldCheck size={18} />
+                Access Admin Portal
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // RENDER SCREEN 2: FIRST-TIME SETUP WIZARD
+  // ==========================================
+  if (screen === 'SETUP_WIZARD') {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          background: 'var(--pb-bg)',
+          color: 'var(--pb-text)',
+          padding: '40px 24px',
+          display: 'grid',
+          placeItems: 'center',
+        }}
+      >
+        <div
+          style={{
+            width: 'min(680px, 100%)',
+            background: 'var(--pb-surface)',
+            border: '1px solid var(--pb-border)',
+            borderRadius: '20px',
+            padding: '36px',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.06)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '24px' }}>
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '12px',
+                background: 'var(--pb-accent-soft)',
+                color: 'var(--pb-accent)',
+                display: 'grid',
+                placeItems: 'center',
+              }}
+            >
+              <Sparkles size={24} />
+            </div>
+            <div>
+              <h1 style={{ fontSize: '24px', fontWeight: 800, margin: 0 }}>Shop Setup Wizard</h1>
+              <p style={{ color: 'var(--pb-muted)', fontSize: '13px', margin: '4px 0 0' }}>
+                Key verified! Fill in your Xerox shop details to begin receiving customer orders.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSaveSetup} style={{ display: 'grid', gap: '20px' }}>
+            {/* Identity */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                  Xerox Shop Name *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Anna University Quick Xerox"
+                  value={setupShopName}
+                  onChange={(e) => setSetupShopName(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                  Branch / Location *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Guindy Counter 01, Chennai"
+                  value={setupLocation}
+                  onChange={(e) => setSetupLocation(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                  Contact Phone *
+                </label>
+                <input
+                  type="text"
+                  placeholder="+91 98401 23456"
+                  value={setupPhone}
+                  onChange={(e) => setSetupPhone(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                  Shop UPI ID for Customer Payments *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. yourname@okaxis"
+                  value={setupUpi}
+                  onChange={(e) => setSetupUpi(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Pricing */}
+            <div
+              style={{
+                borderTop: '1px solid var(--pb-border)',
+                paddingTop: '20px',
+              }}
+            >
+              <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '12px' }}>
+                Per-Page Pricing Rates (INR ₹)
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                    Black & White Rate per Page (₹)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0.5"
+                    value={setupBwRate}
+                    onChange={(e) => setSetupBwRate(Number(e.target.value))}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                    Full Color Rate per Page (₹)
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    value={setupColorRate}
+                    onChange={(e) => setSetupColorRate(Number(e.target.value))}
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Operating Mode */}
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                Workstation Order Dispatch Mode
+              </label>
+              <select
+                value={setupOrderMode}
+                onChange={(e) => setSetupOrderMode(e.target.value as 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC')}
+              >
+                <option value="MANUAL_APPROVAL">
+                  Manual Approval (Operator reviews & clicks Approve before printing)
+                </option>
+                <option value="FULL_AUTOMATIC">
+                  Full Automatic (Directly prints once customer UPI payment is verified)
+                </option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
+              <button type="button" onClick={handleLogout}>
+                Cancel / Log Out
+              </button>
+              <button type="submit" className="ws-primary" style={{ minWidth: '180px' }}>
+                Save & Open Queue →
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // RENDER SCREEN 4: SUPER ADMIN PORTAL
+  // ==========================================
+  if (screen === 'ADMIN_PORTAL') {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--pb-bg)', color: 'var(--pb-text)' }}>
+        {/* Admin Topbar */}
+        <header
+          style={{
+            height: '72px',
+            borderBottom: '1px solid var(--pb-border)',
+            background: 'var(--pb-surface)',
+            padding: '0 32px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                background: 'var(--pb-text)',
+                color: '#fff',
+                display: 'grid',
+                placeItems: 'center',
+              }}
+            >
+              <ShieldCheck size={20} />
+            </div>
+            <div>
+              <strong style={{ display: 'block', fontSize: '16px' }}>Print Bot Admin Center</strong>
+              <small style={{ color: 'var(--pb-muted)', fontSize: '11px' }}>
+                Platform Super Admin · License Issuance & Management
+              </small>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span
+              style={{
+                fontSize: '12px',
+                padding: '6px 12px',
+                borderRadius: '20px',
+                background: 'var(--pb-accent-soft)',
+                color: 'var(--pb-accent)',
+                fontWeight: 700,
+              }}
+            >
+              Logged in: admin
+            </span>
+            <button onClick={handleLogout} style={{ minHeight: '38px', fontSize: '12px' }}>
+              <LogOut size={16} /> Log Out
+            </button>
+          </div>
+        </header>
+
+        {/* Admin Content */}
+        <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 24px' }}>
+          {/* Key Generator Form */}
+          <div
+            style={{
+              background: 'var(--pb-surface)',
+              border: '1px solid var(--pb-border)',
+              borderRadius: '16px',
+              padding: '28px',
+              marginBottom: '32px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+              <PlusCircle size={22} color="var(--pb-accent)" />
+              <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0 }}>
+                Generate New Shop License Key
+              </h2>
+            </div>
+
+            <form
+              onSubmit={handleGenerateKey}
+              style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr) auto', gap: '14px', alignItems: 'flex-end' }}
+            >
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                  Xerox Shop Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. SRM Campus Xerox"
+                  value={newShopName}
+                  onChange={(e) => setNewShopName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                  Shop Owner Username
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. srm_xerox"
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                  Duration
+                </label>
+                <select value={newDuration} onChange={(e) => setNewDuration(e.target.value)}>
+                  <option>1 Month</option>
+                  <option>1 Year</option>
+                  <option>Lifetime Commercial</option>
+                </select>
+              </div>
+
+              <button type="submit" className="ws-primary" style={{ minHeight: '44px' }}>
+                Generate Key
+              </button>
+            </form>
+
+            {generatedKey && (
+              <div
+                style={{
+                  marginTop: '20px',
+                  padding: '16px 20px',
+                  borderRadius: '12px',
+                  background: 'var(--pb-accent-soft)',
+                  border: '1px solid var(--pb-accent)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div>
+                  <span style={{ fontSize: '11px', color: 'var(--pb-muted)', textTransform: 'uppercase' }}>
+                    Newly Generated License Key (Copy and send to Shop Owner):
+                  </span>
+                  <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--pb-text)', marginTop: '4px' }}>
+                    <code>{generatedKey}</code>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(generatedKey);
+                    alert('License Key copied to clipboard!');
+                  }}
+                  style={{ minHeight: '38px', fontSize: '12px' }}
+                >
+                  <Copy size={16} /> Copy Key
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Active Licenses Table */}
+          <div
+            style={{
+              background: 'var(--pb-surface)',
+              border: '1px solid var(--pb-border)',
+              borderRadius: '16px',
+              padding: '28px',
+            }}
+          >
+            <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 18px' }}>
+              Active Shop Licenses ({Object.keys(licenses).length})
+            </h2>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--pb-border)', textAlign: 'left', color: 'var(--pb-muted)' }}>
+                    <th style={{ padding: '12px 16px' }}>Shop Name</th>
+                    <th style={{ padding: '12px 16px' }}>Username</th>
+                    <th style={{ padding: '12px 16px' }}>License Key</th>
+                    <th style={{ padding: '12px 16px' }}>Status</th>
+                    <th style={{ padding: '12px 16px' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.values(licenses).map((lic) => (
+                    <tr key={lic.username} style={{ borderBottom: '1px solid var(--pb-rule)' }}>
+                      <td style={{ padding: '14px 16px', fontWeight: 700 }}>{lic.shopName}</td>
+                      <td style={{ padding: '14px 16px' }}>
+                        <code>{lic.username}</code>
+                      </td>
+                      <td style={{ padding: '14px 16px' }}>
+                        <code style={{ background: 'var(--pb-raised)', padding: '4px 8px', borderRadius: '4px' }}>
+                          {lic.licenseKey}
+                        </code>
+                      </td>
+                      <td style={{ padding: '14px 16px' }}>
+                        <span
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '12px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            background: lic.status === 'ACTIVE' ? '#ecfdf5' : '#fef2f2',
+                            color: lic.status === 'ACTIVE' ? '#047857' : '#b91c1c',
+                          }}
+                        >
+                          {lic.status}
+                        </span>
+                      </td>
+                      <td style={{ padding: '14px 16px' }}>
+                        <button
+                          onClick={() => handleRevokeKey(lic.username)}
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '11px',
+                            minHeight: '32px',
+                            color: lic.status === 'ACTIVE' ? '#b91c1c' : '#047857',
+                          }}
+                        >
+                          {lic.status === 'ACTIVE' ? 'Revoke Key' : 'Reactivate Key'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // RENDER SCREEN 3: WORKSTATION QUEUE (OPERATOR)
+  // ==========================================
+  const pendingCount = jobs.filter((j) => j.status === 'PENDING_APPROVAL').length;
+  const queuedCount = jobs.filter((j) => j.status === 'QUEUED').length;
+  const completedCount = jobs.filter((j) => j.status === 'COMPLETED').length;
+  const attentionCount = jobs.filter((j) => j.status === 'COMPLETION_UNKNOWN').length;
+
+  const filteredJobs = jobs.filter((j) => {
+    if (statusFilter !== 'ALL' && j.status !== statusFilter) return false;
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      j.id.toLowerCase().includes(q) ||
+      j.file_name.toLowerCase().includes(q) ||
+      j.customer_email.toLowerCase().includes(q)
+    );
+  });
+
+  return (
+    <div className="workstation">
+      {/* Sidebar */}
+      <aside className="ws-sidebar">
+        <a href="#brand" className="ws-brand" onClick={(e) => e.preventDefault()}>
+          <span>
+            <Printer size={24} />
+          </span>
+          <div>
+            Print Bot
+            <small>COUNTER WORKSPACE</small>
+          </div>
+        </a>
+
+        {currentShop && (
+          <div className="ws-shop">
+            <span className="ws-eyebrow">ACTIVE LICENSED SHOP</span>
+            <strong>{currentShop.shopName}</strong>
+            <small>{currentShop.location}</small>
+          </div>
+        )}
+
+        <nav aria-label="Workstation primary">
+          <button
+            aria-current={activeTab === 'queue' ? 'page' : undefined}
+            onClick={() => setActiveTab('queue')}
+          >
+            <Layers size={18} />
+            Dispatch queue
+            <b>{jobs.length}</b>
+          </button>
+          <button
+            aria-current={activeTab === 'printers' ? 'page' : undefined}
+            onClick={() => setActiveTab('printers')}
+          >
+            <Printer size={18} />
+            Printers
+          </button>
+          <button
+            aria-current={activeTab === 'pairing' ? 'page' : undefined}
+            onClick={() => setActiveTab('pairing')}
+          >
+            <KeyRound size={18} />
+            Device pairing
+          </button>
+          <button
+            aria-current={activeTab === 'settings' ? 'page' : undefined}
+            onClick={() => setActiveTab('settings')}
+          >
+            <Settings size={18} />
+            Preferences
+          </button>
+        </nav>
+
+        <div className="ws-sidebar-bottom">
+          <ShieldCheck size={20} />
+          <strong>One plan. Every printer.</strong>
+          <p>Unlimited printers per subscribed shop.</p>
+          <button
+            onClick={handleLogout}
+            style={{ width: '100%', minHeight: '38px', fontSize: '12px', gap: '6px' }}
+          >
+            <Lock size={14} /> Lock / Log Out
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Panel */}
+      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        {/* Topbar */}
+        <header className="ws-topbar">
+          <div>
+            <span className="ws-eyebrow">WORKSTATION</span>
+            <strong>Counter-PC-01 ({currentShop?.username})</strong>
+          </div>
+
+          <div className="ws-top-actions">
+            <button
+              aria-label={isAudioEnabled ? 'Disable audio alerts' : 'Enable audio alerts'}
+              onClick={() => setIsAudioEnabled(!isAudioEnabled)}
+            >
+              {isAudioEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+            </button>
+            <ThemeSwitch />
+          </div>
+        </header>
+
+        {notice && (
+          <div
+            style={{
+              padding: '10px 24px',
+              background: 'var(--pb-accent-soft)',
+              color: 'var(--pb-accent)',
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderBottom: '1px solid var(--pb-border)',
+            }}
+          >
+            <span>{notice}</span>
+            <button onClick={() => setNotice('')} style={{ border: 0, padding: '4px', minHeight: '28px' }}>
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
+        <main className="ws-main">
+          {/* TAB: QUEUE */}
+          {activeTab === 'queue' && (
+            <div className="ws-view">
+              <div className="ws-page-heading">
+                <div>
+                  <span className="ws-eyebrow">PRINT STUDIO / OPERATIONS</span>
+                  <h1>A clear view of your queue.</h1>
+                  <p>Review incoming customer orders. Keep every job moving with care.</p>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button onClick={handleSimulateNewCustomerJob} style={{ fontSize: '13px', gap: '6px' }}>
+                    <PlusCircle size={16} /> Simulate Customer QR Job
+                  </button>
+                  <button
+                    className="ws-primary"
+                    disabled={pendingCount === 0}
+                    onClick={() => {
+                      setJobs((prev) =>
+                        prev.map((j) => (j.status === 'PENDING_APPROVAL' ? { ...j, status: 'QUEUED' } : j))
+                      );
+                      setNotice(`Approved all ${pendingCount} pending jobs.`);
+                    }}
+                  >
+                    Approve all ({pendingCount})
+                  </button>
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div className="ws-stats">
+                <div className="ws-stat">
+                  <span>Awaiting review</span>
+                  <strong>{pendingCount.toString().padStart(2, '0')}</strong>
+                  <small>Your next decisions</small>
+                </div>
+                <div className="ws-stat">
+                  <span>In the queue</span>
+                  <strong>{queuedCount.toString().padStart(2, '0')}</strong>
+                  <small>Ready to dispatch</small>
+                </div>
+                <div className="ws-stat">
+                  <span>Completed today</span>
+                  <strong>{completedCount.toString().padStart(2, '0')}</strong>
+                  <small>Total customer prints</small>
+                </div>
+                <div className="ws-stat">
+                  <span>Needs attention</span>
+                  <strong>{attentionCount.toString().padStart(2, '0')}</strong>
+                  <small>Supervised reconciliation</small>
+                </div>
+              </div>
+
+              {/* Queue Table */}
+              <div className="ws-panel">
+                <div className="ws-queue-toolbar">
+                  <div>
+                    <h3>Job activity</h3>
+                    <p>{filteredJobs.length} of {jobs.length} jobs</p>
+                  </div>
+
+                  <div className="ws-search">
+                    <Search size={16} />
+                    <input
+                      type="text"
+                      placeholder="Search filename, customer, or ID"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
+
+                  <select
+                    className="ws-filter"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                  >
+                    <option value="ALL">All jobs</option>
+                    <option value="PENDING_APPROVAL">Awaiting review</option>
+                    <option value="QUEUED">Ready to dispatch</option>
+                    <option value="COMPLETED">Completed</option>
+                    <option value="REJECTED">Rejected</option>
+                  </select>
+                </div>
+
+                {filteredJobs.length === 0 ? (
+                  <div className="ws-empty">
+                    <FileText size={32} />
+                    <p>No jobs found matching your criteria.</p>
+                  </div>
+                ) : (
+                  filteredJobs.map((job) => (
+                    <div key={job.id} className="ws-job">
+                      <div className="ws-file-icon">
+                        <FileText size={22} />
+                      </div>
+                      <div className="ws-job-main">
+                        <div className="ws-job-title">
+                          <h3>{job.file_name}</h3>
+                          <span className="ws-chip">{job.status}</span>
+                        </div>
+                        <p style={{ margin: '4px 0', color: 'var(--pb-muted)', fontSize: '12px' }}>
+                          {job.id} · {job.customer_email} · {job.created_at}
+                        </p>
+                        <div className="ws-job-specs">
+                          <span>
+                            {job.options.paper_size} / {job.options.color_mode.toUpperCase()}
+                          </span>
+                          <span>{job.options.copies} copies</span>
+                          <span>{job.physical_sheets} sheets</span>
+                          <span>{job.options.duplex_mode}</span>
+                        </div>
+
+                        {job.status === 'PENDING_APPROVAL' && (
+                          <div className="ws-job-actions">
+                            <button
+                              className="ws-primary"
+                              onClick={() => handleApproveJob(job.id)}
+                            >
+                              Approve & Print
+                            </button>
+                            <button
+                              onClick={() => {
+                                setRejectionModalJobId(job.id);
+                              }}
+                            >
+                              Reject Job
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="ws-price">
+                        <strong>₹{job.calculated_price_rupees.toFixed(2)}</strong>
+                        <small>Paid via UPI</small>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: PRINTERS */}
+          {activeTab === 'printers' && (
+            <div className="ws-view">
+              <div className="ws-page-heading">
+                <div>
+                  <span className="ws-eyebrow">HARDWARE CONNECTIONS</span>
+                  <h1>Your printer fleet.</h1>
+                  <p>Native Windows spooler handles jobs without direct PDF driver assumptions.</p>
+                </div>
+              </div>
+
+              <div className="ws-printer-grid">
+                {printers.map((prn) => (
+                  <div key={prn.id} className="ws-panel ws-printer">
+                    <div className="ws-printer-symbol">
+                      <Printer size={48} />
+                    </div>
+                    <h2>{prn.name}</h2>
+                    <p>{prn.driver_name}</p>
+                    <dl>
+                      <div>
+                        <dt>Port</dt>
+                        <dd>{prn.port}</dd>
+                      </div>
+                      <div>
+                        <dt>Status</dt>
+                        <dd style={{ color: 'var(--pb-success)', fontWeight: 700 }}>Online</dd>
+                      </div>
+                      <div>
+                        <dt>Color</dt>
+                        <dd>{prn.supports_color ? 'Color & Mono' : 'Monochrome only'}</dd>
+                      </div>
+                      <div>
+                        <dt>Duplex</dt>
+                        <dd>{prn.supports_duplex ? 'Automatic Duplex' : 'Manual duplex'}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: PAIRING */}
+          {activeTab === 'pairing' && (
+            <div className="ws-view">
+              <div className="ws-page-heading">
+                <div>
+                  <span className="ws-eyebrow">QR CODE & SECURITY</span>
+                  <h1>Device pairing & counter QR link.</h1>
+                  <p>Customers scan this counter QR code to directly access your shop's mobile portal.</p>
+                </div>
+              </div>
+
+              <div className="ws-panel" style={{ padding: '36px', maxWidth: '600px' }}>
+                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                  <QrCode size={96} color="var(--pb-accent)" style={{ margin: '0 auto 16px' }} />
+                  <h3 style={{ fontSize: '20px', fontWeight: 800 }}>Counter Stand QR</h3>
+                  <p style={{ fontSize: '13px', color: 'var(--pb-muted)' }}>
+                    Print this QR code and paste it on your desk counter.
+                  </p>
+                </div>
+
+                <div
+                  style={{
+                    padding: '16px',
+                    borderRadius: '12px',
+                    background: 'var(--pb-raised)',
+                    border: '1px solid var(--pb-border)',
+                    fontSize: '12px',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <strong>Shop Portal QR URL:</strong>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`https://printbot-57e1.vercel.app/?qr=shop_anna_univ_01`);
+                        alert('Copied shop QR link!');
+                      }}
+                      style={{ border: 0, padding: '4px 8px', fontSize: '11px' }}
+                    >
+                      Copy Link
+                    </button>
+                  </div>
+                  <code>https://printbot-57e1.vercel.app/?qr=shop_anna_univ_01</code>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: SETTINGS */}
+          {activeTab === 'settings' && (
+            <div className="ws-view">
+              <div className="ws-page-heading">
+                <div>
+                  <span className="ws-eyebrow">CONFIGURATION</span>
+                  <h1>Shop settings & rates.</h1>
+                  <p>Update your per-page billing rates, dispatch mode, and shop contact details.</p>
+                </div>
+              </div>
+
+              <div className="ws-panel" style={{ padding: '32px', maxWidth: '640px' }}>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!activeSession) return;
+                    const u = activeSession.username;
+                    setLicenses((prev) => ({
+                      ...prev,
+                      [u]: {
+                        ...prev[u],
+                        shopName: setupShopName,
+                        location: setupLocation,
+                        phone: setupPhone,
+                        upiId: setupUpi,
+                        rates: {
+                          bwPerSideRupees: Number(setupBwRate) || 1.5,
+                          colorPerSideRupees: Number(setupColorRate) || 10.0,
+                          duplexDiscountPercent: 15,
+                        },
+                        orderMode: setupOrderMode,
+                      },
+                    }));
+                    setNotice('Shop preferences and rates updated successfully.');
+                  }}
+                  style={{ display: 'grid', gap: '16px' }}
+                >
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                      Shop Name
+                    </label>
+                    <input
+                      type="text"
+                      value={setupShopName}
+                      onChange={(e) => setSetupShopName(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                      Branch Location
+                    </label>
+                    <input
+                      type="text"
+                      value={setupLocation}
+                      onChange={(e) => setSetupLocation(e.target.value)}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                        B&W Rate (₹/pg)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={setupBwRate}
+                        onChange={(e) => setSetupBwRate(Number(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                        Color Rate (₹/pg)
+                      </label>
+                      <input
+                        type="number"
+                        step="1"
+                        value={setupColorRate}
+                        onChange={(e) => setSetupColorRate(Number(e.target.value))}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                      Order Dispatch Mode
+                    </label>
+                    <select
+                      value={setupOrderMode}
+                      onChange={(e) => setSetupOrderMode(e.target.value as 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC')}
+                    >
+                      <option value="MANUAL_APPROVAL">Manual Approval</option>
+                      <option value="FULL_AUTOMATIC">Full Automatic</option>
+                    </select>
+                  </div>
+
+                  <button type="submit" className="ws-primary" style={{ marginTop: '10px' }}>
+                    Save Preferences
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* Rejection Modal */}
+      {rejectionModalJobId && (
+        <Dialog title="Reject print job" onClose={() => setRejectionModalJobId(null)}>
+          <p>Select a clear reason for the customer:</p>
+          <select
+            value={rejectionReason}
+            onChange={(e) => setRejectionReason(e.target.value)}
+            style={{ marginBottom: '16px' }}
+          >
+            <option>Poor image resolution or blurred scan</option>
+            <option>Page bounds or margins exceed printable area</option>
+            <option>Incompatible paper size requested</option>
+            <option>Payment verification mismatch at counter</option>
+          </select>
+          <div className="ws-dialog-actions">
+            <button onClick={() => setRejectionModalJobId(null)}>Cancel</button>
+            <button className="ws-primary" onClick={handleRejectJob}>
+              Confirm Rejection
+            </button>
+          </div>
+        </Dialog>
+      )}
     </div>
-    {selected && <Dialog title="Job details" onClose={() => setSelectedId(null)}><div className="ws-detail-name"><FileText size={28}/><h3>{selected.file_name}</h3><p>{selected.id} · Sample document metadata</p></div><dl className="ws-details">{[['Customer',selected.customer_email],['Status',statusLabels[selected.status]],['Paper',`${selected.options.paper_size} · ${selected.options.paper_gsm} GSM`],['Color / copies',`${selected.options.color_mode} · ${selected.options.copies}`],['Duplex / finishing',`${selected.options.duplex_mode} · ${selected.options.binding}`],['Page selection',selected.options.page_range || 'All'],['Pages per sheet',selected.options.pages_per_sheet || 1],['Accounting',`${selected.logical_pages} logical pages / ${selected.rendered_sides} sides / ${selected.physical_sheets} sheets`]].map(([key,value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}</dl><div className="ws-detail-price"><span>Sample customer quote</span><strong>{money(selected.calculated_price_paise)}</strong><small>No per-page software commission. Payment is unverified.</small></div><button onClick={() => setSelectedId(null)}>Close details</button></Dialog>}
-    {rejectionModalJobId && <Dialog title="Reject sample job" onClose={() => setRejectionModalJobId(null)}><p>Record a reason in this local session. No notification is sent to a customer.</p><label>Rejection reason<select value={rejectionReason} onChange={e => setRejectionReason(e.target.value)}>{['Poor image resolution or blurred scan','Requested paper size currently out of stock','Corrupted or unreadable PDF text','Customer requested cancellation'].map(reason => <option key={reason}>{reason}</option>)}</select></label><div className="ws-dialog-actions"><button onClick={() => setRejectionModalJobId(null)}>Cancel</button><button className="ws-primary" onClick={() => {setJobStatus(rejectionModalJobId,'REJECTED',rejectionReason);setRejectionModalJobId(null);}}>Confirm rejection</button></div></Dialog>}
-    {reconcileId && <Dialog title="Supervised sample reconciliation" onClose={() => setReconcileId(null)}><p>An unknown outcome must never trigger an automatic reprint. Record the operator's review before closing this sample job.</p><label>Operator review note<textarea rows={3} value={reconcileNote} onChange={e => setReconcileNote(e.target.value)} placeholder="Describe the reviewed outcome"/></label><div className="ws-dialog-actions"><button onClick={() => setReconcileId(null)}>Keep unresolved</button><button className="ws-primary" disabled={!reconcileNote.trim()} onClick={() => {setJobStatus(reconcileId,'COMPLETED',`Simulated operator review: ${reconcileNote.trim()}`);setReconcileId(null);setNotice('Sample reconciliation recorded locally. This does not confirm physical output or create a durable audit event.');}}>Resolve sample</button></div></Dialog>}
-  </div>;
+  );
 }
-export default function WorkstationApp() { return <ThemeProvider><Workstation/></ThemeProvider>; }

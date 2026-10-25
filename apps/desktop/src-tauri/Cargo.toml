@@ -1,8 +1,12 @@
 [package]
-name = "xerox-workstation"
+name = "print-bot"
 version = "1.0.0"
-description = "Xerox Print Shop SaaS Windows Desktop Workstation"
+description = "Print Bot Multi-Tenant Print Shop SaaS Windows Desktop Workstation"
 edition = "2021"
+
+[[bin]]
+name = "print-bot"
+path = "src/main.rs"
 
 [build-dependencies]
 tauri-build = { version = "=2.7.4", features = [] }

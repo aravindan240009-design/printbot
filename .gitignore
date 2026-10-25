@@ -71,3 +71,4 @@ sites/
 # Scratch and test files
 scratch/
 .superpowers/
+*.exe
