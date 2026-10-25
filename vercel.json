@@ -1,5 +1,6 @@
 {
   "framework": "vite",
+  "installCommand": "pnpm install",
   "buildCommand": "pnpm --filter @xerox/customer-web build",
   "outputDirectory": "apps/customer-web/dist",
   "rewrites": [

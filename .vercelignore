@@ -1,0 +1,17 @@
+# Prevent Vercel from detecting and installing Python backend dependencies
+requirements.txt
+requirements-phase0.txt
+services/
+tests/
+fixtures/
+docs/
+*.py
+.venv/
+__pycache__/
+
+# Native desktop and Rust tools (not needed for web deployment)
+Cargo.toml
+Cargo.lock
+target/
+apps/desktop/
+tools/
