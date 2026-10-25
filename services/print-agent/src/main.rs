@@ -3,8 +3,8 @@ pub mod journal;
 pub mod printer_adapter;
 pub mod service;
 
-use std::env;
 use sha2::{Digest, Sha256};
+use std::env;
 
 use crate::ipc::{IpcHandler, IpcRequest};
 use crate::journal::Journal;
@@ -16,23 +16,38 @@ fn print_usage() {
     println!("Usage:");
     println!("  print-agent                   - Launches Desktop Workstation Native Window & background service");
     println!("  print-agent ui                - Launches Desktop Workstation Native Window & background service");
-    println!("  print-agent run               - Runs the persistent background service loop (headless)");
+    println!(
+        "  print-agent run               - Runs the persistent background service loop (headless)"
+    );
     println!("  print-agent install           - Registers PrintBotService into Windows SCM");
     println!("  print-agent uninstall         - Unregisters PrintBotService from Windows SCM");
-    println!("  print-agent printers          - Enumerates connected Windows printers & capabilities");
+    println!(
+        "  print-agent printers          - Enumerates connected Windows printers & capabilities"
+    );
     println!("  print-agent test-ipc          - Runs local named pipe IPC self-check");
     println!("  print-agent enroll --code <C> - Enrolls device with server using TPM-backed asymmetric key");
 }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let command = if args.len() < 2 { "ui" } else { args[1].as_str() };
+    let command = if args.len() < 2 {
+        "ui"
+    } else {
+        args[1].as_str()
+    };
 
     match command {
         "ui" => {
             println!("[AGENT] Launching Xerox PrintFlow Desktop Workstation Native Window...");
             let _ = std::process::Command::new("cmd")
-                .args(&["/C", "start", "", "msedge.exe", "--app=http://localhost:5173", "--window-size=1280,840"])
+                .args([
+                    "/C",
+                    "start",
+                    "",
+                    "msedge.exe",
+                    "--app=http://localhost:5173",
+                    "--window-size=1280,840",
+                ])
                 .spawn();
             println!("[SERVICE] Print Bot Windows Native Service started in foreground.");
             println!("[SERVICE] IPC endpoint active at \\\\.\\pipe\\printbot_service_ipc");

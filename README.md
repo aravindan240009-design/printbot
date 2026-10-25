@@ -1,188 +1,345 @@
-# Print Bot — Xerox PrintFlow Platform & Marketing Landing Page
+# Print Bot
 
-> **The modern operating system for high-volume photocopy and digital print counters.**  
-> Connects walk-in smartphone customers directly to local shop Windows workstations without mobile app installations or manual counter file transfers.
+Print Bot is a multi-tenant print-shop SaaS platform for walk-in customers,
+print-shop staff, and Windows workstations. A customer scans a shop-specific
+QR code, uploads documents from a phone, configures print options, receives a
+server-generated preview and quote, pays or chooses cash at the counter, and
+tracks the order.
 
-Official repository for the **Print Bot / Xerox PrintFlow** platform: a production-grade multi-tenant Print Shop SaaS platform engineered for university copy centers, retail print shops, and commercial printers, combined with an approachable, conversion-focused **White Theme Marketing Landing Page** built with React 18, TypeScript 5, Vite 5, and Vanilla CSS.
+The shop operates the queue through a web dashboard and a Windows desktop
+workstation. The workstation is built with Tauri 2 + Rust so printer discovery,
+local files, spool journals, and future Windows spooler submission remain
+outside the React UI.
 
-Live GitHub Repository: [https://github.com/aravindan240009-design/printbot](https://github.com/aravindan240009-design/printbot)
+> Current status: the customer flow, shop portals, API security hardening,
+> Rust journal, native printer boundary, and release compilation are
+> implemented. Physical printing, authenticated device pairing, real-printer
+> validation, and signed installer distribution remain release gates.
 
----
+## Product flows
 
-## Architecture & Directory Structure
+### Customer
 
-```
-printbot/
-├── AGENTS.md                          # Engineering Charter & Rules for Antigravity & Codex
-├── .agents/skills/                    # Workspace Customization Skills (Frontend, Backend, Security, Printing, etc.)
-├── apps/
-│   ├── web/                           # Next.js customer marketing portal & web studio
-│   ├── customer-web/                  # Mobile QR PWA for walk-in print orders
-│   ├── shop-web/                      # Counter operator triage web interface
-│   ├── superadmin-web/                # Fleet licensing and multi-tenant admin portal
-│   └── desktop/                       # Workstation counter app (Tauri 2 + React + Rust winspool.drv)
-├── services/
-│   ├── api/                           # Core FastAPI cloud service (Multi-tenant, Idempotency, Pricing, Webhooks)
-│   └── worker/                        # Background async worker fleet (Document inspection, page counting)
-├── packages/
-│   ├── contracts/                     # Shared Pydantic models (Python) & TypeScript type declarations
-│   ├── ui/                            # Shared React components, badges, live pricing calculators
-│   └── api-client/                    # Typed HTTP client with automatic tenant header injection & retry
-├── infra/
-│   ├── docker/                        # Docker Compose & production Dockerfiles
-│   └── migrations/                    # PostgreSQL schema with Row-Level Security (RLS)
-├── tests/                             # Comprehensive test suites (multi-tenancy, idempotency, spool reconciliation)
-│   ├── test_tenant_isolation.py       # Strict multi-tenant isolation tests
-│   ├── test_payment_idempotency.py    # HMAC signature verification & webhook replay protection
-│   ├── test_print_reconciliation.py   # Safe print-job reconciliation & zero-duplicate guarantee
-│   ├── test_pricing_engine.py         # Comprehensive pricing formula validation
-│   └── benchmark_latency.py           # Real-world concurrent latency benchmarking harness
-├── docs/                              # System Architecture & Reconciliation Protocol specs
-├── .github/workflows/                 # CI/CD and Windows .exe installer release pipelines
-├── public/                            # High-resolution assets, favicon, printer hardware photography
-├── src/                               # Standalone High-Conversion White-Theme Landing Page
-│   ├── components/                    # Hero, HowItWorks, Features, Pricing, Download, PilotModal, etc.
-│   ├── utils/                         # Safe HTTPS .exe installer configuration validator
-│   ├── App.tsx                        # Root React component with reveal animations
-│   ├── index.css                      # Modern design tokens, reset, typography, [data-ui]
-│   └── main.tsx                       # React 18 DOM mount entry point
-├── .env.example                       # Unified environment configuration template
-├── index.html                         # Semantic HTML5 shell, SEO tags, Archivo font
-├── package.json                       # Root workspace and landing page scripts
-├── tsconfig.json                      # Strict TypeScript compiler options
-├── vercel.json                        # Edge deployment configuration
-└── vite.config.ts                     # Vite build configuration with relative assets base
+```text
+Shop QR code
+  -> mobile customer web app
+  -> guest session bound to that shop
+  -> upload supported document
+  -> server scan and preview
+  -> print options and server quote
+  -> verified payment or cash-at-counter choice
+  -> order tracking and collection status
 ```
 
----
+The customer does not need a mobile app or mandatory account. The QR link is
+shop-specific; the API must resolve the shop from the validated guest session,
+not from an unchecked browser field.
 
-## 1. Cloud & Backend Services Quickstart
+### Shop
 
-### Run Backend Automated Tests
+Staff use the shop portal to manage queue review, shop settings, pricing,
+printers, payment choices, order mode, bookings, and reconciliation. A shop
+can use exactly one all-inclusive subscription plan and unlimited printers;
+there are no software tiers or per-printer software commissions.
+
+### Windows workstation
+
+The desktop application displays the operator queue and calls narrow, typed
+Tauri commands for native operations. The Rust layer:
+
+- discovers Windows printers through the print spooler API;
+- validates shop binding, printer availability, capabilities, and spool paths;
+- records print intent in a local SQLite journal before submission;
+- rejects duplicate jobs and cross-shop requests;
+- preserves ambiguous outcomes as `COMPLETION_UNKNOWN`;
+- never performs an automatic reprint.
+
+Physical submission is intentionally not enabled until server-authorized job
+contracts, device pairing, PDF rendering, and real hardware verification are
+complete.
+
+## Repository structure
+
+```text
+apps/
+  web/             Public marketing/product site (Next.js, port 3000)
+  customer-web/    QR customer upload and checkout flow (Vite, port 3000)
+  shop-web/        Shop owner/staff portal (Vite, port 3001)
+  superadmin-web/  Platform owner administration portal (Vite, port 3002)
+  desktop/         Tauri 2 + React + Rust Windows workstation
+
+services/
+  api/             FastAPI modular monolith and REST API
+  worker/          Background document and queue processing
+  print-agent/     Rust Windows service/IPC prototype and journal rules
+
+packages/
+  contracts/       Shared TypeScript contracts
+  printplan-contract/ Canonical PrintPlan contract and schema
+  api-client/      Typed frontend API client
+  ui/              Shared React UI, motion, and 3D components
+
+infra/
+  migrations/      Database migrations and RLS-related schema
+  docker/          Local/deployment container definitions
+
+tests/             Python API, isolation, idempotency, payment, and print tests
+docs/              Architecture, security, operations, and license documents
+fixtures/          Test documents and shared test data
+```
+
+## Technology stack
+
+| Area | Technology |
+| --- | --- |
+| Customer, shop, admin UI | React 18, TypeScript, Vite |
+| Marketing site | Next.js 14 |
+| Desktop UI | Tauri 2, React, TypeScript |
+| Native workstation | Rust, SQLite journal, Windows print APIs |
+| Cloud API | Python, FastAPI, Pydantic |
+| Database | PostgreSQL with tenant isolation and RLS design |
+| Cache/queue support | Valkey/Redis-compatible services and worker processes |
+| Storage | Local filesystem for development; private S3-compatible storage in production |
+| Payments | Razorpay integration boundary with signed webhook verification |
+| Preview/conversion | Explicitly supported document converters and bounded processing |
+
+## Prerequisites
+
+Install the following before local development:
+
+- Node.js 20+ and pnpm;
+- Python 3.11+;
+- Rust stable with the MSVC target;
+- Visual Studio Build Tools with Desktop development with C++ and a Windows SDK
+  for Tauri Windows builds;
+- WebView2 Runtime for running the desktop application;
+- PostgreSQL and Valkey/Redis-compatible service for live API development;
+- an S3-compatible local object store if testing object storage paths.
+
+On Windows, verify Rust with:
+
 ```powershell
-pytest tests/ -v
+cargo --version
+rustc --version
+rustup show
 ```
-*Expected: 7 passed tests covering multi-tenancy, idempotency, webhook anti-replay, and print spool reconciliation.*
 
-### Run Latency Benchmarks
+## Installation
+
+From the repository root:
+
 ```powershell
-python tests/benchmark_latency.py
-```
-*Throughput: > 450 requests/sec throughput; p50 < 2.0ms; p95 < 3.8ms.*
+pnpm install
 
-### Verify Windows Native Printing Hardware
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+Copy the environment template and replace development values as needed:
+
 ```powershell
-python apps/desktop/native_printing_bridge.py
+Copy-Item .env.example .env
 ```
-*Queries Windows Print Spooler (`winspool.drv`) and reports installed hardware & printer status.*
 
-### Start Cloud API
+The development template contains local-only defaults. Never copy its secret
+values into production and never commit real payment, database, storage, or
+JWT secrets.
+
+## Running the applications
+
+### Marketing site
+
 ```powershell
-uvicorn services.api.main:app --reload --port 8000
-```
-Interactive Swagger documentation is available at `http://localhost:8000/docs`.
-
----
-
-## 2. Marketing Landing Page Quickstart & Local Dev
-
-### Prerequisites
-- **Node.js**: v18.0.0 or later (v20+ or v22+ recommended)
-- **npm**: v9.0.0 or later
-
-### Installation
-```bash
-# Clone the repository
-git clone https://github.com/aravindan240009-design/printbot.git
-cd printbot
-
-# Install project dependencies
-npm install
+pnpm dev
 ```
 
-### Running the Local Dev Server
-```bash
-npm run dev
-```
-Open [http://localhost:5173/](http://localhost:5173/) in your web browser. The server supports instant Hot Module Replacement (HMR).
+Open `http://localhost:5173`.
 
-### Building for Production
-```bash
-npm run build
-```
-Compiles optimized, gzipped static assets into the `dist/` directory:
-- `dist/index.html` (~1.0 kB)
-- `dist/assets/index-[hash].css` (~19.5 kB / 4.3 kB gzipped)
-- `dist/assets/index-[hash].js` (~190 kB / 56.6 kB gzipped)
+### Customer web
 
-To preview the production build locally:
-```bash
-npm run preview
+```powershell
+pnpm --filter @xerox/customer-web dev
 ```
 
----
+Open `http://localhost:3000`. A customer session is normally opened from a
+shop QR URL containing the QR token, for example:
 
-## 3. Configuring the Windows Installer (.env)
-
-The application handles installer downloads safely through `src/utils/installer.ts`.
-
-### Setup Instructions
-1. Copy `.env.example` to create your local `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-2. Open `.env` and set `VITE_WINDOWS_INSTALLER_URL` to your verified `.exe` release:
-   ```env
-   VITE_WINDOWS_INSTALLER_URL=https://releases.printbot.app/v1.0.0/PrintBot-Setup-x64.exe
-   ```
-3. Rebuild the app (`npm run build`).
-
-### Built-in Security Validation
-- **Protocol Enforcement**: Must start with `https://`. Insecure `http://` or arbitrary protocols are rejected.
-- **Extension Enforcement**: Must end with `.exe`.
-- **Pilot Fallback**: If unset, empty, or invalid, the download buttons automatically switch to "Windows Installer (Pilot)" and display the interactive setup dialog instead of a broken link.
-
----
-
-## 4. Automated Quality & Taste Audits
-
-### 1. Static Anti-Slop Linter
-```bash
-npm run lint:landing
+```text
+http://localhost:3000/?qr=<shop-qr-token>
 ```
-Inspects all CSS and TSX source files to enforce clean code:
-- Forbids arbitrary gradients and static CSS box-shadows.
-- Verifies that cards and custom UI elements are explicitly annotated with `[data-ui]`.
-- **Status: 0 FAIL, 0 WARN**
 
-### 2. Headless Browser Visual Inspector
-```bash
-npm run inspect
+The customer app requires the API to be configured and reachable for server
+scan, preview, quote, payment, and tracking behavior. Without that connection,
+the UI can render but cannot create a real order.
+
+### Shop portal
+
+```powershell
+pnpm --filter @xerox/shop-web dev
 ```
-Launches a headless Chrome / Edge browser to evaluate the rendered DOM across three viewports (Desktop 1440px, Tablet 768px, Mobile 390px):
-- Measures line wrapping on headlines and ensures zero horizontal overflow.
-- Verifies font consistency (100% Archivo font family coverage).
-- Evaluates color distribution and contrast.
-- **Status: 0 FAIL**
 
----
+Open `http://localhost:3001`.
 
-## 5. Design System & Visual Language (White Theme)
+### Super-admin portal
 
-Inspired by enterprise print platforms such as [ApnaPrinter](https://apnaprinter.com/) and modern industrial tool design, the landing page uses an **approachable, high-contrast White Theme**:
+```powershell
+pnpm --filter @xerox/superadmin-web dev
+```
 
-| Token Name | Value | Purpose |
-| :--- | :--- | :--- |
-| `--bg` | `#ffffff` | Primary background canvas |
-| `--surface` | `#f8fafc` | Subtle card background (Slate 50) |
-| `--surface-subtle` | `#f1f5f9` | Accent card & active state background (Slate 100) |
-| `--line` | `#e2e8f0` | Structured dividers and borders (Slate 200) |
-| `--text` | `#0f172a` | High-contrast heading and primary text (Slate 900) |
-| `--text-muted` | `#475569` | Readable secondary copy and labels (Slate 600) |
-| `--accent` | `#1e3a8a` | Deep Royal Navy for high-intent CTA buttons & badges |
-| `--accent-hover` | `#172554` | Rich navy hover state |
-| `--status-online` | `#065f46` | High-contrast emerald for live spooler indicators |
+Open `http://localhost:3002`.
 
----
+### FastAPI service
 
-*Engineered with precision for Print Bot.*
+```powershell
+uvicorn services.api.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+In development, API documentation is available at `http://localhost:8000/docs`.
+Production disables interactive API documentation and other development-only
+diagnostic endpoints.
+
+### Worker
+
+```powershell
+python -m services.worker.worker
+```
+
+The worker requires the configured database, queue/cache, and storage services
+when running a non-simulated document pipeline.
+
+## Building the Windows workstation
+
+Build the frontend only:
+
+```powershell
+pnpm --filter @xerox/desktop build
+```
+
+Build the Tauri release executable and installers:
+
+```powershell
+pnpm --filter @xerox/desktop tauri:build
+```
+
+The release executable is written to:
+
+```text
+apps/desktop/src-tauri/target/release/xerox-workstation.exe
+```
+
+Tauri installers are written below:
+
+```text
+apps/desktop/src-tauri/target/release/bundle/
+```
+
+The local build is unsigned. A production release also needs an Authenticode
+certificate, signing configuration, update strategy, and verification on the
+target shop hardware. If Tauri reports that `cargo` cannot be found, add
+`%USERPROFILE%\.cargo\bin` to `PATH` and reopen PowerShell.
+
+## Testing and verification
+
+### Python API tests
+
+```powershell
+python -m pytest tests/ -q
+```
+
+These tests cover API behavior including tenant isolation, authorization,
+payment webhook replay protection, pricing, malformed input, and print-job
+reconciliation.
+
+### Rust tests
+
+```powershell
+cargo test --workspace --no-fail-fast
+cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --no-fail-fast
+```
+
+### Rust quality checks
+
+```powershell
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
+```
+
+### TypeScript and production builds
+
+```powershell
+pnpm -r build
+git diff --check
+```
+
+Real printer tests must be executed on a dedicated Windows machine with the
+target printer and driver installed. A simulator or a successful spooler API
+call is not evidence that paper was physically delivered.
+
+## Security model
+
+Print Bot treats every shop as a separate tenant. The security boundary applies
+to customers, files, previews, quotes, orders, printers, devices, jobs,
+payments, logs, and analytics.
+
+Important rules:
+
+- the server resolves `shop_id` from authenticated membership or a validated
+  shop-bound guest session;
+- client-provided shop or tenant fields are never trusted as authorization;
+- storage keys and download permissions are tenant- and owner-scoped;
+- uploads are size-bounded and checked by MIME, file signature, and supported
+  format policy;
+- conversion work must be isolated, resource-bounded, and denied network access;
+- payment callbacks are not trusted until the signed provider webhook is
+  verified and processed idempotently;
+- cookies, CSRF, CORS, CSP, RBAC, MFA, audit logging, and retention policies
+  are environment-sensitive;
+- no customer document content or credentials belong in telemetry;
+- device IDs and shop IDs are identifiers, not secrets;
+- ambiguous spooler outcomes require supervised reconciliation and never
+  trigger automatic reprinting.
+
+Read [AGENTS.md](AGENTS.md), [docs/OPERATIONS_RUNBOOK.md](docs/OPERATIONS_RUNBOOK.md),
+and [docs/SOFTWARE_BILL_OF_MATERIALS.md](docs/SOFTWARE_BILL_OF_MATERIALS.md)
+before changing security, deployment, or native-printing behavior.
+
+## Production readiness gates
+
+The following are deliberately not represented as complete just because local
+tests pass:
+
+1. PostgreSQL, Valkey, private object storage, HTTPS, backups, and monitoring
+   must be deployed and tested.
+2. Device pairing needs an authenticated server challenge, revocable device
+   credentials, and preferably TPM-backed non-exportable keys.
+3. The Rust workstation must receive an immutable server-authorized `PrintPlan`
+   and verify its shop/device binding before native submission.
+4. Supported PDFs must be rendered through a verified compatible path for each
+   target driver and printer family.
+5. Real printers must be tested for enumeration, capabilities, offline states,
+   spooler failures, restart recovery, and ambiguous completion.
+6. Razorpay production credentials and webhook secrets must be stored outside
+   the repository and rotated if exposed.
+7. Installer and update artifacts must be Authenticode-signed and tested on a
+   clean Windows machine.
+8. Dependency licenses and shipped notices must be reviewed before commercial
+   redistribution.
+
+## Documentation map
+
+- [AGENTS.md](AGENTS.md): product, security, architecture, and engineering contract
+- [docs/OPERATIONS_RUNBOOK.md](docs/OPERATIONS_RUNBOOK.md): local operation and incident procedures
+- [docs/SOFTWARE_BILL_OF_MATERIALS.md](docs/SOFTWARE_BILL_OF_MATERIALS.md): dependency/license record
+- [docs/superpowers/specs/2026-10-25-tauri-rust-workstation-design.md](docs/superpowers/specs/2026-10-25-tauri-rust-workstation-design.md): Tauri workstation design
+- [docs/superpowers/plans/2026-10-25-tauri-rust-workstation-plan.md](docs/superpowers/plans/2026-10-25-tauri-rust-workstation-plan.md): implementation plan and verification ledger
+
+## Contributing
+
+Keep changes inside the existing monorepo boundaries, add tests for new
+behavior, and preserve the tenant and print-safety invariants. Before opening a
+pull request, run the relevant Python, TypeScript, Rust, security, and build
+checks. Do not commit `.env` files, production credentials, customer uploads,
+private keys, or unsigned artifacts as if they were production releases.

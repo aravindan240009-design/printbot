@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Printer, Layers, KeyRound, Settings, Search, FileText, Eye, RefreshCw, Volume2, VolumeX, Copy, ArrowUpRight, ShieldCheck, X, AlertTriangle } from 'lucide-react';
 import { ThemeProvider, ThemeSwitch, MotionSurface, PaperScene, PrinterScene, useGsapStagger } from '@xerox/ui';
+import { discoverPrinters, type NativePrinterInfo } from './native';
 
 interface PrintJob {
   id: string;
@@ -59,13 +60,14 @@ function Workstation() {
   const [pairingCode, setPairingCode] = useState('');
   const [deviceName, setDeviceName] = useState('Counter-PC-01');
   const [notice, setNotice] = useState('');
+  const [nativePrinters, setNativePrinters] = useState<NativePrinterInfo[] | null>(null);
   const [localJournalCount, setLocalJournalCount] = useState(0);
   const [redact, setRedact] = useState(true);
   const [background, setBackground] = useState(true);
   const statsRef = useGsapStagger<HTMLDivElement>({ selector: '.ws-stat', stagger: 0.05, y: 10 });
   const jobListRef = useGsapStagger<HTMLDivElement>({ selector: '.ws-job', stagger: 0.04, y: 12 });
   const tone = () => { if (!isAudioEnabled) return; try { const ctx = new AudioContext(); const osc = ctx.createOscillator(); const gain = ctx.createGain(); gain.gain.value = 0.03; osc.connect(gain); gain.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 0.08); osc.onended = () => { void ctx.close(); }; } catch {} };
-  const [printers] = useState<ConnectedPrinter[]>([
+  const [printers, setPrinters] = useState<ConnectedPrinter[]>([
     {
       id: 'prn-canon-ir3530',
       name: 'Canon imageRUNNER ADV C3530i (Color Production)',
@@ -170,13 +172,31 @@ function Workstation() {
     },
   ]);
 
+  useEffect(() => {
+    void discoverPrinters().then(found => {
+      setNativePrinters(found);
+      setPrinters(found.map((printer, index) => ({
+        id: `native-${index}-${printer.name}`,
+        name: printer.name,
+        driver_name: 'Windows print spooler',
+        port: 'Native queue',
+        online: printer.is_online,
+        supports_color: printer.supports_color,
+        supports_duplex: printer.supports_duplex,
+        supported_sizes: printer.supported_paper_sizes,
+      })));
+    }).catch(error => {
+      setNativePrinters(null);
+      setNotice(`Native printer discovery unavailable: ${error.message}. The screen is showing simulation data.`);
+    });
+  }, []);
   const selected = queue.find(job => job.id === selectedId);
   const filteredQueue = useMemo(() => queue.filter(job => {
     const matches = `${job.file_name} ${job.customer_email} ${job.id}`.toLowerCase().includes(searchQuery.toLowerCase());
     return matches && (statusFilter === 'ALL' || (statusFilter === 'PENDING' && job.status === 'PENDING_APPROVAL') || (statusFilter === 'SPOOLING' && ['QUEUED','PRINTING'].includes(job.status)) || (statusFilter === 'COMPLETED' && job.status === 'COMPLETED') || (statusFilter === 'ATTENTION' && job.status === 'COMPLETION_UNKNOWN'));
   }), [queue, searchQuery, statusFilter]);
   const pendingCount = queue.filter(j => j.status === 'PENDING_APPROVAL').length;
-  const dispatch = (ids: string[]) => { setQueue(prev => prev.map(job => ids.includes(job.id) && ['QUEUED','PENDING_APPROVAL'].includes(job.status) ? {...job, status: 'PRINTING'} : job)); setLocalJournalCount(n => n + ids.length); tone(); setNotice('Dispatch simulated locally. No document was sent to a printer; physical completion is unverified.'); };
+  const dispatch = (_ids: string[]) => { tone(); setNotice(nativePrinters ? 'Dispatch is blocked until the server-authorized job contains a paired shop, verified document path, printer capability match, and native acknowledgement. No job was marked printing.' : 'Native printer discovery is unavailable, so dispatch remains blocked. No job was marked printing.'); };
   const setJobStatus = (id: string, status: PrintJob['status'], rejection_reason?: string) => { setQueue(prev => prev.map(job => job.id === id ? {...job, status, rejection_reason} : job)); setLocalJournalCount(n => n + 1); };
   const money = (paise: number) => new Intl.NumberFormat('en-IN', {style:'currency', currency:'INR'}).format(paise / 100);
   const nav = [{id:'queue',label:'Dispatch queue',icon:Layers},{id:'printers',label:'Printers',icon:Printer},{id:'pairing',label:'Device pairing',icon:KeyRound},{id:'settings',label:'Preferences',icon:Settings}] as const;

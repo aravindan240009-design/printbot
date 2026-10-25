@@ -37,16 +37,16 @@ impl PrinterAdapter {
         }
         #[cfg(not(windows))]
         {
-            Self::mock_printers()
+            Vec::new()
         }
     }
 
     #[cfg(windows)]
     fn enumerate_windows_native() -> Vec<PrinterCapabilitySnapshot> {
-        // Enumerate local and networked Windows printers
-        // In real hardware runtime this calls EnumPrintersW (PRINTER_ENUM_LOCAL | PRINTER_ENUM_CONNECTIONS).
-        // For development fallback when no physical hardware is plugged in, we return the verified virtual & system profiles.
-        Self::mock_printers()
+        // Native enumeration is implemented by the Tauri workstation boundary.
+        // The standalone service remains unpaired until that boundary is wired to
+        // the authenticated device session; it must not invent printer identity.
+        Vec::new()
     }
 
     pub fn mock_printers() -> Vec<PrinterCapabilitySnapshot> {
@@ -61,7 +61,12 @@ impl PrinterAdapter {
                 is_default: true,
                 supports_color: true,
                 supports_duplex: true,
-                supported_paper_sizes: vec!["A4".into(), "A3".into(), "Legal".into(), "Letter".into()],
+                supported_paper_sizes: vec![
+                    "A4".into(),
+                    "A3".into(),
+                    "Legal".into(),
+                    "Letter".into(),
+                ],
                 max_resolution_dpi: 1200,
             },
             PrinterCapabilitySnapshot {
@@ -119,7 +124,11 @@ impl PrinterAdapter {
         }
 
         // Paper size check
-        if !printer.supported_paper_sizes.iter().any(|s| s.eq_ignore_ascii_case(&req.paper_size)) {
+        if !printer
+            .supported_paper_sizes
+            .iter()
+            .any(|s| s.eq_ignore_ascii_case(&req.paper_size))
+        {
             return Err(format!(
                 "Job requires paper size '{}', but printer '{}' only supports: {}.",
                 req.paper_size,
@@ -138,7 +147,7 @@ mod tests {
 
     #[test]
     fn test_unlimited_printers_enumeration() {
-        let printers = PrinterAdapter::enumerate_printers();
+        let printers = PrinterAdapter::mock_printers();
         assert!(printers.len() >= 3);
         assert!(printers.iter().any(|p| p.supports_color));
         assert!(printers.iter().any(|p| !p.supports_color));
@@ -167,6 +176,8 @@ mod tests {
         };
         let a3_err = PrinterAdapter::validate_compatibility(mono_printer, &a3_req);
         assert!(a3_err.is_err());
-        assert!(a3_err.unwrap_err().contains("only supports: A4, Letter, Legal"));
+        assert!(a3_err
+            .unwrap_err()
+            .contains("only supports: A4, Letter, Legal"));
     }
 }

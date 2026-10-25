@@ -75,3 +75,9 @@ impl PrintBotService {
         Ok(())
     }
 }
+
+impl Default for PrintBotService {
+    fn default() -> Self {
+        Self::new()
+    }
+}

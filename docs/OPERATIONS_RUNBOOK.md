@@ -35,6 +35,32 @@ pnpm install
 pnpm tauri dev
 ```
 
+### 4. Building the Tauri 2 + Rust workstation
+
+The workstation keeps printer and spool access in Rust. React is only the
+unprivileged operator interface. A fresh Windows machine needs the Rust MSVC
+toolchain, Visual Studio C++ Build Tools, Windows SDK, and WebView2.
+
+```powershell
+$env:Path = "C:\Users\$env:USERNAME\.cargo\bin;" + $env:Path
+cd "D:\print bot"
+pnpm.cmd --filter @xerox/desktop build
+pnpm.cmd --filter @xerox/desktop tauri:build
+```
+
+The unsigned local installers are written below
+`apps\desktop\src-tauri\target\release\bundle\`. Authenticode signing and
+real-printer verification remain release gates. The local SQLite journal is
+created under the Tauri application data directory in `spool\`; it records
+intent before any future native submission and treats uncertain outcomes as
+`COMPLETION_UNKNOWN` without automatic reprinting.
+
+Before enabling physical dispatch, verify all of the following on a dedicated
+shop workstation: authenticated device pairing, server-authorized shop/job
+binding, real printer enumeration, PDF render-to-driver compatibility,
+spooler reconciliation after restart, supervised ambiguous-outcome handling,
+and signed installer/update delivery.
+
 ---
 
 ## 2. Platform Telemetry & Observability Endpoints

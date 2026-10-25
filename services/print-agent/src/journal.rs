@@ -61,7 +61,8 @@ impl Journal {
         };
 
         if log_path.exists() {
-            let data = fs::read_to_string(&log_path).map_err(|e| format!("failed to read WAL: {e}"))?;
+            let data =
+                fs::read_to_string(&log_path).map_err(|e| format!("failed to read WAL: {e}"))?;
             for line in data.lines() {
                 if line.trim().is_empty() {
                     continue;
@@ -91,13 +92,17 @@ impl Journal {
     ) -> Result<JournalEntry, String> {
         if let Some(existing) = self.entries.get(job_id) {
             // If already submitted or unknown, refuse to overwrite without supervisor resolution
-            if existing.state == JobState::Submitting || existing.state == JobState::CompletionUnknown {
+            if existing.state == JobState::Submitting
+                || existing.state == JobState::CompletionUnknown
+            {
                 return Err(format!(
                     "Job '{job_id}' is in ambiguous state '{:?}'; automatic resubmission forbidden.",
                     existing.state
                 ));
             }
-            if existing.state == JobState::SubmittedToSpooler || existing.state == JobState::PhysicalCompleteIfConfirmed {
+            if existing.state == JobState::SubmittedToSpooler
+                || existing.state == JobState::PhysicalCompleteIfConfirmed
+            {
                 return Err(format!(
                     "Job '{job_id}' already spooled; duplicate print rejected."
                 ));
@@ -181,8 +186,10 @@ impl Journal {
                 .append(true)
                 .open(path)
                 .map_err(|e| format!("failed to append to WAL: {e}"))?;
-            writeln!(file, "{}", serialized).map_err(|e| format!("failed to write WAL line: {e}"))?;
-            file.flush().map_err(|e| format!("failed to flush WAL: {e}"))?;
+            writeln!(file, "{}", serialized)
+                .map_err(|e| format!("failed to write WAL line: {e}"))?;
+            file.flush()
+                .map_err(|e| format!("failed to flush WAL: {e}"))?;
         }
         Ok(())
     }
@@ -205,9 +212,16 @@ mod tests {
     #[test]
     fn test_duplicate_intent_for_submitted_job_is_rejected() {
         let mut journal = Journal::new_in_memory();
-        journal.record_intent("job-101", "shop-chennai", "hash_abc").unwrap();
         journal
-            .transition("job-101", JobState::SubmittedToSpooler, "Spool complete", Some(42))
+            .record_intent("job-101", "shop-chennai", "hash_abc")
+            .unwrap();
+        journal
+            .transition(
+                "job-101",
+                JobState::SubmittedToSpooler,
+                "Spool complete",
+                Some(42),
+            )
             .unwrap();
 
         // Attempting to record intent again for same job MUST be rejected
@@ -219,9 +233,16 @@ mod tests {
     #[test]
     fn test_completion_unknown_blocks_auto_reprint() {
         let mut journal = Journal::new_in_memory();
-        journal.record_intent("job-999", "shop-chennai", "hash_xyz").unwrap();
         journal
-            .transition("job-999", JobState::Submitting, "In transit to winspool", None)
+            .record_intent("job-999", "shop-chennai", "hash_xyz")
+            .unwrap();
+        journal
+            .transition(
+                "job-999",
+                JobState::Submitting,
+                "In transit to winspool",
+                None,
+            )
             .unwrap();
         journal
             .mark_unknown("job-999", "Spooler process stalled or crashed")

@@ -33,7 +33,8 @@
 | :--- | :--- | :--- | :--- |
 | **windows-sys** | 0.52.0+ | MIT / Apache-2.0 | Official Microsoft Win32 API bindings (`winspool.drv`, named pipes). |
 | **tokio** | 1.40.0+ | MIT | Asynchronous runtime. |
-| **rusqlite** | 0.31.0+ | MIT | Embedded SQLite client for local WAL journal. |
+| **rusqlite** | 0.32.1 (Cargo.lock) | MIT; bundled SQLite is public-domain software | Embedded SQLite client for the local spool journal; retain upstream notices in redistribution materials. |
+| **tempfile** | 3.27.0 (dev-only) | MIT / Apache-2.0 | Isolated temporary directories for Rust tests; not shipped in the installer. |
 | **ed25519-dalek** | 2.1.1+ | BSD-3-Clause | High-speed asymmetric digital signature keypair generation. |
 | **serde / serde_json** | 1.0.200+ | MIT / Apache-2.0 | Serialization primitives. |
 | **sha2** | 0.10.8+ | MIT / Apache-2.0 | SHA-256 cryptographic hashing. |
@@ -48,6 +49,7 @@
 | **React / React-DOM** | 19.0.0+ | MIT | Permissive UI library. |
 | **Vite** | 5.4.0+ | MIT | Frontend build tooling. |
 | **TypeScript** | 5.5.0+ | Apache-2.0 | Type checking and compilation. |
+| **@tauri-apps/api** | 2.12.4 | MIT / Apache-2.0 | Typed frontend IPC bridge; privileged operations remain in Rust commands. |
 | **Tauri 2 Core** | 2.0.0+ | MIT / Apache-2.0 | Native desktop application framework (WebView2 on Windows). |
 | **TailwindCSS** | 3.4.0+ | MIT | Utility-first CSS framework. |
 | **Lucide-React** | 0.440.0+ | ISC | Permissive icon toolkit. |
