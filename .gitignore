@@ -16,6 +16,7 @@ playwright-report/
 out/
 build/
 dist/
+dist-ssr/
 target/
 .tools/
 .phase0-local/
@@ -47,10 +48,15 @@ temp_uploads/
 .env.local
 .env.production
 .env.staging
+.env.*.local
 *.pem
 *.key
 
-# OS and IDE files
+# Local Taste-skill screenshots and report
+.taste-skill/inspect/
+
+# Logs and OS files
+*.log
 .DS_Store
 Thumbs.db
 desktop.ini
@@ -61,3 +67,6 @@ desktop.ini
 *.tsbuildinfo
 .playwright-mcp/
 sites/
+
+# Scratch and test files
+scratch/
