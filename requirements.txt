@@ -1,0 +1,8 @@
+# Runtime dependencies for the FastAPI API and isolated document inspection path.
+# Keep versions pinned until the OSS license audit is updated for an upgrade.
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic[email]==2.9.2
+python-multipart==0.0.12
+Pillow==11.1.0
+pypdf==6.19.0

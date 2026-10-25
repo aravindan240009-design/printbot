@@ -22,6 +22,7 @@ from services.api.core.security import decode_mock_jwt
 from services.api.services.auth_service import auth_service
 from services.api.services.device_service import device_service
 from services.api.services.guest_service import guest_service
+from services.api.core.config import settings
 
 EXEMPT_EXACT_PATHS = {
     "/docs",
@@ -34,6 +35,7 @@ EXEMPT_EXACT_PATHS = {
     "/api/v1/devices/pair",
     "/api/v1/devices/challenge-response",
     "/api/v1/guest/session",
+    "/api/v1/guest/session/from-qr",
     "/api/v1/subscriptions/plan",
     "/api/v1/webhooks/payments",
     "/api/v1/subscriptions/simulate-webhook",
@@ -47,6 +49,13 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         request_id = request.headers.get("X-Request-ID") or f"req_{secrets.token_hex(8)}"
         request.state.request_id = request_id
+
+        if settings.ENVIRONMENT.lower() in {"production", "prod"} and (
+            path.startswith("/api/v1/lab")
+            or path == "/api/v1/subscriptions/simulate-webhook"
+            or path == "/metrics"
+        ):
+            return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"detail": "Not found."})
 
         # Exempt public endpoints (exact match, qr route, or lab diagnostic simulator)
         if path in EXEMPT_EXACT_PATHS or path.startswith("/api/v1/qr/") or path.startswith("/api/v1/lab") or path.startswith("/docs") or path.startswith("/openapi"):
@@ -142,6 +151,13 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
 
         # If still no resolved shop, use header if present
         if not resolved_shop_id and header_tenant_id:
+            if settings.ENVIRONMENT.lower() in {"production", "prod"}:
+                return JSONResponse(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    content={"detail": "Authenticated shop credentials are required."},
+                )
+            # Development-only compatibility for the legacy simulator. A
+            # production deployment can never select a tenant from a header.
             resolved_shop_id = header_tenant_id
 
         if not resolved_shop_id:
@@ -166,3 +182,7 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Content-Security-Policy"] = "default-src 'self'"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Permissions-Policy"] = "camera=(self), microphone=()"
+        if settings.ENVIRONMENT.lower() in {"production", "prod"}:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"

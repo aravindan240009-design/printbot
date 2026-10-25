@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { Upload, Camera, FileText, Trash2, ArrowUp, ArrowDown, ArrowRight, ShieldCheck, SlidersHorizontal, LockKeyhole, Printer } from 'lucide-react';
 import { MotionSurface, PaperScene, PrinterScene, StudioHeader, useGsapStagger } from '@xerox/ui';
 import { translations, Language } from './locales';
+import { openShopSession, quoteFiles, scanFile, ServerQuote, ShopSession } from './api';
 
 
 interface Options { copies: number; colorMode: 'bw' | 'color' | 'grayscale'; finishing: string; paperSize: string; duplex: string; pageRange: string; nup: number; photoPreset: string }
-interface DocumentSelection { id: string; name: string; size: string; format: string; options: Options }
+interface DocumentSelection { id: string; name: string; size: string; format: string; options: Options; source: File; assetId?: string; pageCount?: number }
 const defaults: Options = { copies: 1, finishing: 'none', colorMode: 'bw', paperSize: 'A4', duplex: 'simplex', pageRange: 'all', nup: 1, photoPreset: 'standard' };
 const copy = {
  en: { welcome: 'A little less waiting. A lot more doing.', intro: 'Your documents, your way. Choose a file, set the details, and get ready for your next print.', preview: 'Interactive preview', notice: 'Files stay in this tab. Upload, server preview, pricing, payment and printing are not connected.', select: 'Choose your documents', selected: 'Selected files', configure: 'Make it yours.', review: 'Review your choices.', advanced: 'More print options', next: 'Continue', back: 'Back', pending: 'Awaiting a server quote', unavailable: 'Checkout unavailable', pendingInfo: 'A connected shop session must validate your files and options, return a preview and lock a price before checkout.', workflow: 'What happens next', workflowInfo: 'After a verified order, status updates will appear here. No order has been created.', options: 'Print preferences', payment: 'Preferred payment method', empty: 'No files selected yet', fileInfo: 'PDF, PNG, JPG, DOCX, XLSX, PPTX · 100 MB per file', unknown: 'Page count needs server validation', rangeHelp: 'Use all, odd, even or a range such as 1-3,5,8-. The server must validate page bounds.', example: 'Example shop · Anna Xerox, Guindy', privacy: 'No account needed for the customer flow', clear: 'Clear selection', estimate: 'Price and sheet count pending', illustration: 'Illustration only. This is not a preview of your file.' },
@@ -21,25 +22,50 @@ function CustomerFlow() {
  const [applyAll, setApplyAll] = useState(true);
  const [payment, setPayment] = useState('upi');
  const [error, setError] = useState('');
+ const [session, setSession] = useState<ShopSession | null>(null);
+ const [quote, setQuote] = useState<ServerQuote | null>(null);
+ const [scanning, setScanning] = useState(false);
  const fileListRef = useGsapStagger<HTMLUListElement>({ selector: 'li', stagger: 0.05, y: 10 });
  const t = translations[lang]; const c = copy[lang];
  const active = files.find(f => f.id === activeId) || files[0];
  useEffect(() => { document.documentElement.lang = lang; }, [lang]);
- useEffect(() => { try { localStorage.removeItem('printbot_customer_session'); } catch { /* No customer metadata is persisted. */ } }, []);
- const selectFiles = (selected: FileList | null) => {
+ useEffect(() => {
+  const qrCode = new URLSearchParams(window.location.search).get('qr');
+  if (!qrCode) return;
+  openShopSession(qrCode).then(setSession).catch(e => setError(e instanceof Error ? e.message : 'Unable to open this shop session.'));
+ }, []);
+ const selectFiles = async (selected: FileList | null) => {
   if (!selected) return;
   const accepted: DocumentSelection[] = []; const rejected: string[] = [];
   Array.from(selected).forEach(file => {
    if (!/\.(pdf|png|jpe?g|docx|xlsx|pptx)$/i.test(file.name) || file.size > 100 * 1024 * 1024 || file.size === 0) { rejected.push(file.name); return; }
-   accepted.push({ id: crypto.randomUUID(), name: file.name, size: `${(file.size / 1024 / 1024).toFixed(2)} MB`, format: file.name.split('.').pop()!.toUpperCase(), options: { ...(applyAll && active ? active.options : defaults) } });
+   accepted.push({ id: crypto.randomUUID(), name: file.name, size: `${(file.size / 1024 / 1024).toFixed(2)} MB`, format: file.name.split('.').pop()!.toUpperCase(), options: { ...(applyAll && active ? active.options : defaults) }, source: file });
   });
   setFiles(previous => [...previous, ...accepted]);
-  setError(rejected.length ? `Unsupported, empty or over 100 MB: ${rejected.join(', ')}` : '');
+  setQuote(null);
+  if (rejected.length) setError(`Unsupported, empty or over 100 MB: ${rejected.join(', ')}`);
+  if (accepted.length && session) {
+   setScanning(true);
+   try {
+    const scanned = await Promise.all(accepted.map(file => scanFile(file.source, session.session_token)));
+    setFiles(previous => previous.map(file => { const index = accepted.findIndex(candidate => candidate.id === file.id); const result = index >= 0 ? scanned[index] : undefined; return result ? { ...file, assetId: result.asset_id, pageCount: result.page_count } : file; }));
+   } catch (e) { setError(e instanceof Error ? e.message : 'The server could not inspect the files.'); }
+   finally { setScanning(false); }
+  } else if (accepted.length && !session) {
+   setError('Scan the shop QR code to connect this order to a shop before uploading.');
+  }
  };
- const update = (patch: Partial<Options>) => setFiles(previous => previous.map(file => applyAll || file.id === active?.id ? { ...file, options: { ...file.options, ...patch } } : file));
+ const update = (patch: Partial<Options>) => { setQuote(null); setFiles(previous => previous.map(file => applyAll || file.id === active?.id ? { ...file, options: { ...file.options, ...patch } } : file)); };
  const remove = (id: string) => { setFiles(previous => previous.filter(f => f.id !== id)); if (files.length === 1) setStep(1); };
  const move = (index: number, direction: number) => setFiles(previous => { const result = [...previous]; [result[index], result[index + direction]] = [result[index + direction], result[index]]; return result; });
  const rangeValid = files.every(file => /^(all|odd|even|[1-9]\d*(?:-(?:[1-9]\d*)?)?(?:\s*,\s*[1-9]\d*(?:-(?:[1-9]\d*)?)?)*)$/.test(file.options.pageRange));
+ const createQuote = async () => {
+  if (!session || !files.length || files.some(file => !file.assetId || !file.pageCount)) return;
+  setError(''); setScanning(true);
+  try { setQuote(await quoteFiles(files.map(file => ({ fileId: file.assetId!, fileName: file.name, pageCount: file.pageCount!, options: { copies: file.options.copies, color_mode: file.options.colorMode, paper_size: file.options.paperSize, duplex_mode: file.options.duplex, binding: file.options.finishing, page_range: file.options.pageRange, pages_per_sheet: file.options.nup, photo_layout: file.options.photoPreset } })), session.session_token)); }
+  catch (e) { setError(e instanceof Error ? e.message : 'The server could not calculate a quote.'); }
+  finally { setScanning(false); }
+ };
  return <div className="customer-app">
   <StudioHeader title={t.title} subtitle={c.example}>
    <label className="customer-language"><span className="sr-only">Language</span><select value={lang} onChange={e => setLang(e.target.value as Language)}><option value="en">English</option><option value="ta">தமிழ்</option><option value="hi">हिन्दी</option></select></label>
@@ -76,12 +102,12 @@ function CustomerFlow() {
      </>}
      {step === 3 && <>
       <div className="customer-summary">{files.map(file => <div key={file.id}><FileText size={21}/><div><strong>{file.name}</strong><p>{file.options.copies} × {file.options.paperSize} · {file.options.colorMode === 'grayscale' ? (lang === 'ta' ? 'சாம்பல் நிறம்' : lang === 'hi' ? 'ग्रेस्केल' : 'Grayscale') : file.options.colorMode === 'bw' ? t.bw.replace(/\s*\(₹[^)]*\)/, '') : t.color.replace(/\s*\(₹[^)]*\)/, '')} · {file.options.pageRange}</p></div></div>)}</div>
-      <div className="customer-quote"><LockKeyhole size={25}/><h3>{c.pending}</h3><p>{c.pendingInfo}</p><dl>{[t.logical_pages, t.rendered_sides, t.physical_sheets, t.price_total].map(label => <div key={label}><dt>{label}</dt><dd>—</dd></div>)}</dl></div>
+      <div className="customer-quote"><LockKeyhole size={25}/><h3>{quote ? 'Server quote ready' : c.pending}</h3><p>{quote ? 'Your files were inspected and the price was calculated by the shop server.' : c.pendingInfo}</p><dl>{[[t.logical_pages, quote?.total_logical_pages], [t.rendered_sides, quote?.total_rendered_sides], [t.physical_sheets, quote?.total_physical_sheets], [t.price_total, quote ? `₹${quote.total_rupees.toFixed(2)}` : '—']].map(([label, value]) => <div key={String(label)}><dt>{label}</dt><dd>{value ?? '—'}</dd></div>)}</dl>{!quote && <button className="customer-secondary-action" disabled={scanning || !session || files.some(file => !file.assetId)} onClick={createQuote}>{scanning ? 'Inspecting files…' : 'Get server quote'}</button>}</div>
       <fieldset><legend>{c.payment}</legend><div className="customer-choice-row"><button aria-pressed={payment === 'upi'} onClick={() => setPayment('upi')}>{t.pay_upi}</button><button aria-pressed={payment === 'cash'} onClick={() => setPayment('cash')}>{t.pay_cash}</button></div></fieldset>
       <div className="customer-server-note"><Printer size={24}/><div><strong>{c.workflow}</strong><p>{c.workflowInfo}</p></div></div>
      </>}
     </MotionSurface>
-    {files.length > 0 && <footer className="customer-action-bar"><div><strong>{files.length} {c.selected.toLowerCase()}</strong><span>{c.estimate}</span></div><div className="customer-footer-buttons">{step > 1 && <button onClick={() => setStep(step - 1)}>{c.back}</button>}<button className="customer-primary" disabled={step === 3 || !rangeValid} onClick={() => setStep(step + 1)}>{step === 3 ? c.unavailable : c.next}{step < 3 && <ArrowRight size={18}/>}</button></div></footer>}
+    {files.length > 0 && <footer className="customer-action-bar"><div><strong>{files.length} {c.selected.toLowerCase()}</strong><span>{scanning ? 'Server inspection in progress' : quote ? `₹${quote.total_rupees.toFixed(2)} · ${quote.total_physical_sheets} sheets` : c.estimate}</span></div><div className="customer-footer-buttons">{step > 1 && <button onClick={() => setStep(step - 1)}>{c.back}</button>}<button className="customer-primary" disabled={step === 3 || !rangeValid || (step === 2 && (!session || scanning || files.some(file => !file.assetId)))} onClick={() => { if (step === 2 && !quote) createQuote(); setStep(step + 1); }}>{step === 3 ? c.unavailable : c.next}{step < 3 && <ArrowRight size={18}/>}</button></div></footer>}
    </main>
   </div>
  </div>;

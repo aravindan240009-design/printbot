@@ -12,6 +12,7 @@ from datetime import datetime
 class ColorMode(str, Enum):
     BW = "bw"
     COLOR = "color"
+    GRAYSCALE = "grayscale"
 
 
 class PaperSize(str, Enum):
@@ -387,6 +388,7 @@ class AdminOverrideRequest(BaseModel):
 # ==============================================================================
 
 class FileScanResult(BaseModel):
+    asset_id: Optional[str] = None
     is_valid: bool
     format: SupportedFormat
     mime_type: str

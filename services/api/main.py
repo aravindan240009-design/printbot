@@ -46,19 +46,19 @@ app = FastAPI(
     title=settings.APP_NAME,
     description="Production Multi-Tenant Print Shop SaaS Platform API with Windows Desktop Hardware Integration",
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    docs_url=None if settings.ENVIRONMENT.lower() in {"production", "prod"} else "/docs",
+    redoc_url=None if settings.ENVIRONMENT.lower() in {"production", "prod"} else "/redoc",
+    openapi_url=None if settings.ENVIRONMENT.lower() in {"production", "prod"} else "/openapi.json",
     lifespan=lifespan
 )
 
 # 1. CORS Configuration (Allows Next.js web portal and Tauri localhost / tauri://localhost)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[origin.strip() for origin in settings.CORS_ALLOWED_ORIGINS.split(",") if origin.strip()],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Guest-Session", "X-Request-ID", "X-Shop-ID", "X-Tenant-ID", "X-Razorpay-Signature", "X-Signature", "X-Timestamp"],
 )
 
 # 2. Strict Multi-Tenant Isolation Middleware
@@ -132,7 +132,7 @@ async def global_exception_handler(request: Request, exc: Exception):
             "type": "about:blank",
             "title": "Internal Server Error",
             "status": 500,
-            "detail": str(exc),
+            "detail": "Internal server error." if settings.ENVIRONMENT.lower() in {"production", "prod"} else str(exc),
             "instance": request.url.path,
         }
     )

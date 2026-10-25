@@ -64,7 +64,7 @@ def test_complete_customer_mobile_guest_flow():
         "shop_id": SHOP_A,
         "items": [
             {
-                "file_id": "file-101",
+                "file_id": scan_data["asset_id"],
                 "file_name": "College_Notes.jpg",
                 "page_count": 1,
                 "options": {

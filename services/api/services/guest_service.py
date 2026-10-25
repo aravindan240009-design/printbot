@@ -66,6 +66,20 @@ class GuestService:
         link.scan_count += 1
         return link
 
+    def resolve_shop_id(self, shop_id: str) -> QRLink:
+        """Resolve a shop identifier only through the server-owned QR registry.
+
+        This exists for backwards-compatible API clients. It prevents arbitrary
+        request-body tenant selection while the clients migrate to qr_code.
+        """
+        for link in self._qr_links.values():
+            if link.shop_id == shop_id.strip() and link.is_active:
+                return link
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Shop is not registered to an active QR link.",
+        )
+
     def mint_guest_session(
         self,
         shop_id: str,

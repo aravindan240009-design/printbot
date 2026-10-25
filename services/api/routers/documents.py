@@ -22,7 +22,7 @@ from packages.contracts.models import (
     PhoneCaptureRequest,
     PhoneCaptureResponse,
 )
-from services.api.services.conversion_engine import conversion_engine
+from services.api.services.conversion_engine import conversion_engine, MAX_FILE_SIZE_BYTES
 from services.api.services.preview_service import preview_service
 from services.api.services.accounting_engine import accounting_engine
 from services.api.services.asset_service import asset_service
@@ -42,19 +42,26 @@ async def scan_document(
     Scans an uploaded document buffer for format magic bytes, MIME types,
     page count, encryption, and potential decompression bomb exploits.
     """
-    content = await file.read()
+    # Read one byte beyond the limit so oversized uploads are rejected without
+    # allowing an attacker to force an unbounded in-memory allocation.
+    content = await file.read(MAX_FILE_SIZE_BYTES + 1)
     scan_res = conversion_engine.scan_file(content, file.filename, file.content_type)
 
     # Cache asset buffer for preview rendering if valid
     asset_id = str(uuid.uuid4())
     tenant_id = getattr(request.state, "tenant_id", "default-tenant") if request else "default-tenant"
-    MOCK_ASSET_CACHE[asset_id] = {
-        "tenant_id": tenant_id,
-        "filename": file.filename,
-        "content": content,
-        "scan": scan_res
-    }
+    if scan_res.is_valid:
+        MOCK_ASSET_CACHE[asset_id] = {
+            "tenant_id": tenant_id,
+            "filename": file.filename,
+            "content": content,
+            "scan": scan_res
+        }
 
+    # The temporary asset identifier is returned only after the server has
+    # inspected the bytes. The customer must use this identifier for previews
+    # and quotes; filenames and client-side page counts are never trusted.
+    scan_res.asset_id = asset_id
     return scan_res
 
 
@@ -73,10 +80,10 @@ async def unlock_pdf(req: UnlockPdfRequest, request: Request):
         )
 
     # Verify tenant isolation
-    if cached["tenant_id"] != tenant_id and tenant_id != "default-tenant":
+    if cached["tenant_id"] != tenant_id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cross-tenant asset access forbidden."
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document asset not found."
         )
 
     success, page_count, unlocked_bytes, error_msg = conversion_engine.unlock_pdf(cached["content"], req.password)
@@ -107,6 +114,23 @@ async def calculate_quote(req: MultiFileQuoteRequest, request: Request):
     Generates a deterministic multi-file print quote in Indian paise.
     Applies exact duplex padding across copy and file boundaries.
     """
+    tenant_id = getattr(request.state, "tenant_id", None)
+    if not tenant_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="A shop-bound guest session is required.")
+    # The request body is not an authority for tenant selection. The shop is
+    # resolved by TenantContextMiddleware from the guest credential.
+    req.shop_id = tenant_id
+    validated_items = []
+    for item in req.items:
+        cached = MOCK_ASSET_CACHE.get(item.file_id)
+        if not cached or cached["tenant_id"] != tenant_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document asset not found.")
+        if not cached["scan"].is_valid:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Document asset is not printable.")
+        item.page_count = cached["scan"].page_count
+        item.file_name = cached["filename"]
+        validated_items.append(item)
+    req.items = validated_items
     return accounting_engine.generate_multi_file_quote(req)
 
 
@@ -125,14 +149,17 @@ async def get_page_preview(
     tenant_id = getattr(request.state, "tenant_id", "default-tenant")
     cached = MOCK_ASSET_CACHE.get(asset_id)
 
-    if cached and cached["tenant_id"] != tenant_id and tenant_id != "default-tenant":
+    if not cached or cached["tenant_id"] != tenant_id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Cross-tenant access forbidden. Asset does not belong to shop '{tenant_id}'."
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document asset not found."
         )
 
-    doc_name = cached["filename"] if cached else f"Document_{asset_id[:8]}.pdf"
-    total_pages = cached["scan"].page_count if cached else max(page_num, 10)
+    if page_num < 1 or page_num > cached["scan"].page_count:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Requested document page not found.")
+
+    doc_name = cached["filename"]
+    total_pages = cached["scan"].page_count
 
     # If it's an image asset, return downscaled thumbnail
     if cached and cached["scan"].format.value in ("jpeg", "png", "webp", "bmp", "tiff"):
@@ -160,8 +187,10 @@ async def create_photo_layout(req: PhotoLayoutRequest, request: Request):
     tenant_id = getattr(request.state, "tenant_id", "default-tenant")
     cached = MOCK_ASSET_CACHE.get(req.asset_id)
 
-    # Use uploaded asset if available, or generate synthetic test sample
-    photo_content = cached["content"] if cached else preview_service._create_error_thumbnail("Sample Photo")
+    if not cached or cached["tenant_id"] != tenant_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document asset not found.")
+
+    photo_content = cached["content"]
 
     composite_id = str(uuid.uuid4())
     if req.layout_preset == PhotoLayoutPreset.PASSPORT_8UP:

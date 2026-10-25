@@ -431,6 +431,18 @@ class RazorpayProvider(BasePaymentProvider):
                 detail=f"Malformed Razorpay webhook body: {str(e)}",
             )
 
+        created_at = data.get("created_at")
+        if created_at is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Razorpay webhook timestamp is required.")
+        try:
+            if abs(int(time.time()) - int(created_at)) > 300:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Razorpay webhook timestamp outside the valid replay window.",
+                )
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Razorpay webhook timestamp.")
+
         payload_obj = data.get("payload", {})
         payment_entity = payload_obj.get("payment", {}).get("entity", {})
         notes = payment_entity.get("notes", {})

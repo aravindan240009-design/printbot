@@ -80,10 +80,11 @@ def test_cross_tenant_preview_isolation():
     )
     assert res_a.status_code == 200
 
-    # Shop B is forbidden from accessing Shop A's preview
+    # Shop B receives an indistinguishable not-found response so the asset
+    # identifier cannot be used as a cross-tenant oracle.
     res_b = client.get(
         f"/api/v1/documents/{asset_id}/preview/1",
         headers={"X-Shop-ID": SHOP_B}
     )
-    assert res_b.status_code == 403
-    assert f"Cross-tenant access forbidden" in res_b.json()["detail"]
+    assert res_b.status_code == 404
+    assert res_b.json()["detail"] == "Document asset not found."

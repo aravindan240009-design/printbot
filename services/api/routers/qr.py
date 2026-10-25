@@ -14,7 +14,12 @@ router = APIRouter(tags=["QR Links & Guest Sessions"])
 
 
 class MintGuestSessionRequest(BaseModel):
-    shop_id: str
+    qr_code: Optional[str] = None
+    shop_id: Optional[str] = None
+
+
+class MintQrGuestSessionRequest(BaseModel):
+    qr_code: str
 
 
 @router.get("/qr/{code}/resolve")
@@ -40,11 +45,17 @@ async def mint_guest_session(req: MintGuestSessionRequest, request: Request):
     Mints an independent, short-lived session token bound strictly to shop_id.
     Zero cross-shop identity merging.
     """
+    if req.qr_code:
+        link = guest_service.resolve_qr_code(req.qr_code)
+    elif req.shop_id:
+        link = guest_service.resolve_shop_id(req.shop_id)
+    else:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="qr_code is required.")
     ip_addr = request.client.host if request.client else "127.0.0.1"
     user_agent = request.headers.get("User-Agent")
 
     session = guest_service.mint_guest_session(
-        shop_id=req.shop_id,
+        shop_id=link.shop_id,
         ip_hash=ip_addr,
         user_agent=user_agent
     )
@@ -52,5 +63,30 @@ async def mint_guest_session(req: MintGuestSessionRequest, request: Request):
     return {
         "session_token": session.session_token,
         "shop_id": session.shop_id,
+        "shop_name": link.shop_name,
+        "shop_slug": link.shop_slug,
         "expires_at": session.expires_at.isoformat()
+    }
+
+
+@router.post("/guest/session/from-qr")
+async def mint_guest_session_from_qr(req: MintQrGuestSessionRequest, request: Request):
+    """Create a guest session from the signed/printed shop QR code.
+
+    The client supplies a QR code, never a shop identifier. The server resolves
+    the code and carries that shop binding into the guest credential.
+    """
+    link = guest_service.resolve_qr_code(req.qr_code)
+    ip_addr = request.client.host if request.client else "127.0.0.1"
+    session = guest_service.mint_guest_session(
+        shop_id=link.shop_id,
+        ip_hash=ip_addr,
+        user_agent=request.headers.get("User-Agent"),
+    )
+    return {
+        "session_token": session.session_token,
+        "shop_id": session.shop_id,
+        "shop_name": link.shop_name,
+        "shop_slug": link.shop_slug,
+        "expires_at": session.expires_at.isoformat(),
     }

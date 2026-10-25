@@ -53,12 +53,13 @@ def verify_webhook_signature(
 
 
 def create_mock_jwt(payload: Dict[str, Any]) -> str:
-    """Mock JWT token helper for deterministic tests and token parsing."""
+    """Create a signed test JWT-shaped token for local integration tests."""
     import base64
     import json
     token_data = {"exp": time.time() + 86400, **payload}
     encoded = base64.urlsafe_b64encode(json.dumps(token_data).encode()).decode()
-    return f"mockjwt.{encoded}.valid"
+    signature = hmac.new(settings.SECRET_KEY.encode("utf-8"), encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"mockjwt.{encoded}.{signature}"
 
 
 def decode_mock_jwt(token: str) -> Dict[str, Any]:
@@ -69,6 +70,9 @@ def decode_mock_jwt(token: str) -> Dict[str, Any]:
     if len(parts) != 3:
         raise HTTPException(status_code=401, detail="Malformed JWT token format")
     try:
+        expected_signature = hmac.new(settings.SECRET_KEY.encode("utf-8"), parts[1].encode("ascii"), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(parts[2], expected_signature):
+            raise HTTPException(status_code=401, detail="Invalid token signature")
         decoded_bytes = base64.urlsafe_b64decode(parts[1].encode())
         payload = json.loads(decoded_bytes.decode())
         if payload.get("exp") and payload["exp"] < time.time():
