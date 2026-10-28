@@ -1,15 +1,15 @@
 'use client';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { MotionConfig } from 'motion/react';
-import { Sun, Moon, Monitor } from 'lucide-react';
+import { Sun, Moon } from 'lucide-react';
 
-type Theme = 'light' | 'dark' | 'system';
+type Theme = 'light' | 'dark';
 const storageKey = 'printbot-theme-v1';
-const valid = (value: string | null): Theme => value === 'light' || value === 'dark' ? value : 'system';
-const ThemeContext = createContext<{ theme: Theme; setTheme: (theme: Theme) => void }>({ theme: 'system', setTheme: () => {} });
+const valid = (value: string | null): Theme => value === 'dark' ? 'dark' : 'light';
+const ThemeContext = createContext<{ theme: Theme; setTheme: (theme: Theme) => void }>({ theme: 'light', setTheme: () => {} });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, updateTheme] = useState<Theme>('system');
+  const [theme, updateTheme] = useState<Theme>('light');
   useEffect(() => {
     const fine = window.matchMedia('(hover: hover) and (pointer: fine)');
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -37,11 +37,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return () => { clear(); window.removeEventListener('pointermove', pointer); window.removeEventListener('blur', clear); document.removeEventListener('pointerleave', clear); };
   }, []);
   useEffect(() => {
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    let preference: Theme = 'system';
-    try { preference = valid(localStorage.getItem(storageKey)); } catch { /* Privacy mode */ }
+    let preference: Theme = 'light';
+    try {
+      const stored = localStorage.getItem(storageKey);
+      preference = stored ? valid(stored) : 'light';
+    } catch { /* Privacy mode */ }
     const apply = () => {
-      const dark = preference === 'dark' || (preference === 'system' && media.matches);
+      const dark = preference === 'dark';
       document.documentElement.dataset.theme = dark ? 'dark' : 'light';
       document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
       document.documentElement.classList.toggle('dark', dark);
@@ -50,11 +52,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const change = (event: Event) => { preference = (event as CustomEvent<Theme>).detail; apply(); };
     const sync = (event: StorageEvent) => { if (event.key === storageKey || event.key === null) { preference = valid(event.newValue); apply(); } };
     apply();
-    media.addEventListener('change', apply);
     window.addEventListener('printbot-theme', change);
     window.addEventListener('storage', sync);
     return () => {
-      media.removeEventListener('change', apply);
       window.removeEventListener('printbot-theme', change);
       window.removeEventListener('storage', sync);
     };
@@ -69,7 +69,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 export function ThemeSwitch() {
   const { theme, setTheme } = useContext(ThemeContext);
   return <div className="pb-theme-switch" role="group" aria-label="Appearance">
-    {([{ value: 'light', Icon: Sun, label: 'Light' }, { value: 'dark', Icon: Moon, label: 'Dark' }, { value: 'system', Icon: Monitor, label: 'System' }] as const).map(({ value, Icon, label }) =>
+    {([{ value: 'light', Icon: Sun, label: 'Light' }, { value: 'dark', Icon: Moon, label: 'Dark' }] as const).map(({ value, Icon, label }) =>
       <button key={value} type="button" aria-label={`${label} theme`} aria-pressed={theme === value} title={`${label} theme`} onClick={() => setTheme(value)}><Icon size={16} aria-hidden="true" /><span>{label}</span></button>
     )}
   </div>;

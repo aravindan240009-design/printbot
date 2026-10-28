@@ -499,8 +499,12 @@ export default function App() {
           background: 'var(--pb-bg)',
           color: 'var(--pb-text)',
           padding: '24px',
+          position: 'relative',
         }}
       >
+        <div style={{ position: 'absolute', top: '24px', right: '24px' }}>
+          <ThemeSwitch />
+        </div>
         <div
           style={{
             width: 'min(460px, 100%)',
@@ -749,8 +753,12 @@ export default function App() {
           padding: '40px 24px',
           display: 'grid',
           placeItems: 'center',
+          position: 'relative',
         }}
       >
+        <div style={{ position: 'absolute', top: '24px', right: '24px' }}>
+          <ThemeSwitch />
+        </div>
         <div
           style={{
             width: 'min(680px, 100%)',
@@ -964,6 +972,7 @@ export default function App() {
             >
               Logged in: admin
             </span>
+            <ThemeSwitch />
             <button onClick={handleLogout} style={{ minHeight: '38px', fontSize: '12px' }}>
               <LogOut size={16} /> Log Out
             </button>
