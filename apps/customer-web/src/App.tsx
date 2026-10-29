@@ -67,10 +67,10 @@ const defaults: Options = {
 };
 
 const defaultShopSession: ShopSession = {
-  session_token: 'local-shop-session-anna-univ',
-  shop_id: 'shop-anna-univ-01',
-  shop_name: 'Anna University Quick Xerox',
-  shop_slug: 'anna-univ-quick-xerox',
+  session_token: 'shop-session-counter',
+  shop_id: 'shop-counter',
+  shop_name: 'Print Bot Counter',
+  shop_slug: 'print-bot-counter',
   expires_at: new Date(Date.now() + 86400000).toISOString(),
 };
 
@@ -93,7 +93,7 @@ const copy = {
     empty: 'No files selected yet',
     fileInfo: 'PDF, PNG, JPG, DOCX, XLSX, PPTX · 100 MB per file',
     verifiedInfo: 'Page count & rate calculated from shop pricing table.',
-    example: 'Anna University Quick Xerox · Guindy',
+    example: 'Print Bot Counter Stand · Main Counter',
     privacy: 'No customer account or login required',
     clear: 'Clear selection',
   },

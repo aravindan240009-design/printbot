@@ -132,31 +132,16 @@ export interface ConnectedPrinter {
   supported_sizes: string[];
 }
 
-// Pre-seeded licenses
-const INITIAL_LICENSES: Record<string, ShopLicense> = {
-  shopowner: {
-    username: 'shopowner',
-    licenseKey: 'PB-KEY-2026-XEROX',
-    shopName: 'Anna University Quick Xerox',
-    location: 'Guindy Counter 01, Chennai',
-    phone: '+91 98401 23456',
-    upiId: 'quickxerox@okaxis',
-    rates: {
-      bwPerSideRupees: 1.5,
-      colorPerSideRupees: 10.0,
-      duplexDiscountPercent: 15,
-    },
-    orderMode: 'MANUAL_APPROVAL',
-    status: 'ACTIVE',
-    expiresAt: '2027-12-31',
-    isConfigured: true,
-    duration: '1 Year',
-    deviceId: 'PC-WIN11-TPM-7B2F',
-    totalOrdersCount: 148,
-    totalPagesCount: 624,
-    lastActive: 'Today, 12:20 PM',
-  },
-};
+// Auto-purge any legacy mock/seeded data from browser localStorage once
+try {
+  if (!localStorage.getItem('printbot_clean_v1')) {
+    localStorage.removeItem('printbot_licenses');
+    localStorage.removeItem('printbot_audit_logs');
+    localStorage.setItem('printbot_clean_v1', 'true');
+  }
+} catch {}
+
+const INITIAL_LICENSES: Record<string, ShopLicense> = {};
 
 type AppScreen = 'LOCK_SCREEN' | 'SETUP_WIZARD' | 'WORKSTATION' | 'ADMIN_PORTAL';
 type Tab = 'queue' | 'printers' | 'pairing' | 'settings';
@@ -340,22 +325,7 @@ export default function App() {
       const saved = localStorage.getItem('printbot_audit_logs');
       if (saved) return JSON.parse(saved);
     } catch {}
-    return [
-      {
-        id: 'AUD-001',
-        timestamp: '2026-10-25 09:30:15',
-        action: 'KEY_ISSUED',
-        details: 'Issued 1 Year license to Anna University Quick Xerox (shopowner)',
-        actor: 'admin',
-      },
-      {
-        id: 'AUD-002',
-        timestamp: '2026-10-25 09:32:40',
-        action: 'DEVICE_RESET',
-        details: 'Bound TPM-backed counter PC device PC-WIN11-TPM-7B2F for shopowner',
-        actor: 'system',
-      },
-    ];
+    return [];
   });
 
   useEffect(() => {
@@ -579,105 +549,9 @@ export default function App() {
   const [notice, setNotice] = useState('');
   const [nativePrinters, setNativePrinters] = useState<NativePrinterInfo[] | null>(null);
 
-  const [printers] = useState<ConnectedPrinter[]>([
-    {
-      id: 'prn-canon-ir3530',
-      name: 'Canon imageRUNNER ADV C3530i (Color Production)',
-      driver_name: 'Canon Generic Plus UFR II',
-      port: '192.168.1.150',
-      online: true,
-      supports_color: true,
-      supports_duplex: true,
-      supported_sizes: ['A4', 'A3', 'Legal', 'Letter'],
-    },
-    {
-      id: 'prn-hp-m404dn',
-      name: 'HP LaserJet Pro M404dn (Mono Workhorse)',
-      driver_name: 'HP LaserJet Pro M404-M405 PCL-6',
-      port: 'USB001',
-      online: true,
-      supports_color: false,
-      supports_duplex: true,
-      supported_sizes: ['A4', 'Letter', 'Legal'],
-    },
-    {
-      id: 'prn-virtual-pdf',
-      name: 'Microsoft Print to PDF (Virtual Native Proof)',
-      driver_name: 'Microsoft Print To PDF',
-      port: 'PORTPROMPT:',
-      online: true,
-      supports_color: true,
-      supports_duplex: false,
-      supported_sizes: ['A4', 'Letter'],
-    },
-  ]);
+  const [printers] = useState<ConnectedPrinter[]>([]);
 
-  const [jobs, setJobs] = useState<PrintJob[]>([
-    {
-      id: 'job-9841',
-      customer_email: 'ramesh.kumar@annauniv.edu',
-      file_name: 'Engineering_Drawings_A3.pdf',
-      page_count: 8,
-      logical_pages: 8,
-      rendered_sides: 8,
-      physical_sheets: 8,
-      options: {
-        copies: 1,
-        color_mode: 'color',
-        paper_size: 'A3',
-        duplex_mode: 'simplex',
-        paper_gsm: 80,
-        binding: 'none',
-      },
-      calculated_price_paise: 20000,
-      calculated_price_rupees: 200.0,
-      status: 'REJECTED',
-      rejection_reason: 'Poor image resolution or blurred scan',
-      created_at: '2026-10-25 10:14',
-    },
-    {
-      id: 'job-9842',
-      customer_email: 'priya.s@annauniv.edu',
-      file_name: 'Semester_Project_Report_Final.pdf',
-      page_count: 42,
-      logical_pages: 42,
-      rendered_sides: 42,
-      physical_sheets: 21,
-      options: {
-        copies: 1,
-        color_mode: 'bw',
-        paper_size: 'A4',
-        duplex_mode: 'duplex_long',
-        paper_gsm: 75,
-        binding: 'spiral',
-      },
-      calculated_price_paise: 9550,
-      calculated_price_rupees: 95.5,
-      status: 'QUEUED',
-      created_at: '2026-10-25 10:30',
-    },
-    {
-      id: 'job-9843',
-      customer_email: 'walkin.karthik@gmail.com',
-      file_name: 'ak_resume.pdf',
-      page_count: 2,
-      logical_pages: 4,
-      rendered_sides: 4,
-      physical_sheets: 4,
-      options: {
-        copies: 2,
-        color_mode: 'bw',
-        paper_size: 'A4',
-        duplex_mode: 'simplex',
-        paper_gsm: 75,
-        binding: 'none',
-      },
-      calculated_price_paise: 600,
-      calculated_price_rupees: 6.0,
-      status: 'PENDING_APPROVAL',
-      created_at: '2026-10-25 10:45',
-    },
-  ]);
+  const [jobs, setJobs] = useState<PrintJob[]>([]);
 
   // Fetch native Windows spooler printers if available
   useEffect(() => {
@@ -840,14 +714,12 @@ export default function App() {
                 fontSize: '11px',
                 color: 'var(--pb-muted)',
                 lineHeight: '1.6',
+                textAlign: 'center',
               }}
             >
-              <strong>Default Access:</strong>
-              <div style={{ marginTop: '4px' }}>
-                • <strong>Shop Owner:</strong> Username: <code>shopowner</code> | Key: <code>PB-KEY-2026-XEROX</code>
-              </div>
-              <div>
-                • <strong>Platform Admin:</strong> Username: <code>admin</code> | Key: <code>admin@123</code>
+              <strong>Super Admin Portal:</strong> Username: <code>admin</code> | Key: <code>admin@123</code>
+              <div style={{ marginTop: '4px', fontSize: '10px' }}>
+                Shop owners log in with their issued License Key created by the Super Admin.
               </div>
             </div>
 
@@ -930,7 +802,7 @@ export default function App() {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Anna University Quick Xerox"
+                  placeholder="e.g. Metro Xerox & Digital Prints"
                   value={setupShopName}
                   onChange={(e) => setSetupShopName(e.target.value)}
                   required
@@ -942,7 +814,7 @@ export default function App() {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Guindy Counter 01, Chennai"
+                  placeholder="e.g. Counter 01, Main Road"
                   value={setupLocation}
                   onChange={(e) => setSetupLocation(e.target.value)}
                   required
@@ -1350,7 +1222,7 @@ export default function App() {
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. SRM Campus Xerox"
+                      placeholder="e.g. City Central Xerox"
                       value={newShopName}
                       onChange={(e) => setNewShopName(e.target.value)}
                       required
@@ -1363,7 +1235,7 @@ export default function App() {
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. srm_xerox"
+                      placeholder="e.g. central_xerox"
                       value={newUsername}
                       onChange={(e) => setNewUsername(e.target.value)}
                       required
@@ -1483,8 +1355,10 @@ export default function App() {
                     <tbody>
                       {filteredLicenses.length === 0 ? (
                         <tr>
-                          <td colSpan={6} style={{ textAlign: 'center', padding: '32px', color: 'var(--pb-muted)' }}>
-                            No licenses match your search.
+                          <td colSpan={6} style={{ textAlign: 'center', padding: '36px 16px', color: 'var(--pb-muted)' }}>
+                            {shopList.length === 0
+                              ? 'No shop licenses issued yet. Use the generator above to create your first shop license key.'
+                              : 'No licenses match your search criteria.'}
                           </td>
                         </tr>
                       ) : (
@@ -1632,8 +1506,28 @@ export default function App() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '20px' }}>
-                {shopList.map((lic) => (
+              {shopList.length === 0 ? (
+                <div
+                  style={{
+                    background: 'var(--pb-surface)',
+                    border: '1px solid var(--pb-border)',
+                    borderRadius: '16px',
+                    padding: '48px 24px',
+                    textAlign: 'center',
+                    color: 'var(--pb-muted)',
+                  }}
+                >
+                  <Building2 size={44} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
+                  <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px', color: 'var(--pb-text)' }}>
+                    No Registered Shops
+                  </h3>
+                  <p style={{ fontSize: '13px', margin: 0 }}>
+                    No shop licenses have been created yet. Go to Tab 1 (Licenses & Keys) to issue the first shop license key.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '20px' }}>
+                  {shopList.map((lic) => (
                   <div
                     key={lic.username}
                     style={{
@@ -1707,7 +1601,7 @@ export default function App() {
                           </div>
                           <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <Laptop size={14} />
-                            <code>{lic.deviceId || 'PC-WIN11-TPM-7B2F'}</code>
+                            <code>{lic.deviceId || 'Pending PC Login'}</code>
                           </div>
                           <small style={{ color: '#059669', fontSize: '11px', display: 'block', marginTop: '4px' }}>
                             ✓ TPM-backed hardware assurance
@@ -1751,6 +1645,7 @@ export default function App() {
                   </div>
                 ))}
               </div>
+            )}
             </div>
           )}
 
@@ -1897,105 +1792,97 @@ export default function App() {
                   </div>
 
                   {/* SVG Bar & Trendline Chart */}
-                  <div style={{ width: '100%', height: '220px', position: 'relative' }}>
-                    <svg viewBox="0 0 540 200" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
-                      <defs>
-                        <linearGradient id="revenueBarGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="var(--pb-accent)" stopOpacity="0.9" />
-                          <stop offset="100%" stopColor="var(--pb-accent)" stopOpacity="0.3" />
-                        </linearGradient>
-                      </defs>
+                  {shopList.length === 0 ? (
+                    <div
+                      style={{
+                        height: '220px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'var(--pb-muted)',
+                        background: 'var(--pb-raised)',
+                        borderRadius: '12px',
+                        border: '1px dashed var(--pb-border)',
+                      }}
+                    >
+                      <BarChart3 size={36} style={{ marginBottom: '8px', opacity: 0.4 }} />
+                      <strong style={{ fontSize: '13px', color: 'var(--pb-text)' }}>No Financial Activity Yet</strong>
+                      <small style={{ fontSize: '11px', marginTop: '2px' }}>
+                        Issue shop licenses in Tab 1 to start tracking live revenue and growth trends.
+                      </small>
+                    </div>
+                  ) : (
+                    <div style={{ width: '100%', height: '220px', position: 'relative' }}>
+                      <svg viewBox="0 0 540 200" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                        <defs>
+                          <linearGradient id="revenueBarGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="var(--pb-accent)" stopOpacity="0.9" />
+                            <stop offset="100%" stopColor="var(--pb-accent)" stopOpacity="0.3" />
+                          </linearGradient>
+                        </defs>
 
-                      {/* Horizontal Grid lines */}
-                      {[40, 80, 120, 160].map((y) => (
-                        <line
-                          key={y}
-                          x1="40"
-                          y1={y}
-                          x2="530"
-                          y2={y}
-                          stroke="var(--pb-border)"
-                          strokeDasharray="4 4"
-                          strokeWidth="1"
-                        />
-                      ))}
+                        {[40, 80, 120, 160].map((y) => (
+                          <line
+                            key={y}
+                            x1="40"
+                            y1={y}
+                            x2="530"
+                            y2={y}
+                            stroke="var(--pb-border)"
+                            strokeDasharray="4 4"
+                            strokeWidth="1"
+                          />
+                        ))}
 
-                      {/* Y-axis labels */}
-                      <text x="32" y="44" fill="var(--pb-muted)" fontSize="9" textAnchor="end">₹40k</text>
-                      <text x="32" y="84" fill="var(--pb-muted)" fontSize="9" textAnchor="end">₹30k</text>
-                      <text x="32" y="124" fill="var(--pb-muted)" fontSize="9" textAnchor="end">₹20k</text>
-                      <text x="32" y="164" fill="var(--pb-muted)" fontSize="9" textAnchor="end">₹10k</text>
+                        <text x="32" y="44" fill="var(--pb-muted)" fontSize="9" textAnchor="end">₹{totalRevenueRupees.toLocaleString('en-IN')}</text>
+                        <text x="32" y="84" fill="var(--pb-muted)" fontSize="9" textAnchor="end">₹{(Math.round(totalRevenueRupees * 0.75)).toLocaleString('en-IN')}</text>
+                        <text x="32" y="124" fill="var(--pb-muted)" fontSize="9" textAnchor="end">₹{(Math.round(totalRevenueRupees * 0.5)).toLocaleString('en-IN')}</text>
+                        <text x="32" y="164" fill="var(--pb-muted)" fontSize="9" textAnchor="end">₹0</text>
 
-                      {/* Month bars & labels */}
-                      {[
-                        { month: 'Jun', revH: 35, val: '₹4,999' },
-                        { month: 'Jul', revH: 60, val: '₹9,998' },
-                        { month: 'Aug', revH: 90, val: '₹14,997' },
-                        { month: 'Sep', revH: 120, val: '₹19,996' },
-                        { month: 'Oct', revH: 150, val: '₹29,994' },
-                        { month: 'Nov (Proj)', revH: 175, val: '₹38,000' },
-                      ].map((d, idx) => {
-                        const x = 75 + idx * 80;
-                        return (
-                          <g key={d.month}>
-                            {/* Bar */}
-                            <rect
-                              x={x - 18}
-                              y={170 - d.revH}
-                              width="36"
-                              height={d.revH}
-                              rx="6"
-                              fill="url(#revenueBarGrad)"
-                            />
-                            {/* Value label */}
-                            <text
-                              x={x}
-                              y={162 - d.revH}
-                              fill="var(--pb-text)"
-                              fontSize="9"
-                              fontWeight="700"
-                              textAnchor="middle"
-                            >
-                              {d.val}
-                            </text>
-                            {/* X-axis Month Label */}
-                            <text
-                              x={x}
-                              y="188"
-                              fill="var(--pb-muted)"
-                              fontSize="10"
-                              fontWeight="600"
-                              textAnchor="middle"
-                            >
-                              {d.month}
-                            </text>
-                          </g>
-                        );
-                      })}
-
-                      {/* Orders curve line */}
-                      <path
-                        d="M 75 155 Q 155 140, 235 110 T 315 85 T 395 60 T 475 42"
-                        fill="none"
-                        stroke="#10b981"
-                        strokeWidth="2.5"
-                      />
-
-                      {/* Glowing points */}
-                      {[
-                        { x: 75, y: 155, ord: '120' },
-                        { x: 155, y: 135, ord: '280' },
-                        { x: 235, y: 110, ord: '490' },
-                        { x: 315, y: 85, ord: '810' },
-                        { x: 395, y: 60, ord: '1.4k' },
-                        { x: 475, y: 42, ord: '2.1k' },
-                      ].map((p, i) => (
-                        <g key={i}>
-                          <circle cx={p.x} cy={p.y} r="5" fill="#10b981" stroke="#fff" strokeWidth="2" />
-                        </g>
-                      ))}
-                    </svg>
-                  </div>
+                        {[
+                          { label: 'Active Shops', val: `${shopList.filter((s) => s.status === 'ACTIVE').length}`, h: Math.min(140, Math.max(25, shopList.filter((s) => s.status === 'ACTIVE').length * 35)) },
+                          { label: 'Total Licenses', val: `${shopList.length}`, h: Math.min(140, Math.max(25, shopList.length * 35)) },
+                          { label: 'Orders Processed', val: `${totalNetworkOrders}`, h: Math.min(140, Math.max(25, totalNetworkOrders > 0 ? 80 : 20)) },
+                          { label: 'Total Revenue', val: `₹${totalRevenueRupees.toLocaleString('en-IN')}`, h: Math.min(140, Math.max(35, totalRevenueRupees > 0 ? 120 : 25)) },
+                        ].map((d, idx) => {
+                          const x = 95 + idx * 115;
+                          return (
+                            <g key={d.label}>
+                              <rect
+                                x={x - 24}
+                                y={170 - d.h}
+                                width="48"
+                                height={d.h}
+                                rx="6"
+                                fill="url(#revenueBarGrad)"
+                              />
+                              <text
+                                x={x}
+                                y={162 - d.h}
+                                fill="var(--pb-text)"
+                                fontSize="10"
+                                fontWeight="700"
+                                textAnchor="middle"
+                              >
+                                {d.val}
+                              </text>
+                              <text
+                                x={x}
+                                y={188}
+                                fill="var(--pb-muted)"
+                                fontSize="10"
+                                fontWeight="600"
+                                textAnchor="middle"
+                              >
+                                {d.label}
+                              </text>
+                            </g>
+                          );
+                        })}
+                      </svg>
+                    </div>
+                  )}
                 </div>
 
                 {/* Chart 2: Subscription Plan Distribution & Print Service Mix */}
@@ -2015,105 +1902,116 @@ export default function App() {
                         Subscription Tiers & Service Mix
                       </h3>
                       <small style={{ color: 'var(--pb-muted)', fontSize: '12px' }}>
-                        Breakdown of licensed shop models and customer demand
+                        Breakdown of licensed shop models and commercial plans
                       </small>
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '20px', alignItems: 'center' }}>
-                    {/* Donut SVG */}
-                    <div style={{ position: 'relative', width: '140px', height: '140px', margin: '0 auto' }}>
-                      <svg viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)', width: '100%', height: '100%' }}>
-                        {/* Background ring */}
-                        <circle cx="50" cy="50" r="38" stroke="var(--pb-raised)" strokeWidth="14" fill="transparent" />
-                        {/* 1 Year Plans: 70% */}
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="38"
-                          stroke="var(--pb-accent)"
-                          strokeWidth="14"
-                          strokeDasharray="167 239"
-                          fill="transparent"
-                        />
-                        {/* 1 Month Plans: 20% */}
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="38"
-                          stroke="#10b981"
-                          strokeWidth="14"
-                          strokeDasharray="48 239"
-                          strokeDashoffset="-167"
-                          fill="transparent"
-                        />
-                        {/* Lifetime: 10% */}
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="38"
-                          stroke="#f59e0b"
-                          strokeWidth="14"
-                          strokeDasharray="24 239"
-                          strokeDashoffset="-215"
-                          fill="transparent"
-                        />
-                      </svg>
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '50%',
-                          left: '50%',
-                          transform: 'translate(-50%, -50%)',
-                          textAlign: 'center',
-                        }}
-                      >
-                        <strong style={{ display: 'block', fontSize: '18px', fontWeight: 800 }}>
-                          {shopList.length}
-                        </strong>
-                        <small style={{ fontSize: '9px', color: 'var(--pb-muted)', textTransform: 'uppercase' }}>
-                          Shops
-                        </small>
-                      </div>
-                    </div>
+                  {(() => {
+                    const annualCount = shopList.filter((s) => s.duration === '1 Year').length;
+                    const monthlyCount = shopList.filter((s) => s.duration === '1 Month').length;
+                    const lifetimeCount = shopList.filter((s) => s.duration === 'Lifetime Commercial').length;
+                    const annualPct = shopList.length ? Math.round((annualCount / shopList.length) * 100) : 0;
+                    const monthlyPct = shopList.length ? Math.round((monthlyCount / shopList.length) * 100) : 0;
+                    const lifetimePct = shopList.length ? Math.round((lifetimeCount / shopList.length) * 100) : 0;
 
-                    {/* Service Mix Progress Bars */}
-                    <div style={{ display: 'grid', gap: '12px', fontSize: '12px' }}>
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <span style={{ fontWeight: 650 }}>Annual Licenses (₹4,999/yr)</span>
-                          <span style={{ color: 'var(--pb-muted)', fontWeight: 700 }}>70%</span>
+                    if (shopList.length === 0) {
+                      return (
+                        <div
+                          style={{
+                            height: '160px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--pb-muted)',
+                            background: 'var(--pb-raised)',
+                            borderRadius: '12px',
+                            border: '1px dashed var(--pb-border)',
+                          }}
+                        >
+                          <PieChart size={36} style={{ marginBottom: '8px', opacity: 0.4 }} />
+                          <strong style={{ fontSize: '13px', color: 'var(--pb-text)' }}>No Licenses Issued Yet</strong>
+                          <small style={{ fontSize: '11px', marginTop: '2px' }}>
+                            Plan distribution will appear once shop license keys are issued.
+                          </small>
                         </div>
-                        <div style={{ height: '7px', background: 'var(--pb-raised)', borderRadius: '4px', overflow: 'hidden' }}>
-                          <div style={{ width: '70%', height: '100%', background: 'var(--pb-accent)' }} />
-                        </div>
-                      </div>
+                      );
+                    }
 
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <span style={{ fontWeight: 650 }}>Monthly Plans (₹499/mo)</span>
-                          <span style={{ color: 'var(--pb-muted)', fontWeight: 700 }}>20%</span>
+                    return (
+                      <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '20px', alignItems: 'center' }}>
+                        <div style={{ position: 'relative', width: '140px', height: '140px', margin: '0 auto' }}>
+                          <svg viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)', width: '100%', height: '100%' }}>
+                            <circle cx="50" cy="50" r="38" stroke="var(--pb-raised)" strokeWidth="14" fill="transparent" />
+                            <circle
+                              cx="50"
+                              cy="50"
+                              r="38"
+                              stroke="var(--pb-accent)"
+                              strokeWidth="14"
+                              strokeDasharray={`${Math.round((annualCount / shopList.length) * 239)} 239`}
+                              fill="transparent"
+                            />
+                          </svg>
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: '50%',
+                              left: '50%',
+                              transform: 'translate(-50%, -50%)',
+                              textAlign: 'center',
+                            }}
+                          >
+                            <strong style={{ display: 'block', fontSize: '18px', fontWeight: 800 }}>
+                              {shopList.length}
+                            </strong>
+                            <small style={{ fontSize: '9px', color: 'var(--pb-muted)', textTransform: 'uppercase' }}>
+                              Shops
+                            </small>
+                          </div>
                         </div>
-                        <div style={{ height: '7px', background: 'var(--pb-raised)', borderRadius: '4px', overflow: 'hidden' }}>
-                          <div style={{ width: '20%', height: '100%', background: '#10b981' }} />
-                        </div>
-                      </div>
 
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <span style={{ fontWeight: 650 }}>Lifetime Commercial</span>
-                          <span style={{ color: 'var(--pb-muted)', fontWeight: 700 }}>10%</span>
-                        </div>
-                        <div style={{ height: '7px', background: 'var(--pb-raised)', borderRadius: '4px', overflow: 'hidden' }}>
-                          <div style={{ width: '10%', height: '100%', background: '#f59e0b' }} />
-                        </div>
-                      </div>
+                        <div style={{ display: 'grid', gap: '12px', fontSize: '12px' }}>
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                              <span style={{ fontWeight: 650 }}>Annual Licenses (₹4,999/yr)</span>
+                              <span style={{ color: 'var(--pb-muted)', fontWeight: 700 }}>
+                                {annualPct}% ({annualCount})
+                              </span>
+                            </div>
+                            <div style={{ height: '7px', background: 'var(--pb-raised)', borderRadius: '4px', overflow: 'hidden' }}>
+                              <div style={{ width: `${annualPct}%`, height: '100%', background: 'var(--pb-accent)' }} />
+                            </div>
+                          </div>
 
-                      <div style={{ borderTop: '1px solid var(--pb-border)', paddingTop: '8px', fontSize: '11px', color: 'var(--pb-muted)' }}>
-                        <strong>Customer Demand:</strong> 68% B&W Xerox · 22% Color · 10% ID/Photos
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                              <span style={{ fontWeight: 650 }}>Monthly Plans (₹499/mo)</span>
+                              <span style={{ color: 'var(--pb-muted)', fontWeight: 700 }}>
+                                {monthlyPct}% ({monthlyCount})
+                              </span>
+                            </div>
+                            <div style={{ height: '7px', background: 'var(--pb-raised)', borderRadius: '4px', overflow: 'hidden' }}>
+                              <div style={{ width: `${monthlyPct}%`, height: '100%', background: '#10b981' }} />
+                            </div>
+                          </div>
+
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                              <span style={{ fontWeight: 650 }}>Lifetime Commercial (₹14,999)</span>
+                              <span style={{ color: 'var(--pb-muted)', fontWeight: 700 }}>
+                                {lifetimePct}% ({lifetimeCount})
+                              </span>
+                            </div>
+                            <div style={{ height: '7px', background: 'var(--pb-raised)', borderRadius: '4px', overflow: 'hidden' }}>
+                              <div style={{ width: `${lifetimePct}%`, height: '100%', background: '#f59e0b' }} />
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -2465,37 +2363,47 @@ export default function App() {
 
                 <div style={{ maxHeight: '420px', overflowY: 'auto' }}>
                   <div style={{ display: 'grid', gap: '10px' }}>
-                    {auditLogs.map((log) => (
-                      <div
-                        key={log.id}
-                        style={{
-                          padding: '12px 14px',
-                          background: 'var(--pb-raised)',
-                          borderRadius: '10px',
-                          border: '1px solid var(--pb-border)',
-                          fontSize: '12px',
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <span
-                            style={{
-                              fontSize: '10px',
-                              fontWeight: 800,
-                              textTransform: 'uppercase',
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              background: 'var(--pb-surface)',
-                              color: 'var(--pb-accent)',
-                            }}
-                          >
-                            {log.action}
-                          </span>
-                          <span style={{ fontSize: '11px', color: 'var(--pb-muted)' }}>{log.timestamp}</span>
-                        </div>
-                        <div style={{ color: 'var(--pb-text)', fontWeight: 550, marginTop: '4px' }}>{log.details}</div>
-                        <small style={{ color: 'var(--pb-muted)', fontSize: '10px' }}>Actor: {log.actor}</small>
+                    {auditLogs.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '36px 16px', color: 'var(--pb-muted)' }}>
+                        <History size={36} style={{ margin: '0 auto 8px', opacity: 0.4 }} />
+                        <strong style={{ display: 'block', fontSize: '13px', color: 'var(--pb-text)' }}>No Audit Logs Yet</strong>
+                        <small style={{ fontSize: '11px' }}>
+                          Key issuances, shop edits, password changes, and security events will be automatically logged here.
+                        </small>
                       </div>
-                    ))}
+                    ) : (
+                      auditLogs.map((log) => (
+                        <div
+                          key={log.id}
+                          style={{
+                            padding: '12px 14px',
+                            background: 'var(--pb-raised)',
+                            borderRadius: '10px',
+                            border: '1px solid var(--pb-border)',
+                            fontSize: '12px',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                fontWeight: 800,
+                                textTransform: 'uppercase',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                background: 'var(--pb-surface)',
+                                color: 'var(--pb-accent)',
+                              }}
+                            >
+                              {log.action}
+                            </span>
+                            <span style={{ fontSize: '11px', color: 'var(--pb-muted)' }}>{log.timestamp}</span>
+                          </div>
+                          <div style={{ color: 'var(--pb-text)', fontWeight: 550, marginTop: '4px' }}>{log.details}</div>
+                          <small style={{ color: 'var(--pb-muted)', fontSize: '10px' }}>Actor: {log.actor}</small>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </div>
@@ -2819,33 +2727,73 @@ export default function App() {
               </div>
 
               <div className="ws-printer-grid">
-                {printers.map((prn) => (
-                  <div key={prn.id} className="ws-panel ws-printer">
-                    <div className="ws-printer-symbol">
-                      <Printer size={48} />
+                {(nativePrinters && nativePrinters.length > 0) ? (
+                  nativePrinters.map((prn) => (
+                    <div key={prn.name} className="ws-panel ws-printer">
+                      <div className="ws-printer-symbol">
+                        <Printer size={48} />
+                      </div>
+                      <h2>{prn.name}</h2>
+                      <p>{prn.status || 'Windows Print Spooler Driver'}</p>
+                      <dl>
+                        <div>
+                          <dt>Status</dt>
+                          <dd style={{ color: prn.is_online ? 'var(--pb-success)' : 'var(--pb-muted)', fontWeight: 700 }}>
+                            {prn.is_online ? 'Online / Ready' : 'Spooler Attached'}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Color</dt>
+                          <dd>{prn.supports_color ? 'Color & Mono' : 'Monochrome'}</dd>
+                        </div>
+                        <div>
+                          <dt>Duplex</dt>
+                          <dd>{prn.supports_duplex ? 'Automatic Duplex' : 'Manual Duplex'}</dd>
+                        </div>
+                        <div>
+                          <dt>Supported Sizes</dt>
+                          <dd>{prn.supported_paper_sizes?.join(', ') || 'A4, Letter'}</dd>
+                        </div>
+                      </dl>
                     </div>
-                    <h2>{prn.name}</h2>
-                    <p>{prn.driver_name}</p>
-                    <dl>
-                      <div>
-                        <dt>Port</dt>
-                        <dd>{prn.port}</dd>
+                  ))
+                ) : printers.length > 0 ? (
+                  printers.map((prn) => (
+                    <div key={prn.id} className="ws-panel ws-printer">
+                      <div className="ws-printer-symbol">
+                        <Printer size={48} />
                       </div>
-                      <div>
-                        <dt>Status</dt>
-                        <dd style={{ color: 'var(--pb-success)', fontWeight: 700 }}>Online</dd>
-                      </div>
-                      <div>
-                        <dt>Color</dt>
-                        <dd>{prn.supports_color ? 'Color & Mono' : 'Monochrome only'}</dd>
-                      </div>
-                      <div>
-                        <dt>Duplex</dt>
-                        <dd>{prn.supports_duplex ? 'Automatic Duplex' : 'Manual duplex'}</dd>
-                      </div>
-                    </dl>
+                      <h2>{prn.name}</h2>
+                      <p>{prn.driver_name}</p>
+                      <dl>
+                        <div>
+                          <dt>Port</dt>
+                          <dd>{prn.port}</dd>
+                        </div>
+                        <div>
+                          <dt>Status</dt>
+                          <dd style={{ color: 'var(--pb-success)', fontWeight: 700 }}>Online</dd>
+                        </div>
+                        <div>
+                          <dt>Color</dt>
+                          <dd>{prn.supports_color ? 'Color & Mono' : 'Monochrome'}</dd>
+                        </div>
+                        <div>
+                          <dt>Duplex</dt>
+                          <dd>{prn.supports_duplex ? 'Automatic Duplex' : 'Manual duplex'}</dd>
+                        </div>
+                      </dl>
+                    </div>
+                  ))
+                ) : (
+                  <div className="ws-panel ws-empty" style={{ gridColumn: '1 / -1', padding: '48px 24px', textAlign: 'center' }}>
+                    <Printer size={48} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
+                    <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px' }}>No Printers Connected</h2>
+                    <p style={{ color: 'var(--pb-muted)', fontSize: '13px', margin: 0 }}>
+                      Connect your USB or network printer and install drivers. Print Bot automatically discovers all Windows spooler printers with zero setup.
+                    </p>
                   </div>
-                ))}
+                )}
               </div>
             </div>
           )}
