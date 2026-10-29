@@ -79,9 +79,10 @@ export const CustomerShopPortal: React.FC<CustomerShopPortalProps> = ({ shopId, 
 
   // Fetch registered shop details & pricing rates from Supabase with Live Realtime Listener
   useEffect(() => {
+    const cleanId = shopId.toLowerCase().trim();
+
     async function loadShop() {
       try {
-        const cleanId = shopId.toLowerCase();
         const { data, error } = await supabase
           .from('pilot_applications')
           .select('shop_name, city, contact_number, plan, notes, generated_username')
@@ -94,8 +95,8 @@ export const CustomerShopPortal: React.FC<CustomerShopPortalProps> = ({ shopId, 
           try {
             if (data.notes) {
               const parsed = typeof data.notes === 'string' ? JSON.parse(data.notes) : data.notes;
-              if (parsed.bwRate) customBw = Number(parsed.bwRate);
-              if (parsed.colorRate) customColor = Number(parsed.colorRate);
+              if (parsed.bwRate !== undefined) customBw = Number(parsed.bwRate);
+              if (parsed.colorRate !== undefined) customColor = Number(parsed.colorRate);
             }
           } catch {}
 
@@ -114,18 +115,39 @@ export const CustomerShopPortal: React.FC<CustomerShopPortalProps> = ({ shopId, 
 
     loadShop();
 
-    // 1. Live Supabase Realtime Listener
+    // 1. Live Supabase Realtime Listener with instant payload reactivity
     const channel = supabase
-      .channel(`live_rates_${shopId}`)
+      .channel(`live_rates_${cleanId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'pilot_applications' },
-        (payload) => {
-          console.info('Live rates update from Supabase:', payload);
+        (payload: any) => {
+          console.info('Live rates update from Supabase Realtime:', payload);
+          if (payload.new) {
+            const row = payload.new;
+            const matchesShop =
+              row.generated_username?.toLowerCase() === cleanId ||
+              row.shop_name?.toLowerCase() === cleanId;
+            if (matchesShop && row.notes) {
+              try {
+                const parsed = typeof row.notes === 'string' ? JSON.parse(row.notes) : row.notes;
+                if (parsed.bwRate !== undefined || parsed.colorRate !== undefined) {
+                  setRates((prev) => ({
+                    bw: parsed.bwRate !== undefined ? Number(parsed.bwRate) : prev.bw,
+                    color: parsed.colorRate !== undefined ? Number(parsed.colorRate) : prev.color,
+                  }));
+                }
+              } catch (e) {
+                console.warn('Error parsing realtime notes:', e);
+              }
+            }
+          }
           loadShop();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.info(`Supabase Realtime status [${cleanId}]:`, status);
+      });
 
     // 2. Auto-fetch whenever customer/operator clicks back into the browser tab
     window.addEventListener('focus', loadShop);

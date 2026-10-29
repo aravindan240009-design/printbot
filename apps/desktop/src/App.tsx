@@ -70,6 +70,7 @@ export interface ShopLicense {
   isConfigured: boolean;
   duration?: '1 Month' | '1 Year' | 'Lifetime Commercial';
   deviceId?: string | null;
+  appId?: string;
   totalOrdersCount?: number;
   totalPagesCount?: number;
   lastActive?: string;
@@ -304,7 +305,7 @@ export default function App() {
       const { data: cloudApp, error } = await supabase
         .from('pilot_applications')
         .select('*')
-        .eq('generated_username', u)
+        .or(`generated_username.ilike.${u},shop_name.ilike.${u}`)
         .eq('status', 'APPROVED')
         .maybeSingle();
 
@@ -320,16 +321,28 @@ export default function App() {
         else if (duration === '1 Year') expiry.setFullYear(expiry.getFullYear() + 1);
         else expiry.setFullYear(expiry.getFullYear() + 50);
 
+        let initBw = 1.5;
+        let initColor = 10.0;
+        if (cloudApp.notes) {
+          try {
+            const p = typeof cloudApp.notes === 'string' ? JSON.parse(cloudApp.notes) : cloudApp.notes;
+            if (p.bwRate !== undefined) initBw = Number(p.bwRate);
+            if (p.colorRate !== undefined) initColor = Number(p.colorRate);
+          } catch {}
+        }
+
+        const canonicalUsername = cloudApp.generated_username?.toLowerCase() || u;
         const newLic: ShopLicense = {
-          username: u,
+          username: canonicalUsername,
+          appId: cloudApp.id,
           licenseKey: k.toUpperCase(),
           shopName: app.shopName,
           location: app.city || 'Counter 01',
           phone: app.contactNumber.startsWith('+91') ? app.contactNumber : `+91 ${app.contactNumber}`,
-          upiId: `${u}@upi`,
+          upiId: `${canonicalUsername}@upi`,
           rates: {
-            bwPerSideRupees: 1.5,
-            colorPerSideRupees: 10.0,
+            bwPerSideRupees: initBw,
+            colorPerSideRupees: initColor,
             duplexDiscountPercent: 15,
           },
           orderMode: 'MANUAL_APPROVAL',
@@ -343,8 +356,13 @@ export default function App() {
           lastActive: 'Authenticated via Cloud',
         };
 
-        setLicenses((prev) => ({ ...prev, [u]: newLic }));
-        setActiveSession({ role: 'SHOP_OWNER', username: u });
+        setLicenses((prev) => ({
+          ...prev,
+          [u]: newLic,
+          [canonicalUsername]: newLic,
+          [app.shopName.toLowerCase()]: newLic,
+        }));
+        setActiveSession({ role: 'SHOP_OWNER', username: canonicalUsername });
         return;
       }
     } catch (err) {
@@ -4234,9 +4252,8 @@ export default function App() {
                     const u = activeSession.username;
                     const bw = Number(setupBwRate) || 1.5;
                     const color = Number(setupColorRate) || 10.0;
-                    setLicenses((prev) => ({
-                      ...prev,
-                      [u]: {
+                    setLicenses((prev) => {
+                      const updated = {
                         ...prev[u],
                         rates: {
                           bwPerSideRupees: bw,
@@ -4244,19 +4261,49 @@ export default function App() {
                           duplexDiscountPercent: 15,
                         },
                         orderMode: setupOrderMode,
-                      },
-                    }));
+                      };
+                      return {
+                        ...prev,
+                        [u]: updated,
+                        ...(currentShop?.username ? { [currentShop.username.toLowerCase()]: updated } : {}),
+                        ...(currentShop?.shopName ? { [currentShop.shopName.toLowerCase()]: updated } : {}),
+                      };
+                    });
 
                     // Sync rates to Supabase for the web portal (matching both generated_username and shop_name)
                     try {
-                      const shopName = currentShop?.shopName || u;
+                      const shopName = currentShop?.shopName || setupShopName || u;
                       const username = currentShop?.username || u;
-                      await supabase
-                        .from('pilot_applications')
-                        .update({
-                          notes: JSON.stringify({ bwRate: bw, colorRate: color }),
-                        })
-                        .or(`generated_username.eq.${username},shop_name.eq.${shopName},generated_username.eq.${u},shop_name.eq.${u}`);
+                      const notesPayload = JSON.stringify({ bwRate: bw, colorRate: color, updatedAt: new Date().toISOString() });
+
+                      // 1. Try updating by direct row id if known
+                      let updated = false;
+                      if (currentShop?.appId) {
+                        const { data, error } = await supabase
+                          .from('pilot_applications')
+                          .update({ notes: notesPayload })
+                          .eq('id', currentShop.appId)
+                          .select();
+                        if (!error && data && data.length > 0) {
+                          updated = true;
+                          console.info('Synced pricing rates to cloud via appId:', data);
+                        }
+                      }
+
+                      // 2. Fallback to matching both generated_username and shop_name
+                      if (!updated) {
+                        const orFilter = `generated_username.ilike.${username},shop_name.ilike.${shopName},generated_username.ilike.${u},shop_name.ilike.${u}`;
+                        const { data, error } = await supabase
+                          .from('pilot_applications')
+                          .update({ notes: notesPayload })
+                          .or(orFilter)
+                          .select();
+                        if (error) {
+                          console.error('Failed to sync rates to cloud:', error);
+                        } else {
+                          console.info('Synced pricing rates to cloud via OR filter:', data);
+                        }
+                      }
                     } catch (err) {
                       console.warn('Failed to sync rates to cloud:', err);
                     }
