@@ -182,7 +182,7 @@ function Console() {
   }
 
   return (
-    <div className="console-shell">
+    <div className="console-shell shop-shell">
       <a className="skip-link" href="#main">Skip to main content</a>
       <aside className="console-rail">
         <div className="brand">

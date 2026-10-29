@@ -207,10 +207,10 @@ export function LuxuryEditorial() {
 
             {/* High-Resolution Architectural Print Studio Image */}
             <picture>
-              <source srcSet="/assets/print-room-light.webp" type="image/webp" />
+              <source srcSet="/assets/editorial-tangible-craft.jpg" type="image/jpeg" />
               <img
-                src="/assets/print-room-light.webp"
-                alt="High-end architectural print studio with commercial digital Xerox machine and blueprint drawings"
+                src="/assets/editorial-tangible-craft.jpg"
+                alt="Bespoke architectural design and print studio table with freshly printed folios, thesis prints, and business cards"
                 loading="lazy"
                 decoding="async"
                 width="1536"
@@ -218,6 +218,9 @@ export function LuxuryEditorial() {
                 style={{
                   transform: isPhotoHovered ? 'scale(1.06)' : 'scale(1.02)',
                   transition: 'transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
+                  objectFit: 'cover',
+                  width: '100%',
+                  height: '100%',
                 }}
               />
             </picture>
