@@ -42,7 +42,9 @@ import {
   Check,
   Trash2,
   BarChart3,
-  PieChart
+  PieChart,
+  Globe,
+  ExternalLink
 } from 'lucide-react';
 import { ThemeProvider, ThemeSwitch, MotionSurface, PaperScene, PrinterScene, useGsapStagger } from '@xerox/ui';
 import { discoverPrinters, type NativePrinterInfo } from './native';
@@ -176,7 +178,7 @@ try {
 const INITIAL_LICENSES: Record<string, ShopLicense> = {};
 
 type AppScreen = 'LOCK_SCREEN' | 'SETUP_WIZARD' | 'WORKSTATION' | 'ADMIN_PORTAL';
-type Tab = 'queue' | 'printers' | 'pairing' | 'settings';
+type Tab = 'queue' | 'printers' | 'website' | 'settings';
 
 function Dialog({
   title,
@@ -3635,11 +3637,11 @@ export default function App() {
             Printers
           </button>
           <button
-            aria-current={activeTab === 'pairing' ? 'page' : undefined}
-            onClick={() => setActiveTab('pairing')}
+            aria-current={activeTab === 'website' ? 'page' : undefined}
+            onClick={() => setActiveTab('website')}
           >
-            <KeyRound size={18} />
-            Device pairing
+            <Globe size={18} />
+            Website
           </button>
           <button
             aria-current={activeTab === 'settings' ? 'page' : undefined}
@@ -3747,9 +3749,6 @@ export default function App() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  <button onClick={handleSimulateNewCustomerJob} style={{ fontSize: '13px', gap: '6px' }}>
-                    <PlusCircle size={16} /> Simulate Customer QR Job
-                  </button>
                   <button
                     className="ws-primary"
                     disabled={pendingCount === 0}
@@ -3961,52 +3960,260 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB: PAIRING */}
-          {activeTab === 'pairing' && (
-            <div className="ws-view">
-              <div className="ws-page-heading">
-                <div>
-                  <span className="ws-eyebrow">QR CODE & SECURITY</span>
-                  <h1>Device pairing & counter QR link.</h1>
-                  <p>Customers scan this counter QR code to directly access your shop's mobile portal.</p>
-                </div>
-              </div>
+          {/* TAB: WEBSITE (SHOP DOMAIN & IMMUTABLE CREDENTIALS) */}
+          {activeTab === 'website' && (() => {
+            const shopSub = (currentShop?.username || 'shop').toLowerCase();
+            const mainDomain = 'https://printbotak.vercel.app';
+            const shopSubdomainUrl = `https://${shopSub}.printbotak.vercel.app`;
+            const shopPortalUrl = `${mainDomain}/?shop=${shopSub}`;
+            const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(shopPortalUrl)}`;
 
-              <div className="ws-panel" style={{ padding: '36px', maxWidth: '600px' }}>
-                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                  <QrCode size={96} color="var(--pb-accent)" style={{ margin: '0 auto 16px' }} />
-                  <h3 style={{ fontSize: '20px', fontWeight: 800 }}>Counter Stand QR</h3>
-                  <p style={{ fontSize: '13px', color: 'var(--pb-muted)' }}>
-                    Print this QR code and paste it on your desk counter.
-                  </p>
-                </div>
-
-                <div
-                  style={{
-                    padding: '16px',
-                    borderRadius: '12px',
-                    background: 'var(--pb-raised)',
-                    border: '1px solid var(--pb-border)',
-                    fontSize: '12px',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <strong>Shop Portal QR URL:</strong>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(`https://printbot-57e1.vercel.app/?qr=shop_anna_univ_01`);
-                        alert('Copied shop QR link!');
-                      }}
-                      style={{ border: 0, padding: '4px 8px', fontSize: '11px' }}
-                    >
-                      Copy Link
-                    </button>
+            return (
+              <div className="ws-view">
+                <div className="ws-page-heading">
+                  <div>
+                    <span className="ws-eyebrow">ONLINE SHOP PORTAL &amp; SUBDOMAIN</span>
+                    <h1>Shop Website &amp; Domain</h1>
+                    <p>Your shop's dedicated online print portal under the Print Bot platform. All parameters are cryptographically locked and immutable.</p>
                   </div>
-                  <code>https://printbot-57e1.vercel.app/?qr=shop_anna_univ_01</code>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr', gap: '24px', alignItems: 'start' }}>
+                  {/* Left Column: Domain & Immutable Shop Parameters */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    {/* Domain Architecture Card */}
+                    <div className="ws-panel" style={{ padding: '24px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                        <Globe size={22} color="var(--pb-accent)" />
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 750 }}>Domain &amp; Routing Architecture</h3>
+                          <small style={{ color: 'var(--pb-muted)' }}>Hosted on High-Performance Vercel Edge Network</small>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        {/* Main Domain */}
+                        <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-muted)' }}>MAIN PLATFORM DOMAIN</span>
+                            <span style={{ fontSize: '10px', background: 'var(--pb-accent-soft)', color: 'var(--pb-accent)', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                              🔒 Immutable
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <code style={{ fontSize: '13px', fontWeight: 650 }}>{mainDomain}/</code>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(`${mainDomain}/`);
+                                setNotice('Copied main platform domain to clipboard.');
+                              }}
+                              style={{ border: 0, padding: '4px 8px', fontSize: '11px', gap: '4px' }}
+                            >
+                              <Copy size={12} /> Copy
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Shop Subdomain */}
+                        <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--pb-raised)', border: '1px solid var(--pb-accent)', boxShadow: '0 0 0 1px var(--pb-accent)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-accent)' }}>SHOP DEDICATED SUBDOMAIN</span>
+                            <span style={{ fontSize: '10px', background: 'var(--pb-accent)', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                              🔒 Active Subdomain
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <code style={{ fontSize: '14px', fontWeight: 750, color: 'var(--pb-accent)' }}>{shopSubdomainUrl}/</code>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(`${shopSubdomainUrl}/`);
+                                setNotice('Copied shop subdomain to clipboard.');
+                              }}
+                              style={{ border: 0, padding: '4px 8px', fontSize: '11px', gap: '4px' }}
+                            >
+                              <Copy size={12} /> Copy
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Direct Customer Web Portal Link */}
+                        <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-muted)' }}>DIRECT CUSTOMER PORTAL ROUTE</span>
+                            <span style={{ fontSize: '10px', background: 'var(--pb-accent-soft)', color: 'var(--pb-accent)', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                              🔒 Scannable Target
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                            <code style={{ fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shopPortalUrl}</code>
+                            <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(shopPortalUrl);
+                                  setNotice('Copied direct customer portal link to clipboard.');
+                                }}
+                                style={{ border: 0, padding: '4px 8px', fontSize: '11px', gap: '4px' }}
+                              >
+                                <Copy size={12} /> Copy
+                              </button>
+                              <a
+                                href={shopPortalUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '4px 8px',
+                                  fontSize: '11px',
+                                  borderRadius: '6px',
+                                  background: 'var(--pb-accent)',
+                                  color: '#fff',
+                                  textDecoration: 'none',
+                                  fontWeight: 650
+                                }}
+                              >
+                                <ExternalLink size={12} /> Visit
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Immutable Shop Details Card */}
+                    <div className="ws-panel" style={{ padding: '24px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Lock size={18} color="var(--pb-accent)" />
+                          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 750 }}>Immutable Shop Parameters</h3>
+                        </div>
+                        <span style={{ fontSize: '11px', color: 'var(--pb-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <ShieldCheck size={14} color="#059669" /> Cryptographically Locked
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                        <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
+                          <span style={{ display: 'block', fontSize: '10px', color: 'var(--pb-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Shop Legal Name</span>
+                          <strong style={{ fontSize: '13px' }}>{currentShop?.shopName || '—'}</strong>
+                        </div>
+                        <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
+                          <span style={{ display: 'block', fontSize: '10px', color: 'var(--pb-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Subdomain ID / Username</span>
+                          <strong style={{ fontSize: '13px' }}>{currentShop?.username || '—'}</strong>
+                        </div>
+                        <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
+                          <span style={{ display: 'block', fontSize: '10px', color: 'var(--pb-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Branch Location</span>
+                          <strong style={{ fontSize: '13px' }}>{currentShop?.location || '—'}</strong>
+                        </div>
+                        <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
+                          <span style={{ display: 'block', fontSize: '10px', color: 'var(--pb-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Official Contact</span>
+                          <strong style={{ fontSize: '13px' }}>{currentShop?.phone || '—'}</strong>
+                        </div>
+                        <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
+                          <span style={{ display: 'block', fontSize: '10px', color: 'var(--pb-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Workstation Terminal</span>
+                          <strong style={{ fontSize: '13px' }}>Counter-PC-01 (Hardware Bound)</strong>
+                        </div>
+                        <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
+                          <span style={{ display: 'block', fontSize: '10px', color: 'var(--pb-muted)', fontWeight: 700, textTransform: 'uppercase' }}>License Key</span>
+                          <strong style={{ fontSize: '13px', letterSpacing: '0.5px' }}>{currentShop?.licenseKey || '—'}</strong>
+                        </div>
+                      </div>
+
+                      <div style={{ marginTop: '16px', padding: '10px 12px', borderRadius: '8px', background: 'var(--pb-accent-soft)', border: '1px solid var(--pb-border)', fontSize: '11px', color: 'var(--pb-accent)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Lock size={14} />
+                        <span>These parameters are securely linked to your license and cannot be altered from this PC. To request changes, contact Super Admin.</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Counter Stand QR Code & Print Badge */}
+                  <div className="ws-panel" style={{ padding: '28px', textAlign: 'center' }}>
+                    <div style={{ display: 'inline-flex', padding: '12px', borderRadius: '16px', background: '#fff', border: '1px solid var(--pb-border)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', marginBottom: '18px' }}>
+                      <img
+                        src={qrImageUrl}
+                        alt="Shop Counter Stand QR"
+                        style={{ width: '210px', height: '210px', display: 'block', borderRadius: '8px' }}
+                      />
+                    </div>
+
+                    <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px' }}>Counter Stand QR Code</h3>
+                    <p style={{ fontSize: '12px', color: 'var(--pb-muted)', margin: '0 0 20px', lineHeight: 1.5 }}>
+                      Customers scan this QR code with any phone camera to upload and pay without app installation.
+                    </p>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <button
+                        className="ws-primary"
+                        onClick={() => {
+                          const printWindow = window.open('', '_blank');
+                          if (printWindow) {
+                            printWindow.document.write(`
+                              <html>
+                                <head>
+                                  <title>Print Bot Counter QR - ${currentShop?.shopName}</title>
+                                  <style>
+                                    body { font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #fff; }
+                                    .card { border: 3px solid #18181b; border-radius: 24px; padding: 40px; text-align: center; max-width: 360px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+                                    h1 { margin: 0 0 8px; font-size: 24px; font-weight: 800; }
+                                    p { color: #52525b; margin: 0 0 24px; font-size: 14px; }
+                                    img { width: 240px; height: 240px; border-radius: 12px; }
+                                    .sub { margin-top: 20px; font-size: 12px; font-weight: 700; color: #18181b; }
+                                  </style>
+                                </head>
+                                <body>
+                                  <div class="card">
+                                    <h1>${currentShop?.shopName || 'Print Shop'}</h1>
+                                    <p>Scan to Upload &amp; Print from Phone</p>
+                                    <img src="${qrImageUrl}" alt="QR Code" />
+                                    <div class="sub">${shopSubdomainUrl}/</div>
+                                  </div>
+                                  <script>window.onload = function() { window.print(); };</script>
+                                </body>
+                              </html>
+                            `);
+                            printWindow.document.close();
+                          }
+                        }}
+                        style={{ width: '100%', justifyContent: 'center', minHeight: '40px', gap: '8px' }}
+                      >
+                        <Printer size={16} /> Print Counter Stand QR Card
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(shopPortalUrl);
+                          setNotice('Copied shop portal URL for customers.');
+                        }}
+                        style={{ width: '100%', justifyContent: 'center', minHeight: '38px', gap: '6px' }}
+                      >
+                        <Copy size={14} /> Copy Customer Link
+                      </button>
+
+                      <a
+                        href={shopPortalUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          padding: '8px',
+                          fontSize: '12px',
+                          color: 'var(--pb-accent)',
+                          textDecoration: 'none',
+                          fontWeight: 650
+                        }}
+                      >
+                        <ExternalLink size={13} /> Test Customer Mobile Experience
+                      </a>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* TAB: SETTINGS */}
           {activeTab === 'settings' && (
@@ -4046,38 +4253,53 @@ export default function App() {
                 >
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                        Shop Name
+                      <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                        <span>Shop Name</span>
+                        <span style={{ fontSize: '10px', color: 'var(--pb-accent)', background: 'var(--pb-accent-soft)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                          🔒 Immutable
+                        </span>
                       </label>
                       <input
                         type="text"
                         value={setupShopName}
-                        onChange={(e) => setSetupShopName(e.target.value)}
-                        placeholder="e.g. Metro Xerox & Digital Prints"
+                        readOnly
+                        disabled
+                        style={{ opacity: 0.75, cursor: 'not-allowed', background: 'var(--pb-raised)' }}
+                        title="Automatically provisioned from License Key"
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                        Branch Location
+                      <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                        <span>Branch Location</span>
+                        <span style={{ fontSize: '10px', color: 'var(--pb-accent)', background: 'var(--pb-accent-soft)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                          🔒 Immutable
+                        </span>
                       </label>
                       <input
                         type="text"
                         value={setupLocation}
-                        onChange={(e) => setSetupLocation(e.target.value)}
-                        placeholder="e.g. Counter 01, Main Road"
+                        readOnly
+                        disabled
+                        style={{ opacity: 0.75, cursor: 'not-allowed', background: 'var(--pb-raised)' }}
+                        title="Automatically provisioned from License Key"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                      Contact Phone
+                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                      <span>Contact Phone</span>
+                      <span style={{ fontSize: '10px', color: 'var(--pb-accent)', background: 'var(--pb-accent-soft)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                        🔒 Immutable
+                      </span>
                     </label>
                     <input
                       type="text"
                       value={setupPhone}
-                      onChange={(e) => setSetupPhone(e.target.value)}
-                      placeholder="+91 98401 23456"
+                      readOnly
+                      disabled
+                      style={{ opacity: 0.75, cursor: 'not-allowed', background: 'var(--pb-raised)' }}
+                      title="Automatically provisioned from License Key"
                     />
                   </div>
 

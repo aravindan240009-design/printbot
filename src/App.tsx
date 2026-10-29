@@ -13,8 +13,24 @@ import { Faq } from './components/Faq';
 import { CtaSection } from './components/CtaSection';
 import { Footer } from './components/Footer';
 import { PilotModal } from './components/PilotModal';
+import { CustomerShopPortal } from './components/CustomerShopPortal';
 
 export const App: React.FC = () => {
+  const [shopId, setShopId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    const qShop = params.get('shop') || params.get('qr');
+    if (qShop) return qShop.trim().toLowerCase();
+
+    const host = window.location.hostname.toLowerCase();
+    const mainDomain = 'printbotak.vercel.app';
+    if (host.endsWith(mainDomain) && host !== mainDomain && host !== `www.${mainDomain}`) {
+      const sub = host.replace(`.${mainDomain}`, '');
+      if (sub && sub !== 'www') return sub;
+    }
+    return null;
+  });
+
   const installerConfig = useMemo(() => getInstallerConfig(), []);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalTab, setModalTab] = useState<'request_pilot' | 'installer_info'>('request_pilot');
@@ -61,6 +77,18 @@ export const App: React.FC = () => {
     setPreselectedPlan(planName);
     setIsModalOpen(true);
   };
+
+  if (shopId) {
+    return (
+      <CustomerShopPortal
+        shopId={shopId}
+        onBackToHome={() => {
+          window.history.replaceState({}, '', '/');
+          setShopId(null);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="page-root">
