@@ -17,7 +17,7 @@ import {
   FileCheck,
   Server
 } from 'lucide-react';
-import { PrintBotLogo, ThemeProvider, MotionSurface, StudioHeader, useGsapStagger } from '@xerox/ui';
+import { PrintBotLogo, ThemeProvider, MotionSurface, StudioHeader, useGsapStagger, Select } from '@xerox/ui';
 import '@xerox/ui/src/studio.css';
 
 type Shop = {
@@ -244,15 +244,13 @@ function Console() {
                           onChange={e => setQuery(e.target.value)}
                         />
                       </label>
-                      <select
-                        aria-label="Filter subscription status"
+                      <Select
+                        ariaLabel="Filter subscription status"
                         value={filter}
-                        onChange={e => setFilter(e.target.value)}
-                      >
-                        {['All statuses', 'Active', 'Grace period', 'Suspended'].map(s => (
-                          <option key={s}>{s}</option>
-                        ))}
-                      </select>
+                        onChange={setFilter}
+                        options={['All statuses', 'Active', 'Grace period', 'Suspended']}
+                        style={{ minWidth: '175px' }}
+                      />
                     </div>
 
                     <div ref={recordListRef} className="record-list">

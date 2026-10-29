@@ -908,3 +908,123 @@ body .panel,body .metric-card,body .ws-panel,body .ws-stat,body .customer-sheet,
 
 .console-rail .brand span,.console-rail .brand strong,.ws-sidebar .ws-brand>div,.ws-sidebar .ws-brand>span{color:#f3dfbf!important}
 @media(max-width:760px){body .page-heading,body .ws-page-heading{padding:24px 24px 155px!important;min-height:350px}body .page-heading:after,body .ws-page-heading:after{inset:auto 0 0;height:160px;opacity:1;background-position:76% 60%;mask-image:linear-gradient(180deg,transparent,#000 30%)}body .page-heading h1,body .ws-page-heading h1,body .page-heading p,body .ws-page-heading p{max-width:100%}}
+
+
+/* ==========================================================================
+   Universal Luxury Dropdown & Select UI System
+   ========================================================================== */
+
+@keyframes pb-dropdown-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.pb-select-container {
+  position: relative;
+  font-family: var(--pb-font-body, system-ui, sans-serif);
+}
+
+.pb-select-trigger {
+  font-family: inherit;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.pb-select-trigger:hover:not(:disabled) {
+  border-color: var(--pb-accent) !important;
+  box-shadow: 0 2px 10px rgba(103, 40, 63, 0.08) !important;
+}
+
+.pb-select-trigger:focus-visible,
+.pb-select-trigger.pb-select-open {
+  outline: none !important;
+  border-color: var(--pb-accent) !important;
+  box-shadow: 0 0 0 3.5px rgba(181, 136, 28, 0.22), 0 4px 16px rgba(103, 40, 63, 0.08) !important;
+}
+
+.pb-select-menu {
+  animation: pb-dropdown-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: top center;
+  box-shadow: 0 16px 40px -6px rgba(0, 0, 0, 0.2), 0 0 0 1px var(--pb-border-gold) !important;
+}
+
+.pb-select-menu::-webkit-scrollbar {
+  width: 5px;
+}
+
+.pb-select-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pb-select-menu::-webkit-scrollbar-thumb {
+  background: var(--pb-border-strong);
+  border-radius: 999px;
+}
+
+.pb-select-menu::-webkit-scrollbar-thumb:hover {
+  background: var(--pb-accent);
+}
+
+/* Universal Native Select Styling & Overhaul */
+body select,
+select {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  cursor: pointer !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23792d47' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 14px center !important;
+  background-size: 16px 16px !important;
+  padding-right: 42px !important;
+  min-height: 44px !important;
+  border: 1.5px solid var(--pb-border-gold) !important;
+  border-radius: 11px !important;
+  color: var(--pb-text) !important;
+  font-family: var(--pb-font-body) !important;
+  font-weight: 550 !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+:root[data-theme="dark"] body select,
+:root[data-theme="dark"] select,
+[data-theme="dark"] select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23e2c18b' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+}
+
+body select:hover:not(:disabled),
+select:hover:not(:disabled) {
+  border-color: var(--pb-accent) !important;
+  box-shadow: 0 3px 12px rgba(121, 45, 71, 0.12) !important;
+}
+
+body select:focus,
+body select:focus-visible,
+select:focus,
+select:focus-visible {
+  outline: none !important;
+  border-color: var(--pb-accent) !important;
+  box-shadow: 0 0 0 3.5px rgba(181, 136, 28, 0.22), 0 4px 16px rgba(181, 136, 28, 0.1) !important;
+}
+
+body select option,
+select option {
+  background-color: var(--pb-surface) !important;
+  color: var(--pb-text) !important;
+  padding: 12px 16px !important;
+  font-family: var(--pb-font-body) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+body select option:checked,
+select option:checked {
+  background: var(--pb-accent) !important;
+  color: var(--pb-on-accent) !important;
+  font-weight: 700 !important;
+}

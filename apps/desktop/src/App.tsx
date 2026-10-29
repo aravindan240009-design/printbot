@@ -29,7 +29,7 @@ import {
   ChevronRight,
   Sparkles
 } from 'lucide-react';
-import { ThemeProvider, ThemeSwitch, MotionSurface, PaperScene, PrintBotLogo, useGsapStagger } from '@xerox/ui';
+import { ThemeProvider, ThemeSwitch, MotionSurface, PaperScene, PrintBotLogo, useGsapStagger, Select } from '@xerox/ui';
 import { discoverPrinters, type NativePrinterInfo } from './native';
 
 // --- Models & Contracts ---
@@ -1023,17 +1023,15 @@ export default function App() {
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
                 Workstation Order Dispatch Mode
               </label>
-              <select
+              <Select
                 value={setupOrderMode}
-                onChange={(e) => setSetupOrderMode(e.target.value as 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC')}
-              >
-                <option value="MANUAL_APPROVAL">
-                  Manual Approval (Operator reviews & clicks Approve before printing)
-                </option>
-                <option value="FULL_AUTOMATIC">
-                  Full Automatic (Directly prints once customer UPI payment is verified)
-                </option>
-              </select>
+                onChange={(val) => setSetupOrderMode(val as 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC')}
+                options={[
+                  { value: 'MANUAL_APPROVAL', label: 'Manual Approval (Operator reviews & clicks Approve)' },
+                  { value: 'FULL_AUTOMATIC', label: 'Full Automatic (Directly prints once UPI payment verified)' }
+                ]}
+                fullWidth
+              />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
@@ -1182,11 +1180,12 @@ export default function App() {
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
                   Duration
                 </label>
-                <select value={newDuration} onChange={(e) => setNewDuration(e.target.value)}>
-                  <option>1 Month</option>
-                  <option>1 Year</option>
-                  <option>Lifetime Commercial</option>
-                </select>
+                <Select
+                  value={newDuration}
+                  onChange={(val) => setNewDuration(val)}
+                  options={['1 Month', '1 Year', 'Lifetime Commercial']}
+                  fullWidth
+                />
               </div>
 
               <button type="submit" className="ws-primary" style={{ minHeight: '44px' }}>
@@ -1501,17 +1500,18 @@ export default function App() {
                     />
                   </div>
 
-                  <select
-                    className="ws-filter"
+                  <Select
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                  >
-                    <option value="ALL">All jobs</option>
-                    <option value="PENDING_APPROVAL">Awaiting review</option>
-                    <option value="QUEUED">Ready to dispatch</option>
-                    <option value="COMPLETED">Completed</option>
-                    <option value="REJECTED">Rejected</option>
-                  </select>
+                    onChange={(val) => setStatusFilter(val)}
+                    options={[
+                      { value: 'ALL', label: 'All jobs' },
+                      { value: 'PENDING_APPROVAL', label: 'Awaiting review' },
+                      { value: 'QUEUED', label: 'Ready to dispatch' },
+                      { value: 'COMPLETED', label: 'Completed' },
+                      { value: 'REJECTED', label: 'Rejected' },
+                    ]}
+                    style={{ minWidth: '170px' }}
+                  />
                 </div>
 
                 {filteredJobs.length === 0 ? (
@@ -1767,13 +1767,15 @@ export default function App() {
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
                       Order Dispatch Mode
                     </label>
-                    <select
+                    <Select
                       value={setupOrderMode}
-                      onChange={(e) => setSetupOrderMode(e.target.value as 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC')}
-                    >
-                      <option value="MANUAL_APPROVAL">Manual Approval</option>
-                      <option value="FULL_AUTOMATIC">Full Automatic</option>
-                    </select>
+                      onChange={(val) => setSetupOrderMode(val as 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC')}
+                      options={[
+                        { value: 'MANUAL_APPROVAL', label: 'Manual Approval' },
+                        { value: 'FULL_AUTOMATIC', label: 'Full Automatic' },
+                      ]}
+                      fullWidth
+                    />
                   </div>
 
                   <button type="submit" className="ws-primary" style={{ marginTop: '10px' }}>
@@ -1790,16 +1792,18 @@ export default function App() {
       {rejectionModalJobId && (
         <Dialog title="Reject print job" onClose={() => setRejectionModalJobId(null)}>
           <p>Select a clear reason for the customer:</p>
-          <select
+          <Select
             value={rejectionReason}
-            onChange={(e) => setRejectionReason(e.target.value)}
+            onChange={(val) => setRejectionReason(val)}
+            options={[
+              'Poor image resolution or blurred scan',
+              'Page bounds or margins exceed printable area',
+              'Incompatible paper size requested',
+              'Payment verification mismatch at counter',
+            ]}
+            fullWidth
             style={{ marginBottom: '16px' }}
-          >
-            <option>Poor image resolution or blurred scan</option>
-            <option>Page bounds or margins exceed printable area</option>
-            <option>Incompatible paper size requested</option>
-            <option>Payment verification mismatch at counter</option>
-          </select>
+          />
           <div className="ws-dialog-actions">
             <button onClick={() => setRejectionModalJobId(null)}>Cancel</button>
             <button className="ws-primary" onClick={handleRejectJob}>

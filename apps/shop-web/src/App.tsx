@@ -22,7 +22,7 @@ import {
   Clock,
   X
 } from 'lucide-react';
-import { PrintBotLogo, ThemeProvider, MotionSurface, StudioHeader, useGsapStagger } from '@xerox/ui';
+import { PrintBotLogo, ThemeProvider, MotionSurface, StudioHeader, useGsapStagger, Select } from '@xerox/ui';
 import '@xerox/ui/src/studio.css';
 
 type Mode = 'FULL_AUTOMATIC' | 'MANUAL_APPROVAL';
@@ -288,15 +288,13 @@ function Console() {
                           onChange={e => setQuery(e.target.value)}
                         />
                       </label>
-                      <select
-                        aria-label="Filter order status"
+                      <Select
+                        ariaLabel="Filter order status"
                         value={filter}
-                        onChange={e => setFilter(e.target.value)}
-                      >
-                        {['All orders', 'Needs approval', 'Queued', 'Payment hold', 'Rejected'].map(s => (
-                          <option key={s}>{s}</option>
-                        ))}
-                      </select>
+                        onChange={setFilter}
+                        options={['All orders', 'Needs approval', 'Queued', 'Payment hold', 'Rejected']}
+                        style={{ minWidth: '175px' }}
+                      />
                     </div>
 
                     <div ref={recordListRef} className="record-list">

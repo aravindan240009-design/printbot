@@ -19,7 +19,7 @@ import {
   RotateCcw,
   X
 } from 'lucide-react';
-import { MotionSurface, StudioHeader, useGsapStagger } from '@xerox/ui';
+import { MotionSurface, StudioHeader, useGsapStagger, Select } from '@xerox/ui';
 import { translations, Language } from './locales';
 import { openShopSession, quoteFiles, scanFile, ServerQuote, ShopSession } from './api';
 
