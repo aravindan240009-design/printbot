@@ -2758,3 +2758,62 @@ html[data-motion=paused] [data-reveal],html[data-motion=paused] .section-heading
     height: 72px !important;
   }
 }
+
+/* ==========================================================================
+   CREATIVE LUXURY MOTION & 3D INTERACTION STYLES
+   ========================================================================== */
+.editorial-line-mask {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+
+.editorial-photo {
+  will-change: transform;
+  transform-style: preserve-3d;
+}
+
+.photo-window {
+  will-change: transform;
+  transform-style: preserve-3d;
+}
+
+.queue {
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+:root[data-theme="light"] .queue {
+  background: #fffdf8 !important;
+  color: #39232d !important;
+  border: 1px solid rgba(121, 45, 71, 0.16) !important;
+  box-shadow: 0 24px 60px rgba(121, 45, 71, 0.08) !important;
+}
+
+:root[data-theme="light"] .queue-header {
+  border-bottom: 1px solid rgba(121, 45, 71, 0.1) !important;
+}
+
+:root[data-theme="light"] .queue-footer {
+  background: #f7eedb !important;
+  color: #553b45 !important;
+  border-top: 1px solid rgba(121, 45, 71, 0.1) !important;
+}
+
+:root[data-theme="light"] .queue-item strong {
+  color: #39232d !important;
+}
+
+:root[data-theme="light"] .mode-switch {
+  background: #ecdcc3 !important;
+}
+
+@keyframes laser-glow-pulse {
+  0%, 100% { opacity: 0.85; filter: drop-shadow(0 0 10px #e2c18b); }
+  50% { opacity: 1; filter: drop-shadow(0 0 20px #e2c18b); }
+}
+
+.qr-laser-scanner {
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.25), inset 0 0 0 1px rgba(226, 193, 139, 0.25);
+  border-radius: 20px;
+}

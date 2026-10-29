@@ -26,6 +26,7 @@ import { FloatingDecorations } from './components/FloatingDecorations';
 import { InteractiveExperience } from './components/InteractiveExperience';
 import { MarqueeShowcase } from './components/MarqueeShowcase';
 import { ShopRoiCalculator } from './components/ShopRoiCalculator';
+import { AutopilotControl } from './components/AutopilotControl';
 import { TypingClosingSection } from './components/TypingClosingSection';
 import { SplashScreen } from './components/SplashScreen';
 import { SubscriptionModal } from './components/SubscriptionModal';
@@ -66,7 +67,6 @@ export default function App() {
     }
   }, [siteTheme]);
 
-  const [mode, setMode] = useState<'automatic' | 'manual'>('automatic');
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
   const [dialog, setDialog] = useState(false);
   const [printed, setPrinted] = useState(false);
@@ -312,79 +312,7 @@ export default function App() {
         <MarqueeShowcase />
 
         {/* Order Mode Control Section */}
-        <section id="control" className="control-section">
-          <div className="shell control-grid section-space" data-reveal>
-            <div>
-              <h2>
-                On autopilot.
-                <br />
-                Or in your hands.
-              </h2>
-              <p>Your counter, your call. Choose the order mode that fits the way you work.</p>
-              <div className="mode-switch" role="group" aria-label="Explore order modes">
-                <button aria-pressed={mode === 'automatic'} onClick={() => setMode('automatic')}>
-                  Full automatic
-                </button>
-                <button aria-pressed={mode === 'manual'} onClick={() => setMode('manual')}>
-                  Manual approval
-                </button>
-              </div>
-              <p className="mode-explainer" aria-live="polite">
-                {mode === 'automatic'
-                  ? 'Eligible, compatible jobs with verified payment move into your print workflow without staff approval.'
-                  : 'Staff approve or reject every submitted job. You keep the final say before printing.'}
-              </p>
-              <small>Demo selector only. Real mode changes require authorized, audited shop access.</small>
-            </div>
-
-            <div className="queue" data-ui>
-              <div className="queue-header">
-                <div className="queue-mark">
-                  <Printer size={19} />
-                </div>
-                <span>Your counter. Connected.</span>
-                <span className="queue-status">Illustration</span>
-              </div>
-              <div className="queue-title">
-                <h3>
-                  A clear head.
-                  <br />
-                  A clearer queue.
-                </h3>
-                <span className="signal" />
-              </div>
-              {[
-                {
-                  name: 'Project proposal.pdf',
-                  detail: 'A4 · Black & white · Duplex',
-                  label: mode === 'automatic' ? 'Eligible for dispatch' : 'Awaiting approval',
-                },
-                {
-                  name: 'Brand portfolio.pdf',
-                  detail: 'A4 · Colour · 1 copy',
-                  label: 'Payment verified',
-                },
-                {
-                  name: 'Workshop notes.pdf',
-                  detail: 'A4 · Black & white · 4 copies',
-                  label: 'Awaiting payment',
-                },
-              ].map((job, i) => (
-                <div className="queue-row" key={job.name}>
-                  <div className="file-icon">PDF</div>
-                  <div>
-                    <strong>{job.name}</strong>
-                    <span>{job.detail}</span>
-                  </div>
-                  <span className={i === 2 ? 'job-status pending' : 'job-status'}>{job.label}</span>
-                </div>
-              ))}
-              <div className="queue-footer">
-                <ShieldCheck size={16} /> Cash and unverified jobs follow your approval policy.
-              </div>
-            </div>
-          </div>
-        </section>
+        <AutopilotControl />
 
         {/* Small Details Section */}
         <section className="details-section shell section-space" data-reveal>
