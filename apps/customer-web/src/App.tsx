@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import {
   Upload,
   Camera,
@@ -13,11 +13,13 @@ import {
   Printer,
   CheckCircle2,
   QrCode,
+  Banknote,
   Clock,
   Sparkles,
-  RotateCcw
+  RotateCcw,
+  X
 } from 'lucide-react';
-import { MotionSurface, PrinterScene, StudioHeader, useGsapStagger } from '@xerox/ui';
+import { MotionSurface, StudioHeader, useGsapStagger } from '@xerox/ui';
 import { translations, Language } from './locales';
 import { openShopSession, quoteFiles, scanFile, ServerQuote, ShopSession } from './api';
 
@@ -76,70 +78,70 @@ const defaultShopSession: ShopSession = {
 
 const copy = {
   en: {
-    welcome: 'A little less waiting. A lot more doing.',
-    intro: 'Your documents, your way. Choose a file, set the details, and get ready for your next print.',
-    select: 'Choose your documents',
-    selected: 'Selected files',
-    configure: 'Make it yours.',
-    review: 'Review your choices.',
-    advanced: 'More print options',
-    next: 'Continue',
-    back: 'Back',
-    pending: 'Instant quote ready',
-    workflow: 'What happens next',
-    workflowInfo: 'Once submitted, your job is sent directly to the shop workstation printer spooler.',
-    options: 'Print preferences',
-    payment: 'Preferred payment method',
-    empty: 'No files selected yet',
-    fileInfo: 'PDF, PNG, JPG, DOCX, XLSX, PPTX · 100 MB per file',
-    verifiedInfo: 'Page count & rate calculated from shop pricing table.',
+    welcome: 'Your documents. Beautifully printed.',
+    intro: 'Upload your documents, choose B&W or color print settings, and collect directly from the counter.',
+    select: 'Select Documents',
+    selected: 'Uploaded Files',
+    configure: 'Print Settings',
+    review: 'Review & Pay',
+    advanced: 'Page Layout & Duplex Options',
+    next: 'Continue to Options',
+    back: 'Back to Documents',
+    pending: 'Price Quote Ready',
+    workflow: 'Direct to Counter Printer',
+    workflowInfo: 'Once submitted, your job is sent directly to the shop printer queue.',
+    options: 'Print Settings',
+    payment: 'Select Payment Method',
+    empty: 'No documents uploaded yet',
+    fileInfo: 'PDF, Word, Excel, PPT, JPG, PNG · Up to 100 MB per file',
+    verifiedInfo: 'Calculated in real-time according to shop pricing.',
     example: 'Anna University Quick Xerox · Guindy',
-    privacy: 'No customer account or login required',
-    clear: 'Clear selection',
+    privacy: '100% Private · Zero Account Required',
+    clear: 'Clear queue',
   },
   ta: {
-    welcome: 'காத்திருப்பது குறைவு. செய்வது அதிகம்.',
-    intro: 'உங்கள் ஆவணங்கள், உங்கள் விருப்பம். கோப்பைத் தேர்ந்தெடுத்து அச்சிடும் அமைப்புகளை மாற்றவும்.',
-    select: 'உங்கள் ஆவணங்களைத் தேர்ந்தெடுக்கவும்',
-    selected: 'தேர்ந்தெடுத்த கோப்புகள்',
-    configure: 'உங்கள் விருப்பப்படி.',
-    review: 'விருப்பங்களைச் சரிபார்க்கவும்.',
-    advanced: 'கூடுதல் அச்சிடும் விருப்பங்கள்',
+    welcome: 'துல்லியமான அச்சுக்கலை. உடனடி ஜெராக்ஸ்.',
+    intro: 'உயர்தர ஆவண அச்சிடுதல். உங்கள் கோப்புகளைப் பதிவேற்றி, கவுண்டரில் உடனடியாகப் பெற்றுக் கொள்ளுங்கள்.',
+    select: 'முதன்மை ஆவணங்களைத் தேர்ந்தெடுக்கவும்',
+    selected: 'வரிசையில் உள்ள கோப்புகள்',
+    configure: 'அச்சிடும் அமைப்புகள்',
+    review: 'விருப்பங்களைச் சரிபார்க்கவும்',
+    advanced: 'கூடுதல் அச்சிடும் தேர்வுகள்',
     next: 'தொடரவும்',
     back: 'பின்செல்',
-    pending: 'விலை விவரம் தயார்',
-    workflow: 'அடுத்து என்ன நடக்கும்',
-    workflowInfo: 'உறுதிசெய்தவுடன் ஆவணம் நேரடியாக கடையின் பிரிண்டர் வரிசையில் சேரும்.',
+    pending: 'உறுதிசெய்யப்பட்ட விலை தயார்',
+    workflow: 'நேரடி இயந்திர அச்சிடுதல்',
+    workflowInfo: 'உறுதிசெய்தவுடன் கோப்பு நேரடியாக பிரிண்டர் வரிசையில் சேரும்.',
     options: 'அச்சிடும் விருப்பங்கள்',
-    payment: 'விருப்பமான கட்டண முறை',
-    empty: 'கோப்புகள் தேர்ந்தெடுக்கப்படவில்லை',
-    fileInfo: 'PDF, PNG, JPG, DOCX, XLSX, PPTX · கோப்புக்கு 100 MB',
-    verifiedInfo: 'கடை விலை அட்டவணையின்படி பக்க எண்ணிக்கை மற்றும் விலை கணக்கிடப்பட்டது.',
+    payment: 'கட்டண முறை',
+    empty: 'கோப்புகள் எதுவும் சேர்க்கப்படவில்லை',
+    fileInfo: 'PDF, PNG, JPG, DOCX, XLSX, PPTX · கோப்புக்கு 100 MB வரை',
+    verifiedInfo: 'கடை விலை அட்டவணையின்படி கணக்கிடப்பட்டது.',
     example: 'அண்ணா பல்கலைக்கழக ஜெராக்ஸ் · கிண்டி',
     privacy: 'வாடிக்கையாளருக்குக் கணக்கு தேவையில்லை',
-    clear: 'தேர்வை அழிக்கவும்',
+    clear: 'வரிசையை அழிக்கவும்',
   },
   hi: {
-    welcome: 'कम इंतज़ार। ज़्यादा काम।',
-    intro: 'आपके दस्तावेज़, आपकी पसंद। फ़ाइल चुनें और प्रिंट विकल्प तय करें।',
-    select: 'अपने दस्तावेज़ चुनें',
-    selected: 'चुनी गई फ़ाइलें',
-    configure: 'अपनी पसंद चुनें।',
-    review: 'अपने विकल्प देखें।',
-    advanced: 'और प्रिंट विकल्प',
+    welcome: 'सटीक प्रिंटिंग। शून्य प्रतीक्षा।',
+    intro: 'उत्कृष्ट गुणवत्ता वाले दस्तावेज़ प्रिंट। अपनी फ़ाइलें अपलोड करें और काउंटर से तुरंत प्राप्त करें।',
+    select: 'अपने मुख्य दस्तावेज़ चुनें',
+    selected: 'कतारबद्ध फ़ाइलें',
+    configure: 'विस्तृत प्रिंट विकल्प',
+    review: 'अपने विकल्प देखें',
+    advanced: 'अतिरिक्त परिष्करण विकल्प',
     next: 'आगे बढ़ें',
     back: 'वापस',
-    pending: 'मूल्य विवरण तैयार है',
-    workflow: 'आगे क्या होगा',
+    pending: 'प्रमाणित दर सूची तैयार है',
+    workflow: 'सीधे मशीन पर प्रिंट',
     workflowInfo: 'ऑर्डर के बाद फ़ाइल सीधे दुकान के प्रिंटर स्पूलर में पहुँच जाएगी।',
     options: 'प्रिंट प्राथमिकताएँ',
     payment: 'पसंदीदा भुगतान तरीका',
-    empty: 'अभी कोई फ़ाइल नहीं चुनी गई',
+    empty: 'कतार में कोई फ़ाइल नहीं है',
     fileInfo: 'PDF, PNG, JPG, DOCX, XLSX, PPTX · प्रति फ़ाइल 100 MB',
-    verifiedInfo: 'दुकान की दर सूची के अनुसार पृष्ठ और मूल्य की गणना की गई।',
+    verifiedInfo: 'दुकान की दर सूची के अनुसार सटीक गणना।',
     example: 'अन्ना यूनिवर्सिटी ज़ेरॉक्स · गिंडी',
-    privacy: 'ग्राहक को खाते की ज़रूरत नहीं',
-    clear: 'चयन हटाएँ',
+    privacy: 'किसी खाते की आवश्यकता नहीं · अल्पकालिक मेमोरी',
+    clear: 'कतार साफ़ करें',
   },
 };
 
@@ -281,9 +283,136 @@ function CustomerFlow() {
   const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
   const [scanning, setScanning] = useState(false);
 
+  // Live WebRTC Camera Scanner State
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
+  const [cameraLoading, setCameraLoading] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [capturedPreview, setCapturedPreview] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    if (videoRef.current && cameraStream && !capturedPreview) {
+      videoRef.current.srcObject = cameraStream;
+      videoRef.current.play().catch((err) => console.warn('Video play warning:', err));
+    }
+  }, [cameraStream, cameraOpen, capturedPreview]);
+
+  const startCamera = async (facing: 'environment' | 'user' = cameraFacing) => {
+    setCameraError(null);
+    setCapturedPreview(null);
+    setCameraOpen(true);
+    setCameraLoading(true);
+
+    try {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop());
+      }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera access is not supported in this browser environment. You can upload photo files directly.');
+      }
+
+      const streamPromise = navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: facing },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+        audio: false,
+      });
+
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error(
+                'Camera request timed out or device not responding. Please allow camera permissions or upload an image.'
+              )
+            ),
+          6000
+        )
+      );
+
+      const stream = await Promise.race([streamPromise, timeoutPromise]);
+      setCameraStream(stream);
+      setCameraLoading(false);
+    } catch (err: any) {
+      console.warn('Camera error:', err);
+      setCameraLoading(false);
+      setCameraError(err?.message || 'Unable to access camera. Please check camera permissions or upload an image file.');
+    }
+  };
+
+  const closeCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setCameraStream(null);
+    }
+    setCameraLoading(false);
+    setCameraOpen(false);
+    setCapturedPreview(null);
+    setCameraError(null);
+  };
+
+  const flipCamera = () => {
+    const nextFacing = cameraFacing === 'environment' ? 'user' : 'environment';
+    setCameraFacing(nextFacing);
+    startCamera(nextFacing);
+  };
+
+  const captureFrame = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    setCapturedPreview(dataUrl);
+  };
+
+  const confirmCapturedPhoto = () => {
+    if (!capturedPreview) return;
+    fetch(capturedPreview)
+      .then((res) => res.blob())
+      .then((blob) => {
+        const file = new File([blob], `camera-scan-${Date.now()}.jpg`, { type: 'image/jpeg' });
+        selectFiles([file]);
+        closeCamera();
+      })
+      .catch(() => {
+        closeCamera();
+      });
+  };
+
+  const retakePhoto = () => {
+    setCapturedPreview(null);
+  };
+
+  // Sync video stream when camera opens
+  useEffect(() => {
+    if (cameraOpen && cameraStream && videoRef.current) {
+      videoRef.current.srcObject = cameraStream;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [cameraOpen, cameraStream, capturedPreview]);
+
+  // Clean up media stream when component unmounts
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [cameraStream]);
+
   const fileListRef = useGsapStagger<HTMLUListElement>({ selector: 'li', stagger: 0.05, y: 10 });
   const t = translations[lang];
   const c = copy[lang];
+  const isPreviewSession = session.session_token === defaultShopSession.session_token;
   const active = files.find((f) => f.id === activeId) || files[0];
 
   useEffect(() => {
@@ -308,7 +437,7 @@ function CustomerFlow() {
     return calculateLocalQuote(files);
   }, [files, serverQuote]);
 
-  const selectFiles = async (selected: FileList | null) => {
+  const selectFiles = async (selected: FileList | File[] | null) => {
     if (!selected) return;
     const accepted: DocumentSelection[] = [];
     const rejected: string[] = [];
@@ -447,23 +576,56 @@ function CustomerFlow() {
         </label>
       </StudioHeader>
 
+      {isPreviewSession && (
+        <div className="customer-preview-notice" role="note">
+          <ShieldCheck size={19} aria-hidden="true" />
+          <div>
+            <strong>{lang === 'ta' ? 'முன்னோட்ட அமர்வு' : lang === 'hi' ? 'पूर्वावलोकन सत्र' : 'Preview session'}</strong>
+            <p>{lang === 'ta' ? 'விலைகளும் மாதிரி ஆர்டர்களும் இந்தச் சாதனத்தில் மட்டுமே. பணம் சரிபார்க்கப்படாது; உண்மையான அச்சிடுதல் தொடங்காது. ஆர்டர் செய்ய கடையின் QR குறியீட்டை ஸ்கேன் செய்யவும்.' : lang === 'hi' ? 'कीमतें और नमूना ऑर्डर इस डिवाइस पर ही हैं। भुगतान सत्यापित नहीं होता और वास्तविक प्रिंट नहीं भेजा जाता। ऑर्डर के लिए दुकान का QR स्कैन करें।' : 'Prices and sample orders are local to this device. No payment is verified and no real print job is dispatched. Scan the shop’s QR to begin an order.'}</p>
+          </div>
+        </div>
+      )}
       <div className="customer-layout">
         <aside className="customer-welcome">
-          <span className="customer-eyebrow">
-            <Printer size={16} /> {session.shop_name.toUpperCase()}
-          </span>
-          <h1>{c.welcome}</h1>
-          <p>{c.intro}</p>
-          <PrinterScene compact />
-          <div className="customer-trust">
-            <ShieldCheck size={20} />
-            <span>{c.privacy}</span>
+          <div className="customer-eyebrow-row">
+            <span className="customer-eyebrow">
+              <Printer size={13} /> DOCUMENT PRINTING
+            </span>
+            <span className="customer-live-pill">
+              <span className="live-pulse"></span>
+              Shop print portal
+            </span>
           </div>
-          <div className="customer-side-note">
-            <strong>01 — 02 — 03</strong>
-            <p>
-              {t.step1_upload} → {t.step2_config} → {t.step3_pay}
-            </p>
+          <h1 className="customer-headline">
+            <span className="headline-main">{c.welcome}</span>
+          </h1>
+          <p className="customer-intro">{c.intro}</p>
+
+          {/* Clean Authentic Indian Counter Rate Card */}
+          <div className="customer-dispatch-card" style={{ padding: '18px', background: 'var(--pb-surface)', borderRadius: '16px', border: '1px solid var(--pb-border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid var(--pb-border)' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--pb-text)' }}>Standard Counter Rates</span>
+              <span style={{ fontSize: '11px', color: '#10b981', background: 'rgba(16, 185, 129, 0.12)', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>{isPreviewSession ? 'Sample' : 'Rate guide'}</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '12px' }}>
+              <div style={{ background: 'var(--pb-raised)', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--pb-border)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--pb-muted)' }}>Black &amp; White</div>
+                <div style={{ fontSize: '16px', fontWeight: 750, color: 'var(--pb-text)', marginTop: '2px' }}>₹1.50 <small style={{ fontSize: '11px', fontWeight: 400, color: 'var(--pb-muted)' }}>/ page</small></div>
+              </div>
+              <div style={{ background: 'var(--pb-raised)', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--pb-border)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--pb-muted)' }}>Full Color</div>
+                <div style={{ fontSize: '16px', fontWeight: 750, color: 'var(--pb-accent)', marginTop: '2px' }}>₹7.00 <small style={{ fontSize: '11px', fontWeight: 400, color: 'var(--pb-muted)' }}>/ page</small></div>
+              </div>
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--pb-muted)', display: 'flex', justifyContent: 'space-between' }}>
+              <span>Paper: A4 · A3 · Legal</span>
+              <span>Duplex (2-Sided) Available</span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '11px 14px', background: 'var(--pb-raised)', borderRadius: '12px', border: '1px solid var(--pb-border)', color: 'var(--pb-muted)', fontSize: '12.5px', marginTop: '16px' }}>
+            <ShieldCheck size={16} color="#10b981" style={{ flexShrink: 0 }} />
+            <span style={{ color: 'var(--pb-text)', fontWeight: 500 }}>Your files belong to this shop session. No account required.</span>
           </div>
         </aside>
 
@@ -478,8 +640,8 @@ function CustomerFlow() {
                   aria-current={step === i + 1 ? 'step' : undefined}
                   onClick={() => setStep(i + 1)}
                 >
-                  <span>{String(i + 1).padStart(2, '0')}</span>
-                  {label.replace(/^\d\.\s*/, '')}
+                  <span className="step-num">{i === 0 ? <Upload size={15} /> : i === 1 ? <SlidersHorizontal size={15} /> : <LockKeyhole size={15} />}<span>{String(i + 1).padStart(2, '0')}</span></span>
+                  <span className="step-label">{label.replace(/^\d\.\s*/, '')}</span>
                 </button>
               ))}
             </nav>
@@ -490,8 +652,13 @@ function CustomerFlow() {
             {step === 1 && (
               <>
                 <div className="customer-section-heading">
-                  <h2>{c.select}</h2>
+                  <div>
+                    <span className="section-step-badge">01 / 03</span>
+                    <h2>{c.select}</h2>
+                  </div>
+                  <span className="section-meta-hint">No account required · Price estimate</span>
                 </div>
+
                 <label className="customer-upload">
                   <input
                     aria-label={t.upload_cta}
@@ -503,27 +670,35 @@ function CustomerFlow() {
                       e.target.value = '';
                     }}
                   />
-                  <span className="customer-upload-icon">
-                    <Upload size={30} />
-                  </span>
-                  <strong>{t.upload_cta}</strong>
-                  <span>{c.fileInfo}</span>
+                  <div className="customer-upload-seal">
+                    <span className="customer-upload-icon">
+                      <Upload size={28} />
+                    </span>
+                  </div>
+                  <strong className="upload-title">{t.upload_cta}</strong>
+                  <p className="upload-subtitle">Choose documents from your phone or computer</p>
+                  <div className="upload-format-chips">
+                    <span>PDF</span>
+                    <span>DOCX</span>
+                    <span>XLSX</span>
+                    <span>PPTX</span>
+                    <span>PNG</span>
+                    <span>JPG</span>
+                    <span className="format-limit">Up to 100 MB</span>
+                  </div>
                 </label>
 
-                <label className="customer-camera">
-                  <Camera size={20} />
-                  {t.camera_cta}
-                  <input
-                    aria-label={t.camera_cta}
-                    type="file"
-                    accept="image/png,image/jpeg"
-                    capture="environment"
-                    onChange={(e) => {
-                      selectFiles(e.target.files);
-                      e.target.value = '';
-                    }}
-                  />
-                </label>
+                <button
+                  type="button"
+                  className="customer-camera"
+                  onClick={() => startCamera('environment')}
+                >
+                  <div className="camera-icon-disc">
+                    <Camera size={18} />
+                  </div>
+                  <span>{t.camera_cta}</span>
+                  <span className="camera-pill-hint">Scan Paper</span>
+                </button>
 
                 {error && (
                   <p role="alert" className="customer-error">
@@ -533,45 +708,64 @@ function CustomerFlow() {
 
                 <div className="customer-files-heading">
                   <h3>
-                    {c.selected} <span>{files.length.toString().padStart(2, '0')}</span>
+                    {c.selected} <span className="files-counter">{files.length}</span>
                   </h3>
-                  {files.length > 0 && <button onClick={() => setFiles([])}>{c.clear}</button>}
+                  {files.length > 0 && <button onClick={() => setFiles([])} className="btn-clear-queue">{c.clear}</button>}
                 </div>
 
                 {!files.length && (
-                  <p className="customer-empty">
-                    <FileText size={24} />
-                    {c.empty}
-                  </p>
+                  <div className="customer-empty-bay">
+                    <div className="empty-bay-icon">
+                      <FileText size={24} />
+                    </div>
+                    <div className="empty-bay-info">
+                      <strong>{c.empty}</strong>
+                      <p>Upload your files above to calculate page count and preview your print</p>
+                    </div>
+                  </div>
                 )}
 
                 <ul ref={fileListRef} className="customer-file-list">
                   {files.map((file, index) => (
-                    <li key={file.id}>
-                      <FileText size={24} />
-                      <div>
-                        <strong>{file.name}</strong>
-                        <span>
-                          {file.format} · {file.size} · {file.pageCount || 1} {file.pageCount === 1 ? 'page' : 'pages'}
-                        </span>
+                    <li key={file.id} className="customer-file-card">
+                      <div className="file-badge-crest">
+                        <FileText size={20} />
+                        <span className="file-ext-tag">{file.format.toUpperCase()}</span>
+                      </div>
+                      <div className="file-details">
+                        <strong className="file-title">{file.name}</strong>
+                        <div className="file-meta-row">
+                          <span className="file-meta-pill">{file.size}</span>
+                          <span className="file-meta-pill page-pill">
+                            {file.pageCount || 1} {file.pageCount === 1 ? 'Page' : 'Pages'}
+                          </span>
+                          <span className="file-status-pill">Ready to Print</span>
+                        </div>
                       </div>
                       <div className="customer-file-actions">
                         <button
                           aria-label={`Move ${file.name} up`}
                           disabled={index === 0}
                           onClick={() => move(index, -1)}
+                          title="Move up in print queue"
                         >
-                          <ArrowUp size={17} />
+                          <ArrowUp size={16} />
                         </button>
                         <button
                           aria-label={`Move ${file.name} down`}
                           disabled={index === files.length - 1}
                           onClick={() => move(index, 1)}
+                          title="Move down in print queue"
                         >
-                          <ArrowDown size={17} />
+                          <ArrowDown size={16} />
                         </button>
-                        <button aria-label={`Remove ${file.name}`} onClick={() => remove(file.id)}>
-                          <Trash2 size={18} />
+                        <button
+                          aria-label={`Remove ${file.name}`}
+                          onClick={() => remove(file.id)}
+                          className="btn-remove"
+                          title="Remove document"
+                        >
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     </li>
@@ -584,7 +778,7 @@ function CustomerFlow() {
             {step === 2 && active && (
               <>
                 <div className="customer-section-heading">
-                  <h2>{c.configure}</h2>
+                  <div><span className="section-step-badge">02 / 03</span><h2>{c.configure}</h2></div>
                 </div>
                 <label className="customer-field">
                   {c.selected}
@@ -784,7 +978,7 @@ function CustomerFlow() {
             {step === 3 && (
               <>
                 <div className="customer-section-heading">
-                  <h2>{c.review}</h2>
+                  <div><span className="section-step-badge">03 / 03</span><h2>{c.review}</h2></div>
                 </div>
                 <div className="customer-summary">
                   {files.map((file) => (
@@ -809,7 +1003,7 @@ function CustomerFlow() {
 
                 <div className="customer-quote">
                   <LockKeyhole size={25} />
-                  <h3>Order Bill Summary</h3>
+                  <h3>Your print summary</h3>
                   <p>Accurate price locked according to {session.shop_name} rate table.</p>
                   <dl>
                     {[
@@ -840,7 +1034,7 @@ function CustomerFlow() {
                       aria-pressed={payment === 'cash'}
                       onClick={() => setPayment('cash')}
                     >
-                      <Printer size={18} />
+                      <Banknote size={18} />
                       {t.pay_cash}
                     </button>
                   </div>
@@ -896,9 +1090,9 @@ function CustomerFlow() {
                   >
                     <Sparkles size={32} />
                   </div>
-                  <h2 style={{ fontSize: '28px', marginBottom: '8px' }}>Order Submitted!</h2>
+                  <h2 style={{ fontSize: '28px', marginBottom: '8px' }}>{isPreviewSession ? 'Sample order saved' : 'Order Submitted!'}</h2>
                   <p style={{ color: 'var(--pb-muted)', fontSize: '14px' }}>
-                    Sent directly to <strong>{placedOrder.shopName}</strong> workstation spooler.
+                    {isPreviewSession ? 'This preview stays on your device. No payment was verified and no print job was dispatched.' : <>Sent directly to <strong>{placedOrder.shopName}</strong> workstation spooler.</>}
                   </p>
                 </div>
 
@@ -942,7 +1136,7 @@ function CustomerFlow() {
 
                 <div className="customer-quote" style={{ marginTop: '0' }}>
                   <Clock size={24} />
-                  <h3>Live Print Status</h3>
+                  <h3>{isPreviewSession ? 'Sample order status' : 'Live Print Status'}</h3>
                   <div style={{ display: 'grid', gap: '12px', marginTop: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <CheckCircle2 size={18} color="var(--pb-success)" />
@@ -950,11 +1144,11 @@ function CustomerFlow() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <Printer size={18} color="var(--pb-accent)" />
-                      <strong>{t.order_approved} · Counter Spooler Active</strong>
+                      <strong>{isPreviewSession ? 'Preview only · No printer dispatch' : `${t.order_approved} · Counter Spooler Active`}</strong>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--pb-muted)' }}>
                       <Clock size={18} />
-                      <span>{t.ready} (Show PIN {placedOrder.pickupPin} at Counter)</span>
+                      <span>{isPreviewSession ? 'Collection is unavailable in preview' : `${t.ready} (Show PIN ${placedOrder.pickupPin} at Counter)`}</span>
                     </div>
                   </div>
                 </div>
@@ -988,7 +1182,7 @@ function CustomerFlow() {
                     border: '1px solid var(--pb-border)',
                   }}
                 >
-                  <span>Total Paid ({placedOrder.paymentMethod}):</span>
+                  <span>{isPreviewSession ? 'Sample total · Unpaid' : `Total Paid (${placedOrder.paymentMethod}):`}</span>
                   <strong style={{ fontSize: '18px' }}>₹{placedOrder.totalRupees.toFixed(2)}</strong>
                 </div>
 
@@ -1031,7 +1225,7 @@ function CustomerFlow() {
                     disabled={!files.length || !rangeValid}
                     onClick={() => setStep(step + 1)}
                   >
-                    {c.next}
+                    {lang === 'en' && step === 2 ? 'Review order' : c.next}
                     <ArrowRight size={18} />
                   </button>
                 )}
@@ -1050,6 +1244,132 @@ function CustomerFlow() {
           )}
         </main>
       </div>
+
+      {/* Interactive Live WebRTC Camera Document Scanner Modal */}
+      {cameraOpen && (
+        <div className="customer-camera-modal" role="dialog" aria-modal="true" aria-label="Camera Document Scanner">
+          <div className="camera-card">
+            <div className="camera-header">
+              <div className="camera-header-title">
+                <span className="camera-live-dot" />
+                <span>Live Document Scanner</span>
+              </div>
+              <div className="camera-header-actions">
+                {!capturedPreview && (
+                  <button
+                    type="button"
+                    className="camera-btn-icon"
+                    onClick={flipCamera}
+                    title="Flip camera (front / back)"
+                    aria-label="Flip camera"
+                  >
+                    <RotateCcw size={18} />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="camera-btn-icon"
+                  onClick={closeCamera}
+                  title="Close camera"
+                  aria-label="Close camera"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div className="camera-viewport">
+              {cameraError ? (
+                <div className="camera-error-view">
+                  <div className="camera-error-icon-box">
+                    <Camera size={36} />
+                  </div>
+                  <strong style={{ fontSize: '15px', color: '#fff' }}>Camera Access Blocked</strong>
+                  <p className="camera-error-text">{cameraError}</p>
+                  <label className="btn-camera-fallback">
+                    <Upload size={16} />
+                    <span>Choose photo from device</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        selectFiles(e.target.files);
+                        closeCamera();
+                      }}
+                    />
+                  </label>
+                </div>
+              ) : capturedPreview ? (
+                <div className="camera-preview-container">
+                  <img src={capturedPreview} alt="Captured Document" className="camera-preview-img" />
+                  <div className="preview-watermark-chip">Scanned Document Ready</div>
+                </div>
+              ) : cameraLoading || !cameraStream ? (
+                <div className="camera-loading-view">
+                  <div className="camera-radar-pulse" />
+                  <div className="camera-loading-content">
+                    <Camera size={40} className="camera-icon-pulse" />
+                    <strong style={{ fontSize: '15px', color: '#fff', marginTop: '12px', display: 'block' }}>
+                      Connecting to Camera Sensor...
+                    </strong>
+                    <p style={{ fontSize: '12px', color: '#94a3b8', margin: '6px 0 0', maxWidth: '320px', lineHeight: 1.5 }}>
+                      Please click "Allow" if prompted by your browser for camera permissions.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="camera-video"
+                  />
+                  <div className="camera-reticle">
+                    <span className="reticle-corner tl" />
+                    <span className="reticle-corner tr" />
+                    <span className="reticle-corner bl" />
+                    <span className="reticle-corner br" />
+                  </div>
+                  <div className="camera-guide-text">
+                    Align document or certificate within guidelines
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="camera-controls">
+              {capturedPreview ? (
+                <div className="camera-action-group">
+                  <button type="button" className="btn-camera-retake" onClick={retakePhoto}>
+                    <RotateCcw size={16} />
+                    <span>Retake Photo</span>
+                  </button>
+                  <button type="button" className="btn-camera-accept" onClick={confirmCapturedPhoto}>
+                    <CheckCircle2 size={16} />
+                    <span>Add to Print Order</span>
+                  </button>
+                </div>
+              ) : !cameraError && !cameraLoading ? (
+                <div className="camera-shutter-container">
+                  <button
+                    type="button"
+                    className="camera-shutter-btn"
+                    onClick={captureFrame}
+                    aria-label="Snap photo"
+                    title="Capture document"
+                  >
+                    <div className="shutter-inner" />
+                  </button>
+                  <span className="shutter-hint">TAP TO SNAP DOCUMENT</span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

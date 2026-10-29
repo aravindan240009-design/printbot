@@ -25,21 +25,23 @@ export const Footer: React.FC<FooterProps> = ({ onRequestAccessClick }) => {
           <div className="footer-links-col">
             <div className="footer-col-heading">Product</div>
             <ul className="footer-col-list">
-              <li><a href="#the-problem">The Problem</a></li>
-              <li><a href="#how-it-works">How It Works</a></li>
+              <li><a href="#hero">Overview</a></li>
+              <li><a href="#workflow">How It Works</a></li>
               <li><a href="#features">Capabilities</a></li>
               <li><a href="#pricing">Pricing Plans</a></li>
+              <li><a href="#requirements">Hardware Specs</a></li>
+              <li><a href="#faq">FAQ</a></li>
             </ul>
           </div>
 
           <div className="footer-links-col">
-            <div className="footer-col-heading">Platform &amp; Access</div>
+            <div className="footer-col-heading">Live Applications</div>
             <ul className="footer-col-list">
-              <li><a href="#download">Windows Download</a></li>
-              <li><a href="#requirements">System Requirements</a></li>
-              <li><a href="#faq">Frequently Asked Questions</a></li>
+              <li><a href="http://localhost:5174/" target="_blank" rel="noreferrer">Customer Mobile Upload (:5174) ↗</a></li>
+              <li><a href="http://localhost:5175/" target="_blank" rel="noreferrer">Counter Workstation (:5175) ↗</a></li>
+              <li><a href="http://localhost:5176/" target="_blank" rel="noreferrer">Shop Owner Portal (:5176) ↗</a></li>
               {onRequestAccessClick && (
-                <li>
+                <li style={{ marginTop: '8px' }}>
                   <button
                     type="button"
                     onClick={onRequestAccessClick}

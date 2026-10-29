@@ -55,11 +55,7 @@ export function useGsapStagger<T extends HTMLElement = HTMLDivElement>(
 
     const ctx = gsap.context(() => {
       if (prefersReducedMotion) {
-        gsap.fromTo(
-          targets,
-          { opacity: 0 },
-          { opacity: 1, duration: 0.25, stagger: 0.04, delay, ease: 'none' }
-        );
+        gsap.set(targets, { opacity: 1, y: 0 });
       } else {
         gsap.fromTo(
           targets,

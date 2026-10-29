@@ -1,0 +1,70 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-10-29T12:00:00Z",
+    "component": {
+      "type": "application",
+      "name": "printbot-marketing-landing",
+      "version": "1.0.0"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "three",
+      "version": "0.170.0",
+      "purl": "pkg:npm/three@0.170.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "@types/three",
+      "version": "0.170.0",
+      "purl": "pkg:npm/%40types/three@0.170.0",
+      "scope": "excluded",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "Manrope.ttf",
+      "licenses": [
+        {
+          "license": {
+            "id": "OFL-1.1"
+          }
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "PlayfairDisplay.ttf",
+      "licenses": [
+        {
+          "license": {
+            "id": "OFL-1.1"
+          }
+        }
+      ]
+    }
+  ],
+  "properties": [
+    {
+      "name": "scope",
+      "value": "Bounded additions inventory only. Existing React/Vite/lucide and transitive workspace dependencies remain in pnpm-lock.yaml and the platform audit. This is not a complete deployment SBOM."
+    }
+  ]
+}

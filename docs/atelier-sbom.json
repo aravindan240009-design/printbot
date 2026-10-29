@@ -1,0 +1,141 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "components": [
+    {
+      "name": "react",
+      "type": "library",
+      "version": "18.3.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "name": "lucide-react",
+      "type": "library",
+      "version": "0.378.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC"
+          }
+        }
+      ]
+    },
+    {
+      "name": "motion",
+      "type": "library",
+      "version": "14.6.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "name": "three",
+      "type": "library",
+      "version": "0.170.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "name": "gsap",
+      "type": "library",
+      "version": "3.15.0",
+      "licenses": [
+        {
+          "license": {
+            "url": "https://gsap.com/standard-license",
+            "name": "Custom Standard no-charge license; release clearance unresolved"
+          }
+        }
+      ]
+    },
+    {
+      "name": "packages/ui/src/fonts/Manrope.ttf",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "3AE11C49DB0455A3CC33E37D380F20FDB8C7F8B41DC07625C177E3D87A9D6AE6"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "name": "packages/ui/src/fonts/PlayfairDisplay.ttf",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "C40F2293766A503BC70CCE9E512EF844A4CCB7CBCDE792FE2EA31D191917D8D6"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "name": "packages/ui/src/assets/atelier-dark.webp",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "3F6175F2D5A179A1C5AEC5448627B476F21EF9070189207F982C4E1726A43B20"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "name": "packages/ui/src/assets/atelier-light.webp",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "EEA0D546F3CD29D931E06808931DD65F9B9FB667F355AED36A48E4E06566CF25"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "name": "artifacts/PrintBot-Atelier-1.0.0-x64-setup.exe",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "AF36C3A3FDAC94F6577379B0554ECFAD73D40CCDA66D3B25FC87620169002A70"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "name": "artifacts/PrintBot-Atelier-1.0.0-x64.msi",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "54567BFAF0C78CE00E9F9A2E66C8071D28FDEAFEFA759791EB64E4E69D4111A1"
+        }
+      ],
+      "type": "file"
+    }
+  ],
+  "version": 1,
+  "metadata": {
+    "component": {
+      "name": "Print Bot unified interfaces",
+      "type": "application",
+      "version": "1.0.0"
+    }
+  },
+  "properties": [
+    {
+      "value": "Bounded existing UI dependencies, modified assets and unsigned build inventory; not a complete deployment SBOM or legal clearance",
+      "name": "scope"
+    }
+  ]
+}

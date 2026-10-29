@@ -20,7 +20,7 @@ import {
   ChevronRight,
   RotateCw,
 } from 'lucide-react';
-import { ThemeProvider, StudioHeader, PrinterScene, useGsapStagger, useGsapCardTilt } from '@xerox/ui';
+import { ThemeProvider, StudioHeader, useGsapStagger, useGsapCardTilt } from '@xerox/ui';
 
 export default function MarketingLandingPage() {
   const heroLeftRef = useGsapStagger<HTMLDivElement>({ duration: 0.6, y: 15 });
@@ -70,7 +70,7 @@ export default function MarketingLandingPage() {
               Product Suites
             </a>
             <a href="#imposition" className="text-[var(--pb-muted)] hover:text-[var(--pb-text)] transition-colors">
-              Live Quote Studio
+              Quote walkthrough
             </a>
             <a href="#architecture" className="text-[var(--pb-muted)] hover:text-[var(--pb-text)] transition-colors">
               Architecture
@@ -92,7 +92,7 @@ export default function MarketingLandingPage() {
           <div className="flex shrink-0 space-x-8 items-center whitespace-nowrap px-4">
             <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"/> CHENNAI COUNTER FLEET ACTIVE</span>
             <span>—</span>
-            <span className="text-[var(--pb-accent)] font-bold">ONE ALL-INCLUSIVE PLAN: ₹999/MO</span>
+            <span className="text-[var(--pb-accent)] font-bold">ONE ALL-INCLUSIVE PLAN · MONTHLY OR ANNUAL</span>
             <span>—</span>
             <span className="text-emerald-700 dark:text-emerald-400 font-bold">ZERO PER-PAGE SOFTWARE COMMISSIONS</span>
             <span>—</span>
@@ -119,9 +119,9 @@ export default function MarketingLandingPage() {
               </div>
 
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-serif font-semibold tracking-tight text-[var(--pb-text)] leading-[1.08]">
-                One Windows installer. <br />
+                A better day at the counter. <br />
                 <span className="text-[var(--pb-accent)] italic">Unlimited printers.</span> <br />
-                Zero software cuts.
+                Beautifully connected.
               </h1>
 
               <p className="text-base sm:text-lg text-[var(--pb-muted)] max-w-2xl leading-relaxed">
@@ -134,7 +134,7 @@ export default function MarketingLandingPage() {
               <div ref={ribbonRef} className="grid grid-cols-2 sm:grid-cols-4 gap-3 py-2">
                 <div className="ribbon-card p-3.5 rounded-xl bg-[var(--pb-surface)] border border-[var(--pb-border)] shadow-sm">
                   <div className="text-[10px] font-mono uppercase text-[var(--pb-muted)] font-bold">Subscription</div>
-                  <div className="text-xl font-bold font-serif text-[var(--pb-accent)]">₹999 / mo</div>
+                  <div className="text-xl font-bold font-serif text-[var(--pb-accent)]">One plan</div>
                   <div className="text-[11px] text-[var(--pb-muted)]">Single all-inclusive plan</div>
                 </div>
 
@@ -151,8 +151,8 @@ export default function MarketingLandingPage() {
                 </div>
 
                 <div className="ribbon-card p-3.5 rounded-xl bg-[var(--pb-surface)] border border-[var(--pb-border)] shadow-sm">
-                  <div className="text-[10px] font-mono uppercase text-[var(--pb-muted)] font-bold">Quote Latency</div>
-                  <div className="text-xl font-bold font-mono text-[var(--pb-text)]">3.8 ms</div>
+                  <div className="text-[10px] font-mono uppercase text-[var(--pb-muted)] font-bold">Price authority</div>
+                  <div className="text-xl font-bold font-mono text-[var(--pb-text)]">Server quote</div>
                   <div className="text-[11px] text-[var(--pb-muted)]">Server-locked pricing</div>
                 </div>
               </div>
@@ -160,7 +160,7 @@ export default function MarketingLandingPage() {
               {/* Direct Launch Action Buttons */}
               <div className="flex flex-wrap gap-3 pt-2">
                 <a
-                  href="http://localhost:5174"
+                  href="http://127.0.0.1:5174"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="pb-button pb-button-primary inline-flex items-center space-x-2 text-sm shadow-md"
@@ -171,7 +171,7 @@ export default function MarketingLandingPage() {
                 </a>
 
                 <a
-                  href="http://localhost:5173"
+                  href="http://127.0.0.1:5175"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="pb-button inline-flex items-center space-x-2 text-sm shadow-sm"
@@ -182,35 +182,19 @@ export default function MarketingLandingPage() {
                 </a>
 
                 <a
-                  href="http://127.0.0.1:8000/docs"
+                  href="http://127.0.0.1:5176"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="pb-button inline-flex items-center space-x-2 text-sm shadow-sm"
                 >
                   <Zap size={16} className="text-amber-600" />
-                  <span>FastAPI REST Docs</span>
+                  <span>Open shop studio</span>
                 </a>
               </div>
             </div>
 
-            {/* Right Column: Interactive 3D Three.js Xerox Production Machine */}
-            <div className="lg:col-span-5 relative">
-              <div className="relative rounded-3xl overflow-hidden border border-[var(--pb-border)] bg-[var(--pb-surface)] shadow-2xl p-2">
-                <div className="px-4 py-3 flex items-center justify-between border-b border-[var(--pb-border)]">
-                  <div className="flex items-center space-x-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-[var(--pb-text)]">
-                      Three.js Precision Hardware Engine
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-mono text-[var(--pb-muted)]">WebGL2 · 60 FPS</span>
-                </div>
-
-                <div className="h-[420px] w-full">
-                  <PrinterScene />
-                </div>
-              </div>
-            </div>
+            {/* Product imagery replaces placeholder hardware telemetry. */}
+            <div className="lg:col-span-5 relative"><figure className="pb-product-shot"><div role="img" aria-label="Professional printer producing a burgundy and gold sample print in a warm print studio"/><figcaption><span>Your next chapter, in print.</span><small>Print studio concept imagery</small></figcaption></figure></div>
           </div>
         </section>
 
@@ -250,7 +234,7 @@ export default function MarketingLandingPage() {
 
               <div className="pt-6">
                 <a
-                  href="http://localhost:5174"
+                  href="http://127.0.0.1:5174"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full py-2.5 px-4 rounded-xl bg-[var(--pb-raised)] hover:bg-[var(--pb-accent)] hover:text-white border border-[var(--pb-border)] text-xs font-bold flex items-center justify-between transition-all"
@@ -282,7 +266,7 @@ export default function MarketingLandingPage() {
 
               <div className="pt-6">
                 <a
-                  href="http://localhost:5173"
+                  href="http://127.0.0.1:5175"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full py-2.5 px-4 rounded-xl bg-[var(--pb-raised)] hover:bg-[var(--pb-accent)] hover:text-white border border-[var(--pb-border)] text-xs font-bold flex items-center justify-between transition-all"
@@ -314,7 +298,7 @@ export default function MarketingLandingPage() {
 
               <div className="pt-6">
                 <a
-                  href="http://localhost:5175"
+                  href="http://127.0.0.1:5176"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full py-2.5 px-4 rounded-xl bg-[var(--pb-raised)] hover:bg-[var(--pb-accent)] hover:text-white border border-[var(--pb-border)] text-xs font-bold flex items-center justify-between transition-all"
@@ -346,7 +330,7 @@ export default function MarketingLandingPage() {
 
               <div className="pt-6">
                 <a
-                  href="http://localhost:5176"
+                  href="http://127.0.0.1:5177"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full py-2.5 px-4 rounded-xl bg-[var(--pb-raised)] hover:bg-[var(--pb-accent)] hover:text-white border border-[var(--pb-border)] text-xs font-bold flex items-center justify-between transition-all"
@@ -574,6 +558,7 @@ export default function MarketingLandingPage() {
           </div>
         </section>
 
+        <section className="px-6 py-12 max-w-[1440px] mx-auto"><div className="pb-print-banner"><h2>Made for the rhythm of your print shop.</h2><p>One connected experience, from document upload to final counter check.</p></div></section>
         {/* ARCHITECTURAL PRINCIPLES (The Five Tenets) */}
         <section id="architecture" className="px-6 py-16 max-w-[1440px] mx-auto border-t border-[var(--pb-border)]">
           <div className="max-w-2xl mb-12">
@@ -581,7 +566,7 @@ export default function MarketingLandingPage() {
               Engineering Rigor
             </span>
             <h2 className="text-3xl font-serif font-semibold mt-2 text-[var(--pb-text)]">
-              Built for commercial distribution. Not a prototype.
+              Built around the way print shops work.
             </h2>
           </div>
 
@@ -592,7 +577,7 @@ export default function MarketingLandingPage() {
               </div>
               <h3 className="font-serif font-bold text-base text-[var(--pb-text)]">Zero-Leak Tenant Isolation</h3>
               <p className="text-xs text-[var(--pb-muted)] leading-relaxed">
-                Guest sessions, files, queues, orders, and pricing belong to precisely one `shop_id`. PostgreSQL Row-Level Security plus application-level negative checks ensure zero cross-shop data leaks.
+                Guest sessions, files, queues, orders, and pricing belong to precisely one `shop_id`. PostgreSQL Row-Level Security plus application-level negative checks support strict shop separation, subject to release verification.
               </p>
             </div>
 
@@ -636,7 +621,7 @@ export default function MarketingLandingPage() {
 
             <div className="py-4">
               <div className="text-5xl font-black font-serif text-[var(--pb-accent)]">
-                ₹999 <span className="text-sm font-sans font-normal text-[var(--pb-muted)]">/ month</span>
+                Contact us <span className="text-sm font-sans font-normal text-[var(--pb-muted)]">for current pricing</span>
               </div>
               <div className="text-xs text-[var(--pb-muted)] font-mono mt-1">
                 or ₹9,990 annually (2 months free)
@@ -670,11 +655,11 @@ export default function MarketingLandingPage() {
             </div>
 
             <div className="flex items-center space-x-6 font-mono text-[11px]">
-              <a href="http://localhost:5173" className="hover:text-[var(--pb-text)] transition-colors">Workstation (:5173)</a>
-              <a href="http://localhost:5174" className="hover:text-[var(--pb-text)] transition-colors">Customer (:5174)</a>
-              <a href="http://localhost:5175" className="hover:text-[var(--pb-text)] transition-colors">Shop (:5175)</a>
-              <a href="http://localhost:5176" className="hover:text-[var(--pb-text)] transition-colors">Superadmin (:5176)</a>
-              <a href="http://127.0.0.1:8000/docs" className="hover:text-[var(--pb-text)] transition-colors">FastAPI (:8000)</a>
+              <a href="http://127.0.0.1:5175" className="hover:text-[var(--pb-text)] transition-colors">Workstation</a>
+              <a href="http://127.0.0.1:5174" className="hover:text-[var(--pb-text)] transition-colors">Customer</a>
+              <a href="http://127.0.0.1:5176" className="hover:text-[var(--pb-text)] transition-colors">Shop</a>
+              <a href="http://127.0.0.1:5177" className="hover:text-[var(--pb-text)] transition-colors">Super-admin</a>
+              <a href="http://127.0.0.1:5176" className="hover:text-[var(--pb-text)] transition-colors">FastAPI (:8000)</a>
             </div>
           </div>
 

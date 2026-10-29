@@ -10,6 +10,17 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    watch: {
+      ignored: [
+        '**/src-tauri/target/**',
+        '**/.tools/**',
+        '**/dist/**',
+        '**/.next/**',
+        '**/.git/**',
+        '**/node_modules/**',
+        '**/fixtures/**',
+      ],
+    },
   },
   preview: {
     port: 4173,

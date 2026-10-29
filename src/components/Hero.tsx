@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Smartphone, Monitor, BarChart3, ArrowRight, ExternalLink, CheckCircle2, Zap } from 'lucide-react';
 import { InstallerConfig } from '../utils/installer';
 
 interface HeroProps {
@@ -7,321 +8,440 @@ interface HeroProps {
   onRequestAccessClick: () => void;
 }
 
-type ServiceType = 'document' | 'photo' | 'id_card';
-type ColorMode = 'grayscale' | 'color';
-type DuplexMode = 'long_edge' | 'single';
-type NUpMode = 1 | 2 | 4;
+type ShowcaseTab = 'customer' | 'counter' | 'owner';
 
 export const Hero: React.FC<HeroProps> = ({
   installerConfig,
   onDownloadClick,
   onRequestAccessClick,
 }) => {
-  const [service, setService] = useState<ServiceType>('document');
-  const [colorMode, setColorMode] = useState<ColorMode>('grayscale');
-  const [duplexMode, setDuplexMode] = useState<DuplexMode>('long_edge');
-  const [nUp, setNUp] = useState<NUpMode>(2);
-  const [copies, setCopies] = useState<number>(1);
-  const [isSimulating, setIsSimulating] = useState<boolean>(false);
-  const [simState, setSimState] = useState<string>('CONNECTED (DEMO)');
-
-  const sourcePages = service === 'document' ? 6 : service === 'photo' ? 2 : 1;
-  const imposedSidesPerCopy = Math.ceil(sourcePages / nUp);
-  const sheetsPerCopy = duplexMode === 'long_edge' ? Math.ceil(imposedSidesPerCopy / 2) : imposedSidesPerCopy;
-  const totalSheets = sheetsPerCopy * copies;
-
-  const costPerSide = colorMode === 'color' ? 7 : 1.5;
-  const totalPrice = Math.max(2, totalSheets * costPerSide * (duplexMode === 'long_edge' ? 1.8 : 1.0)).toFixed(2);
-
-  const runSpoolSimulation = () => {
-    if (isSimulating) return;
-    setIsSimulating(true);
-    setSimState('VALIDATING_PRINT_PLAN');
-
-    setTimeout(() => {
-      setSimState('QUOTE_LOCKED_INR (DEMO)');
-    }, 450);
-
-    setTimeout(() => {
-      setSimState('LEASED_TO_WINDOWS_AGENT');
-    }, 950);
-
-    setTimeout(() => {
-      setSimState('WIN32_SPOOL_INJECTED_#8042');
-    }, 1500);
-
-    setTimeout(() => {
-      setSimState('PRINT_COMPLETED_EPHEMERAL_PURGED');
-      setIsSimulating(false);
-    }, 2200);
-  };
+  const [activeTab, setActiveTab] = useState<ShowcaseTab>('customer');
 
   return (
-    <section id="hero" className="section hero-section">
+    <section id="hero" className="section hero-section" style={{ paddingTop: 'clamp(3rem, 5vw, 5rem)', paddingBottom: 'clamp(4rem, 6vw, 6rem)' }}>
       <div className="wrap">
-        <div className="hero-grid">
-          <div className="hero-content">
-            <h1 className="display headline-masked">
-              <span className="headline-line">
-                <span className="headline-text">Mobile print orders directly</span>
-              </span>
-              <span className="headline-line">
-                <span className="headline-text">to shop Windows printers.</span>
+        {/* Main Grid: Headline + Interactive Product Showcase */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 'clamp(2rem, 4vw, 4rem)', alignItems: 'center' }}>
+          
+          {/* Left Column: Clear Value Proposition */}
+          <div style={{ maxWidth: '580px' }}>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 14px',
+                borderRadius: '999px',
+                background: 'rgba(212, 175, 55, 0.1)',
+                border: '1px solid rgba(212, 175, 55, 0.25)',
+                color: '#fce881',
+                fontSize: '12px',
+                fontWeight: 700,
+                letterSpacing: '0.04em',
+                marginBottom: '20px',
+              }}
+            >
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+              <span>COMMERCIAL PRINT COUNTER OS · INDIA</span>
+            </div>
+
+            <h1
+              style={{
+                fontSize: 'clamp(2.4rem, 4.2vw, 3.8rem)',
+                fontWeight: 800,
+                lineHeight: 1.1,
+                letterSpacing: '-0.035em',
+                color: '#ffffff',
+                marginBottom: '20px',
+              }}
+            >
+              Your Xerox counter, <br />
+              <span style={{ background: 'linear-gradient(135deg, #fce881 0%, #d4af37 60%, #aa8010 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                on complete autopilot.
               </span>
             </h1>
 
-            <p className="lead" data-reveal>
-              The dedicated operating system for photocopy shops and commercial print counters. Customers scan your counter QR to upload and configure jobs in their browser without an app — while your Windows PC receives verified jobs directly into the native print spooler.
+            <p
+              style={{
+                fontSize: 'clamp(1rem, 1.2vw, 1.15rem)',
+                lineHeight: 1.65,
+                color: '#94a3b8',
+                marginBottom: '32px',
+              }}
+            >
+              Walk-in customers scan your counter QR to upload, preview, and pay from their phone. Your shop Windows PC receives verified print jobs directly into the native print spooler — with <strong style={{ color: '#e2e8f0' }}>zero WhatsApp file clutter</strong> and <strong style={{ color: '#e2e8f0' }}>zero infected USB pen drives</strong>.
             </p>
 
-            <div className="hero-actions" data-reveal>
+            {/* CTAs */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', marginBottom: '32px' }}>
               <button
                 type="button"
                 className="btn-primary"
                 onClick={onRequestAccessClick}
-                style={{ minHeight: '3.2rem', paddingInline: '1.75rem' }}
+                style={{ padding: '14px 28px', fontSize: '15px' }}
               >
-                <span>Request Shop Pilot Access</span>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
+                <span>Request Counter Pilot</span>
+                <ArrowRight size={17} />
               </button>
 
               <button
                 type="button"
                 className="btn-secondary"
                 onClick={onDownloadClick}
-                style={{ minHeight: '3.2rem' }}
-                aria-label={
-                  installerConfig.status === 'available'
-                    ? 'Download Print Bot for Windows'
-                    : 'Check Windows Desktop installer pilot availability'
-                }
+                style={{ padding: '14px 24px', fontSize: '15px' }}
               >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
+                <Monitor size={17} />
                 <span>
                   {installerConfig.status === 'available'
-                    ? 'Download for Windows'
+                    ? 'Download Windows App (.exe)'
                     : 'Windows Installer (Pilot)'}
                 </span>
               </button>
             </div>
 
-            <div className="hero-trust-row" data-reveal>
-              <span className="hero-trust-item">
-                <span className="hero-trust-dot" aria-hidden="true" />
-                <span>Closed Pilot Active</span>
-              </span>
-              <span className="hero-trust-item">
-                <span className="hero-trust-dot" aria-hidden="true" />
-                <span>Zero App Install</span>
-              </span>
-              <span className="hero-trust-item">
-                <span className="hero-trust-dot" aria-hidden="true" />
-                <span>Win32 Spooler Integration</span>
-              </span>
-              <span className="hero-trust-item">
-                <span className="hero-trust-dot" aria-hidden="true" />
-                <span>Ephemeral File Purge</span>
-              </span>
+            {/* Grounded Counter Proof Points */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '9px', fontSize: '13px', color: '#cbd5e1' }}>
+                <CheckCircle2 size={16} color="#10b981" />
+                <span>Unlimited connected printers</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '9px', fontSize: '13px', color: '#cbd5e1' }}>
+                <CheckCircle2 size={16} color="#10b981" />
+                <span>Zero WhatsApp number sharing</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '9px', fontSize: '13px', color: '#cbd5e1' }}>
+                <CheckCircle2 size={16} color="#10b981" />
+                <span>Canon, HP, Epson, Ricoh</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '9px', fontSize: '13px', color: '#cbd5e1' }}>
+                <CheckCircle2 size={16} color="#10b981" />
+                <span>Instant ephemeral file purge</span>
+              </div>
             </div>
-
-            <p className="small muted" data-reveal style={{ marginTop: '0.25rem' }}>
-              Engineered for Windows 10 &amp; 11 (64-bit). Works alongside existing USB, Ethernet, and Wi-Fi printers (Canon, HP, Epson, Ricoh).
-            </p>
           </div>
 
-          {/* Interactive Working Product Simulator Fragment */}
-          <div className="ui-visual-wrapper" data-reveal id="simulator-anchor">
-            <div className="ui-panel" data-ui aria-label="Interactive Print Bot print configurator and spooler simulator demonstration">
-              <div className="ui-header">
-                <div className="ui-title-group">
-                  <span className="ui-status-dot" aria-hidden="true" />
-                  <span className="ui-status-label">Simulated Spooler Demo</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span className="ui-badge" style={{ background: 'var(--status-green-soft)', color: 'var(--status-green)' }}>
-                    Order #1042 Verified
-                  </span>
-                  <span className="ui-badge">Canon iR 2525</span>
-                </div>
-              </div>
+          {/* Right Column: Interactive 3-Perspective Live Showcase */}
+          <div
+            style={{
+              background: 'rgba(15, 19, 27, 0.85)',
+              borderRadius: '24px',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              padding: '20px',
+              boxShadow: '0 24px 60px rgba(0, 0, 0, 0.65)',
+              backdropFilter: 'blur(20px)',
+            }}
+          >
+            {/* Perspective Switcher Tabs */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '18px', background: 'rgba(0, 0, 0, 0.35)', padding: '5px', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+              <button
+                type="button"
+                onClick={() => setActiveTab('customer')}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '7px',
+                  padding: '9px 12px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: activeTab === 'customer' ? 'rgba(212, 175, 55, 0.18)' : 'transparent',
+                  color: activeTab === 'customer' ? '#fce881' : '#94a3b8',
+                  borderBottom: activeTab === 'customer' ? '2px solid #d4af37' : '2px solid transparent',
+                  fontSize: '13px',
+                  fontWeight: 650,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <Smartphone size={15} />
+                <span>Customer Mobile</span>
+              </button>
 
-              <div className="ui-segmented" role="tablist" aria-label="Printing service preset selection">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={service === 'document'}
-                  className={`ui-segment-btn ${service === 'document' ? 'is-active' : ''}`}
-                  onClick={() => setService('document')}
-                >
-                  Document (PDF)
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={service === 'photo'}
-                  className={`ui-segment-btn ${service === 'photo' ? 'is-active' : ''}`}
-                  onClick={() => setService('photo')}
-                >
-                  Photo Grid
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={service === 'id_card'}
-                  className={`ui-segment-btn ${service === 'id_card' ? 'is-active' : ''}`}
-                  onClick={() => setService('id_card')}
-                >
-                  ID / Passport
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('counter')}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '7px',
+                  padding: '9px 12px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: activeTab === 'counter' ? 'rgba(212, 175, 55, 0.18)' : 'transparent',
+                  color: activeTab === 'counter' ? '#fce881' : '#94a3b8',
+                  borderBottom: activeTab === 'counter' ? '2px solid #d4af37' : '2px solid transparent',
+                  fontSize: '13px',
+                  fontWeight: 650,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <Monitor size={15} />
+                <span>Counter Station</span>
+              </button>
 
-              <div className="ui-controls-grid">
-                <div className="ui-field-group">
-                  <label htmlFor="hero-color-mode" className="ui-field-label">Color Mode</label>
-                  <select
-                    id="hero-color-mode"
-                    className="ui-select"
-                    value={colorMode}
-                    onChange={(e) => setColorMode(e.target.value as ColorMode)}
-                  >
-                    <option value="grayscale">Black &amp; White (Grayscale)</option>
-                    <option value="color">Full CMYK Color</option>
-                  </select>
-                </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('owner')}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '7px',
+                  padding: '9px 12px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: activeTab === 'owner' ? 'rgba(212, 175, 55, 0.18)' : 'transparent',
+                  color: activeTab === 'owner' ? '#fce881' : '#94a3b8',
+                  borderBottom: activeTab === 'owner' ? '2px solid #d4af37' : '2px solid transparent',
+                  fontSize: '13px',
+                  fontWeight: 650,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <BarChart3 size={15} />
+                <span>Owner Portal</span>
+              </button>
+            </div>
 
-                <div className="ui-field-group">
-                  <label htmlFor="hero-duplex-mode" className="ui-field-label">Duplex Sides</label>
-                  <select
-                    id="hero-duplex-mode"
-                    className="ui-select"
-                    value={duplexMode}
-                    onChange={(e) => setDuplexMode(e.target.value as DuplexMode)}
-                  >
-                    <option value="long_edge">2-Sided (Long-Edge Duplex)</option>
-                    <option value="single">1-Sided (Single Sided)</option>
-                  </select>
-                </div>
-
-                <div className="ui-field-group">
-                  <label htmlFor="hero-nup-mode" className="ui-field-label">Pages per Sheet</label>
-                  <select
-                    id="hero-nup-mode"
-                    className="ui-select"
-                    value={nUp}
-                    onChange={(e) => setNUp(Number(e.target.value) as NUpMode)}
-                  >
-                    <option value="1">1-Up (Standard)</option>
-                    <option value="2">2-Up (2 Pages per Side)</option>
-                    <option value="4">4-Up (4 Pages per Side)</option>
-                  </select>
-                </div>
-
-                <div className="ui-field-group">
-                  <label htmlFor="hero-copies-stepper" className="ui-field-label">Copies</label>
-                  <input
-                    id="hero-copies-stepper"
-                    type="number"
-                    min="1"
-                    max="50"
-                    className="ui-input"
-                    value={copies}
-                    onChange={(e) => setCopies(Math.max(1, parseInt(e.target.value) || 1))}
-                  />
-                </div>
-              </div>
-
-              {/* Live Sheet Imposition Preview Canvas */}
-              <div className="ui-sheet-stage">
-                <div className="ui-sheet-header">
-                  <span>Imposition Preview: A4 Sheet</span>
-                  <span>{duplexMode === 'long_edge' ? 'Double Sided' : 'Single Sided'}</span>
-                </div>
-
-                <div className="ui-sheet-preview-wrap">
-                  <div className={`ui-paper-sheet nup-${nUp}`} aria-hidden="true">
-                    {Array.from({ length: nUp }).map((_, idx) => (
-                      <div key={idx} className="ui-paper-page-box">
-                        <span style={{ fontSize: '7px' }}>p.{idx + 1}</span>
-                        <div className="ui-paper-line" />
-                        <div className={`ui-paper-line ${colorMode === 'color' ? 'accent' : ''}`} />
-                        <div className="ui-paper-line" />
+            {/* TAB 1: Customer Mobile View */}
+            {activeTab === 'customer' && (
+              <div style={{ animation: 'fadeIn 0.25s ease' }}>
+                <div style={{ background: '#090b10', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.08)', overflow: 'hidden' }}>
+                  {/* Phone Header */}
+                  <div style={{ background: '#121620', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc' }}>Sri Ganesh Xerox &amp; Prints</div>
+                      <div style={{ fontSize: '11px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                        Counter Stand #1 · Instant Upload
                       </div>
-                    ))}
-                  </div>
-
-                  {duplexMode === 'long_edge' && (
-                    <div className={`ui-paper-sheet nup-${nUp}`} style={{ opacity: 0.75 }} aria-hidden="true">
-                      {Array.from({ length: nUp }).map((_, idx) => (
-                        <div key={idx} className="ui-paper-page-box">
-                          <span style={{ fontSize: '7px' }}>p.{idx + 1 + nUp}</span>
-                          <div className="ui-paper-line" />
-                          <div className={`ui-paper-line ${colorMode === 'color' ? 'accent' : ''}`} />
-                        </div>
-                      ))}
                     </div>
-                  )}
-                </div>
+                    <span style={{ fontSize: '11px', background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: '6px', color: '#94a3b8' }}>
+                      No App Needed
+                    </span>
+                  </div>
 
-                <div className="ui-sheet-specs">
-                  <div className="ui-spec-item">
-                    <div className="ui-spec-val">{sourcePages}</div>
-                    <div className="ui-spec-lbl">Source Pages</div>
-                  </div>
-                  <div className="ui-spec-item">
-                    <div className="ui-spec-val">{imposedSidesPerCopy}</div>
-                    <div className="ui-spec-lbl">Imposed Sides</div>
-                  </div>
-                  <div className="ui-spec-item">
-                    <div className="ui-spec-val">{totalSheets}</div>
-                    <div className="ui-spec-lbl">Physical Sheets</div>
+                  {/* Document Card */}
+                  <div style={{ padding: '16px' }}>
+                    <div style={{ background: '#151a24', borderRadius: '12px', padding: '12px', border: '1px solid rgba(255, 255, 255, 0.06)', marginBottom: '14px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#f1f5f9' }}>College_Project_Final.pdf</span>
+                        <span style={{ fontSize: '11px', color: '#fce881', background: 'rgba(212,175,55,0.15)', padding: '2px 6px', borderRadius: '4px' }}>16 Pages</span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', fontSize: '12px' }}>
+                        <div style={{ background: '#0d1117', padding: '8px', borderRadius: '8px', textAlign: 'center' }}>
+                          <div style={{ color: '#64748b', fontSize: '10px' }}>COLOR</div>
+                          <div style={{ color: '#e2e8f0', fontWeight: 600, marginTop: '2px' }}>B&amp;W (₹1.50)</div>
+                        </div>
+                        <div style={{ background: '#0d1117', padding: '8px', borderRadius: '8px', textAlign: 'center' }}>
+                          <div style={{ color: '#64748b', fontSize: '10px' }}>DUPLEX</div>
+                          <div style={{ color: '#e2e8f0', fontWeight: 600, marginTop: '2px' }}>2-Sided (8 Shts)</div>
+                        </div>
+                        <div style={{ background: '#0d1117', padding: '8px', borderRadius: '8px', textAlign: 'center' }}>
+                          <div style={{ color: '#64748b', fontSize: '10px' }}>COPIES</div>
+                          <div style={{ color: '#e2e8f0', fontWeight: 600, marginTop: '2px' }}>1 Copy</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Price & Pay Bar */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '12px 14px', borderRadius: '12px', marginBottom: '14px' }}>
+                      <div>
+                        <div style={{ fontSize: '11px', color: '#94a3b8' }}>Total Verified Price</div>
+                        <div style={{ fontSize: '18px', fontWeight: 800, color: '#10b981' }}>₹12.00</div>
+                      </div>
+                      <button
+                        type="button"
+                        style={{
+                          background: '#10b981',
+                          color: '#041f13',
+                          border: 'none',
+                          padding: '8px 16px',
+                          borderRadius: '8px',
+                          fontWeight: 750,
+                          fontSize: '13px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <span>Pay via UPI</span>
+                        <Zap size={14} />
+                      </button>
+                    </div>
+
+                    {/* Direct Test Link */}
+                    <div style={{ textAlign: 'center' }}>
+                      <a
+                        href="http://localhost:5174/"
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '12px',
+                          color: '#fce881',
+                          textDecoration: 'none',
+                          fontWeight: 600,
+                        }}
+                      >
+                        <span>Open Live Customer Web (Port 5174)</span>
+                        <ExternalLink size={12} />
+                      </a>
+                    </div>
                   </div>
                 </div>
               </div>
+            )}
 
-              {/* Real-time Locked Quote & Spooler Simulator */}
-              <div className="ui-quote-bar">
-                <div>
-                  <div style={{ fontSize: '13px', color: 'var(--muted)', fontWeight: 500 }}>Illustrative Locked Quote</div>
-                  <div className="ui-quote-amount">₹{totalPrice}</div>
-                </div>
-                <button
-                  type="button"
-                  className="ui-spool-btn"
-                  onClick={runSpoolSimulation}
-                  disabled={isSimulating}
-                >
-                  {isSimulating ? 'Spooling...' : 'Simulate print dispatch'}
-                </button>
-              </div>
+            {/* TAB 2: Counter Station View (Windows App) */}
+            {activeTab === 'counter' && (
+              <div style={{ animation: 'fadeIn 0.25s ease' }}>
+                <div style={{ background: '#090b10', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.08)', overflow: 'hidden' }}>
+                  {/* Windows 11 Title Bar */}
+                  <div style={{ background: '#121620', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Monitor size={15} color="#d4af37" />
+                      <span style={{ fontSize: '12px', fontWeight: 650, color: '#f1f5f9' }}>Print Bot Counter OS — Station #01 (Windows Win32)</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#334155', display: 'inline-block' }} />
+                      <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#334155', display: 'inline-block' }} />
+                      <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
+                    </div>
+                  </div>
 
-              <div className="ui-spool-journal" aria-live="polite">
-                <div className="ui-journal-entry">
-                  <span>Windows Spooler Agent:</span>
-                  <span className="ui-journal-state">{simState}</span>
-                </div>
-                <div className="ui-journal-entry" style={{ marginTop: '2px' }}>
-                  <span>Demonstration Notice:</span>
-                  <span>Interactive simulation — does not send real paper to physical printers.</span>
+                  {/* Connected Hardware & Spool Queue */}
+                  <div style={{ padding: '16px' }}>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                      <div style={{ flex: 1, background: '#151a24', padding: '10px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                        <div style={{ fontSize: '10px', color: '#64748b' }}>ACTIVE PRINTER</div>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#f8fafc', marginTop: '2px' }}>Canon iR 2525</div>
+                        <div style={{ fontSize: '11px', color: '#10b981', marginTop: '2px' }}>● Ready (Tray 1: A4)</div>
+                      </div>
+                      <div style={{ flex: 1, background: '#151a24', padding: '10px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                        <div style={{ fontSize: '10px', color: '#64748b' }}>COLOR PRINTER</div>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#f8fafc', marginTop: '2px' }}>Epson L805</div>
+                        <div style={{ fontSize: '11px', color: '#10b981', marginTop: '2px' }}>● Ready (Photo Tray)</div>
+                      </div>
+                    </div>
+
+                    {/* Live Job Items */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
+                      <div style={{ background: '#11151e', padding: '10px 12px', borderRadius: '8px', borderLeft: '3px solid #10b981', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontSize: '12px', fontWeight: 650, color: '#f1f5f9' }}>Job #1084 · College_Project.pdf</div>
+                          <div style={{ fontSize: '11px', color: '#64748b' }}>8 Sheets Duplex · Canon iR 2525</div>
+                        </div>
+                        <span style={{ fontSize: '11px', color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                          SPOOLING (75%)
+                        </span>
+                      </div>
+
+                      <div style={{ background: '#11151e', padding: '10px 12px', borderRadius: '8px', borderLeft: '3px solid #d4af37', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontSize: '12px', fontWeight: 650, color: '#f1f5f9' }}>Job #1085 · Aadhaar_Front_Back.pdf</div>
+                          <div style={{ fontSize: '11px', color: '#64748b' }}>1 Sheet Color · Epson L805</div>
+                        </div>
+                        <span style={{ fontSize: '11px', color: '#fce881', background: 'rgba(212, 175, 55, 0.15)', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                          VERIFIED PAID
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Direct Test Link */}
+                    <div style={{ textAlign: 'center' }}>
+                      <a
+                        href="http://localhost:5175/"
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '12px',
+                          color: '#fce881',
+                          textDecoration: 'none',
+                          fontWeight: 600,
+                        }}
+                      >
+                        <span>Open Counter Workstation App (Port 5175)</span>
+                        <ExternalLink size={12} />
+                      </a>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* TAB 3: Shop Owner Portal */}
+            {activeTab === 'owner' && (
+              <div style={{ animation: 'fadeIn 0.25s ease' }}>
+                <div style={{ background: '#090b10', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.08)', overflow: 'hidden' }}>
+                  {/* Owner Header */}
+                  <div style={{ background: '#121620', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc' }}>Owner Remote Dashboard</div>
+                      <div style={{ fontSize: '11px', color: '#94a3b8' }}>Accessible from your smartphone or laptop</div>
+                    </div>
+                    <span style={{ fontSize: '11px', color: '#10b981', background: 'rgba(16, 185, 129, 0.15)', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                      Live Today
+                    </span>
+                  </div>
+
+                  {/* Metrics Grid */}
+                  <div style={{ padding: '16px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '14px' }}>
+                      <div style={{ background: '#151a24', padding: '12px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                        <div style={{ fontSize: '11px', color: '#64748b' }}>TODAY'S REVENUE</div>
+                        <div style={{ fontSize: '20px', fontWeight: 800, color: '#fce881', marginTop: '2px' }}>₹4,850</div>
+                        <div style={{ fontSize: '10px', color: '#10b981', marginTop: '2px' }}>↑ 18% vs yesterday</div>
+                      </div>
+                      <div style={{ background: '#151a24', padding: '12px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                        <div style={{ fontSize: '11px', color: '#64748b' }}>TOTAL SHEETS</div>
+                        <div style={{ fontSize: '20px', fontWeight: 800, color: '#f8fafc', marginTop: '2px' }}>1,240</div>
+                        <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>1,020 B&amp;W · 220 Color</div>
+                      </div>
+                    </div>
+
+                    <div style={{ background: '#11151e', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                      <span style={{ fontSize: '12px', color: '#cbd5e1' }}>UPI Settlement (Direct to Bank)</span>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#10b981' }}>₹3,920 (81%)</span>
+                    </div>
+
+                    {/* Direct Test Link */}
+                    <div style={{ textAlign: 'center' }}>
+                      <a
+                        href="http://localhost:5176/"
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '12px',
+                          color: '#fce881',
+                          textDecoration: 'none',
+                          fontWeight: 600,
+                        }}
+                      >
+                        <span>Open Shop Owner Portal (Port 5176)</span>
+                        <ExternalLink size={12} />
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
+
         </div>
       </div>
     </section>

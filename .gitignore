@@ -72,3 +72,6 @@ sites/
 scratch/
 .superpowers/
 *.exe
+
+# Generated local installer handoff files
+/artifacts/

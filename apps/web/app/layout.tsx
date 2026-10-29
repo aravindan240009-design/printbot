@@ -3,7 +3,8 @@ import Script from 'next/script';
 import './globals.css';
 
 export const metadata = {
-  title: 'Print Bot — Enterprise Multi-Tenant SaaS',
+  title: 'Print Bot — A better day at the counter',
+  icons: { icon: '/favicon.svg' },
   description: 'The Xerox counter, reimagined for Indian print shops. Unified multi-tenant cloud & Windows desktop workstation.',
 };
 export const viewport = { width: 'device-width', initialScale: 1 };

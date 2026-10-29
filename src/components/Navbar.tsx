@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Printer } from 'lucide-react';
 import { InstallerConfig } from '../utils/installer';
 
 interface NavbarProps {
@@ -37,29 +38,30 @@ export const Navbar: React.FC<NavbarProps> = ({
     <header className="nav-bar">
       <div className="nav-container">
         <a href="#hero" className="brand-link" onClick={closeMenu}>
-          <svg
-            width="32"
-            height="32"
-            viewBox="0 0 64 64"
-            fill="none"
-            aria-hidden="true"
+          <div
+            style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: '11px',
+              background: 'linear-gradient(135deg, #1c2432 0%, #0d121b 100%)',
+              border: '1.5px solid var(--border-gold)',
+              color: '#fce881',
+              display: 'grid',
+              placeItems: 'center',
+              boxShadow: '0 4px 16px rgba(212, 175, 55, 0.25)',
+              flexShrink: 0,
+            }}
           >
-            <rect width="64" height="64" rx="12" fill="#1e3a8a" />
-            <rect x="16" y="14" width="32" height="36" rx="4" fill="#ffffff" stroke="#bfdbfe" strokeWidth="2" />
-            <rect x="22" y="22" width="20" height="3" rx="1.5" fill="#1e3a8a" />
-            <rect x="22" y="29" width="20" height="3" rx="1.5" fill="#64748b" />
-            <rect x="22" y="36" width="14" height="3" rx="1.5" fill="#059669" />
-            <circle cx="48" cy="48" r="5" fill="#059669" />
-          </svg>
+            <Printer size={20} />
+          </div>
           <span className="brand-name">Print<span>Bot</span></span>
         </a>
 
         <nav className="nav-links-desktop" aria-label="Main navigation">
-          <a href="#the-problem" className="nav-link">The Problem</a>
-          <a href="#how-it-works" className="nav-link">How It Works</a>
+          <a href="#workflow" className="nav-link">How It Works</a>
           <a href="#features" className="nav-link">Capabilities</a>
           <a href="#pricing" className="nav-link">Pricing</a>
-          <a href="#requirements" className="nav-link">Requirements</a>
+          <a href="#requirements" className="nav-link">Hardware</a>
           <a href="#faq" className="nav-link">FAQ</a>
         </nav>
 
@@ -122,13 +124,11 @@ export const Navbar: React.FC<NavbarProps> = ({
       {isMobileMenuOpen && (
         <div className="wrap">
           <nav className="mobile-nav-panel" aria-label="Mobile navigation">
-            <a href="#overview" className="mobile-nav-link" onClick={closeMenu}>Overview</a>
-            <a href="#the-problem" className="mobile-nav-link" onClick={closeMenu}>The Problem</a>
-            <a href="#how-it-works" className="mobile-nav-link" onClick={closeMenu}>How It Works</a>
+            <a href="#hero" className="mobile-nav-link" onClick={closeMenu}>Overview</a>
+            <a href="#workflow" className="mobile-nav-link" onClick={closeMenu}>How It Works</a>
             <a href="#features" className="mobile-nav-link" onClick={closeMenu}>Capabilities</a>
             <a href="#pricing" className="mobile-nav-link" onClick={closeMenu}>Pricing</a>
-            <a href="#requirements" className="mobile-nav-link" onClick={closeMenu}>Requirements</a>
-            <a href="#download" className="mobile-nav-link" onClick={closeMenu}>Download</a>
+            <a href="#requirements" className="mobile-nav-link" onClick={closeMenu}>Hardware</a>
             <a href="#faq" className="mobile-nav-link" onClick={closeMenu}>FAQ</a>
             <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <button

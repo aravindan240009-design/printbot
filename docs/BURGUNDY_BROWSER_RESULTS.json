@@ -1,0 +1,286 @@
+{
+  "date": "2026-10-29",
+  "scope": "Burgundy edition production previews; initial local desktop login fixture",
+  "checks": [
+    {
+      "site": "customer",
+      "name": "dark theme applied",
+      "passed": true
+    },
+    {
+      "site": "customer",
+      "name": "original identity present",
+      "passed": true
+    },
+    {
+      "site": "customer",
+      "name": "local Manrope typography",
+      "passed": true
+    },
+    {
+      "site": "customer",
+      "name": "light theme applied",
+      "passed": true
+    },
+    {
+      "site": "customer",
+      "name": "theme preference persists",
+      "passed": true
+    },
+    {
+      "site": "customer",
+      "name": "no horizontal overflow 390",
+      "passed": true
+    },
+    {
+      "site": "customer",
+      "name": "no horizontal overflow 768",
+      "passed": true
+    },
+    {
+      "site": "customer",
+      "name": "no horizontal overflow 1440",
+      "passed": true
+    },
+    {
+      "site": "customer",
+      "name": "no remote Google fonts",
+      "passed": true
+    },
+    {
+      "site": "customer",
+      "name": "reduced-motion content visible",
+      "passed": true
+    },
+    {
+      "site": "shop",
+      "name": "dark theme applied",
+      "passed": true
+    },
+    {
+      "site": "shop",
+      "name": "original identity present",
+      "passed": true
+    },
+    {
+      "site": "shop",
+      "name": "local Manrope typography",
+      "passed": true
+    },
+    {
+      "site": "shop",
+      "name": "light theme applied",
+      "passed": true
+    },
+    {
+      "site": "shop",
+      "name": "theme preference persists",
+      "passed": true
+    },
+    {
+      "site": "shop",
+      "name": "no horizontal overflow 390",
+      "passed": true
+    },
+    {
+      "site": "shop",
+      "name": "no horizontal overflow 768",
+      "passed": true
+    },
+    {
+      "site": "shop",
+      "name": "no horizontal overflow 1440",
+      "passed": true
+    },
+    {
+      "site": "shop",
+      "name": "no remote Google fonts",
+      "passed": true
+    },
+    {
+      "site": "shop",
+      "name": "reduced-motion content visible",
+      "passed": true
+    },
+    {
+      "site": "admin",
+      "name": "dark theme applied",
+      "passed": true
+    },
+    {
+      "site": "admin",
+      "name": "original identity present",
+      "passed": true
+    },
+    {
+      "site": "admin",
+      "name": "local Manrope typography",
+      "passed": true
+    },
+    {
+      "site": "admin",
+      "name": "light theme applied",
+      "passed": true
+    },
+    {
+      "site": "admin",
+      "name": "theme preference persists",
+      "passed": true
+    },
+    {
+      "site": "admin",
+      "name": "no horizontal overflow 390",
+      "passed": true
+    },
+    {
+      "site": "admin",
+      "name": "no horizontal overflow 768",
+      "passed": true
+    },
+    {
+      "site": "admin",
+      "name": "no horizontal overflow 1440",
+      "passed": true
+    },
+    {
+      "site": "admin",
+      "name": "no remote Google fonts",
+      "passed": true
+    },
+    {
+      "site": "admin",
+      "name": "reduced-motion content visible",
+      "passed": true
+    },
+    {
+      "site": "desktop",
+      "name": "dark theme applied",
+      "passed": true
+    },
+    {
+      "site": "desktop",
+      "name": "original identity present",
+      "passed": true
+    },
+    {
+      "site": "desktop",
+      "name": "local Manrope typography",
+      "passed": true
+    },
+    {
+      "site": "desktop",
+      "name": "light theme applied",
+      "passed": true
+    },
+    {
+      "site": "desktop",
+      "name": "theme preference persists",
+      "passed": true
+    },
+    {
+      "site": "desktop",
+      "name": "no horizontal overflow 390",
+      "passed": true
+    },
+    {
+      "site": "desktop",
+      "name": "no horizontal overflow 768",
+      "passed": true
+    },
+    {
+      "site": "desktop",
+      "name": "no horizontal overflow 1440",
+      "passed": true
+    },
+    {
+      "site": "desktop",
+      "name": "no remote Google fonts",
+      "passed": true
+    },
+    {
+      "site": "desktop",
+      "name": "reduced-motion content visible",
+      "passed": true
+    },
+    {
+      "site": "platform",
+      "name": "dark theme applied",
+      "passed": true
+    },
+    {
+      "site": "platform",
+      "name": "original identity present",
+      "passed": true
+    },
+    {
+      "site": "platform",
+      "name": "local Manrope typography",
+      "passed": true
+    },
+    {
+      "site": "platform",
+      "name": "light theme applied",
+      "passed": true
+    },
+    {
+      "site": "platform",
+      "name": "theme preference persists",
+      "passed": true
+    },
+    {
+      "site": "platform",
+      "name": "no horizontal overflow 390",
+      "passed": true
+    },
+    {
+      "site": "platform",
+      "name": "no horizontal overflow 768",
+      "passed": true
+    },
+    {
+      "site": "platform",
+      "name": "no horizontal overflow 1440",
+      "passed": true
+    },
+    {
+      "site": "platform",
+      "name": "no remote Google fonts",
+      "passed": true
+    },
+    {
+      "site": "platform",
+      "name": "reduced-motion content visible",
+      "passed": true
+    },
+    {
+      "site": "landing",
+      "name": "custom identity present",
+      "passed": true
+    },
+    {
+      "site": "landing",
+      "name": "light appearance works",
+      "passed": true
+    },
+    {
+      "site": "landing",
+      "name": "no overflow 390",
+      "passed": true
+    },
+    {
+      "site": "landing",
+      "name": "no overflow 768",
+      "passed": true
+    },
+    {
+      "site": "landing",
+      "name": "no overflow 1440",
+      "passed": true
+    },
+    {
+      "site": "landing",
+      "name": "reduced motion skips WebGL",
+      "passed": true
+    }
+  ]
+}

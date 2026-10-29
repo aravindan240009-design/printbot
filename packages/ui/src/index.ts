@@ -9,3 +9,4 @@ export * from './three/SceneViewport';
 export * from './theme';
 export * from './components/Studio';
 export * from './components/PrinterScene';
+export * from './components/PrintBotLogo';

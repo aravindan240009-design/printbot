@@ -1,0 +1,90 @@
+{
+  "specVersion": "1.5",
+  "metadata": {
+    "component": {
+      "type": "application",
+      "name": "Print Bot Burgundy refinement",
+      "version": "1.0.0"
+    }
+  },
+  "components": [
+    {
+      "type": "file",
+      "hashes": [
+        {
+          "content": "6D77BED83D84D36796DE380B0200CFF657019DF9DB2D6AC1BA5423A8D076E6F4",
+          "alg": "SHA-256"
+        }
+      ],
+      "name": "packages/ui/src/assets/print-room-light.webp"
+    },
+    {
+      "type": "file",
+      "hashes": [
+        {
+          "content": "B4756C968990ADBF0A8A3BD7D9D757EFF1A87A5F94DFC3FC37445EB7FAAE6F13",
+          "alg": "SHA-256"
+        }
+      ],
+      "name": "packages/ui/src/assets/print-room-dark.webp"
+    },
+    {
+      "type": "file",
+      "hashes": [
+        {
+          "content": "6D77BED83D84D36796DE380B0200CFF657019DF9DB2D6AC1BA5423A8D076E6F4",
+          "alg": "SHA-256"
+        }
+      ],
+      "name": "public/assets/print-room-light.webp"
+    },
+    {
+      "type": "file",
+      "hashes": [
+        {
+          "content": "B4756C968990ADBF0A8A3BD7D9D757EFF1A87A5F94DFC3FC37445EB7FAAE6F13",
+          "alg": "SHA-256"
+        }
+      ],
+      "name": "public/assets/print-room-dark.webp"
+    },
+    {
+      "type": "file",
+      "hashes": [
+        {
+          "content": "2D889C8FCB603F130B5EB07778D1830AADB3FA7425C88A71F7D7F24AD396D5AF",
+          "alg": "SHA-256"
+        }
+      ],
+      "name": "apps/desktop/src-tauri/icons/icon.ico"
+    },
+    {
+      "type": "file",
+      "hashes": [
+        {
+          "content": "B60A50D2AE20727A735AE1CAE64AC1DBE841ED832340F0593830FABBD1531D47",
+          "alg": "SHA-256"
+        }
+      ],
+      "name": "artifacts/PrintBot-Burgundy-1.0.0-x64-setup.exe"
+    },
+    {
+      "type": "file",
+      "hashes": [
+        {
+          "content": "150D3AAD5584241153366381A9C01A7E8858EE74E4A1DB3593DB2CDF086EF19E",
+          "alg": "SHA-256"
+        }
+      ],
+      "name": "artifacts/PrintBot-Burgundy-1.0.0-x64.msi"
+    }
+  ],
+  "properties": [
+    {
+      "value": "Bounded generated asset and unsigned installer hashes, not a complete dependency/deployment SBOM or legal clearance",
+      "name": "scope"
+    }
+  ],
+  "bomFormat": "CycloneDX",
+  "version": 1
+}
