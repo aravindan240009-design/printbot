@@ -29,7 +29,7 @@ import {
   ChevronRight,
   Sparkles
 } from 'lucide-react';
-import { ThemeProvider, ThemeSwitch, MotionSurface, PaperScene, PrinterScene, useGsapStagger } from '@xerox/ui';
+import { ThemeProvider, ThemeSwitch, MotionSurface, PaperScene, PrintBotLogo, useGsapStagger } from '@xerox/ui';
 import { discoverPrinters, type NativePrinterInfo } from './native';
 
 // --- Models & Contracts ---
@@ -252,6 +252,18 @@ export default function App() {
     currentShop?.orderMode || 'MANUAL_APPROVAL'
   );
 
+  useEffect(() => {
+    if (currentShop) {
+      setSetupShopName(currentShop.shopName || '');
+      setSetupLocation(currentShop.location || '');
+      setSetupPhone(currentShop.phone || '');
+      setSetupUpi(currentShop.upiId || '');
+      setSetupBwRate(currentShop.rates?.bwPerSideRupees || 1.5);
+      setSetupColorRate(currentShop.rates?.colorPerSideRupees || 10.0);
+      setSetupOrderMode(currentShop.orderMode || 'MANUAL_APPROVAL');
+    }
+  }, [currentShop]);
+
   const handleSaveSetup = (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeSession) return;
@@ -280,6 +292,7 @@ export default function App() {
   const [newUsername, setNewUsername] = useState('');
   const [newDuration, setNewDuration] = useState('1 Year');
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
+  const [adminNotice, setAdminNotice] = useState('');
 
   const handleGenerateKey = (e: React.FormEvent) => {
     e.preventDefault();
@@ -310,15 +323,20 @@ export default function App() {
 
     setLicenses((prev) => ({ ...prev, [u]: newLicense }));
     setGeneratedKey(key);
+    setAdminNotice(`Generated new license key for ${newShopName.trim()} (${u}).`);
     setNewShopName('');
     setNewUsername('');
   };
 
   const handleRevokeKey = (username: string) => {
-    setLicenses((prev) => ({
-      ...prev,
-      [username]: { ...prev[username], status: prev[username].status === 'ACTIVE' ? 'REVOKED' : 'ACTIVE' },
-    }));
+    setLicenses((prev) => {
+      const nextStatus = prev[username]?.status === 'ACTIVE' ? 'REVOKED' : 'ACTIVE';
+      setAdminNotice(`License key for ${username} is now ${nextStatus}.`);
+      return {
+        ...prev,
+        [username]: { ...prev[username], status: nextStatus },
+      };
+    });
   };
 
   // --- Workstation Queue State ---
@@ -491,7 +509,7 @@ export default function App() {
   // ==========================================
   if (screen === 'LOCK_SCREEN') {
     return (
-      <div
+      <div className="ws-lock-screen"
         style={{
           minHeight: '100vh',
           display: 'grid',
@@ -529,13 +547,13 @@ export default function App() {
                 margin: '0 auto 16px',
               }}
             >
-              <Lock size={28} />
+              <PrintBotLogo size={56} />
             </div>
             <h1 style={{ fontSize: '26px', fontWeight: 800, margin: 0, letterSpacing: '-0.5px' }}>
               Print Bot
             </h1>
             <p style={{ color: 'var(--pb-muted)', fontSize: '13px', marginTop: '6px' }}>
-              Counter Operating System · License Activation
+              Your counter, beautifully connected.
             </p>
           </div>
 
@@ -593,11 +611,12 @@ export default function App() {
             <div
               style={{
                 padding: '12px 14px',
-                borderRadius: '8px',
-                background: '#fef2f2',
-                color: '#991b1b',
-                border: '1px solid #fecaca',
+                borderRadius: '10px',
+                background: 'rgba(239, 68, 68, 0.12)',
+                color: 'var(--pb-danger, #ef4444)',
+                border: '1px solid rgba(239, 68, 68, 0.28)',
                 fontSize: '12px',
+                fontWeight: 600,
                 marginBottom: '20px',
                 display: 'flex',
                 alignItems: 'center',
@@ -613,8 +632,8 @@ export default function App() {
           {loginMode === 'SHOP_OWNER' && (
             <form onSubmit={handleShopLogin} style={{ display: 'grid', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                  Shop Owner Username
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 750, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--pb-text)', marginBottom: '8px' }}>
+                  Shop owner username
                 </label>
                 <input
                   type="text"
@@ -622,12 +641,25 @@ export default function App() {
                   value={ownerUsername}
                   onChange={(e) => setOwnerUsername(e.target.value)}
                   required
+                  style={{
+                    height: '48px',
+                    width: '100%',
+                    border: '1.5px solid var(--pb-border-gold)',
+                    borderRadius: '12px',
+                    padding: '12px 16px',
+                    background: 'var(--pb-surface)',
+                    color: 'var(--pb-text)',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    outline: 'none',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
+                  }}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                  Activation / License Key
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 750, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--pb-text)', marginBottom: '8px' }}>
+                  Preview activation key
                 </label>
                 <input
                   type="text"
@@ -635,6 +667,19 @@ export default function App() {
                   value={ownerKey}
                   onChange={(e) => setOwnerKey(e.target.value)}
                   required
+                  style={{
+                    height: '48px',
+                    width: '100%',
+                    border: '1.5px solid var(--pb-border-gold)',
+                    borderRadius: '12px',
+                    padding: '12px 16px',
+                    background: 'var(--pb-surface)',
+                    color: 'var(--pb-text)',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    outline: 'none',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
+                  }}
                 />
               </div>
 
@@ -654,13 +699,43 @@ export default function App() {
                 Username: <code>shopowner</code> | Key: <code>PB-KEY-2026-XEROX</code>
               </div>
 
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOwnerUsername('shopowner');
+                    setOwnerKey('PB-KEY-2026-XEROX');
+                    setActiveSession({ role: 'SHOP_OWNER', username: 'shopowner' });
+                    localStorage.setItem('printbot_session', JSON.stringify({ role: 'SHOP_OWNER', username: 'shopowner' }));
+                  }}
+                  style={{
+                    flex: 1,
+                    minHeight: '38px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--pb-border-gold)',
+                    background: 'var(--pb-surface)',
+                    color: 'var(--pb-text)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Sparkles size={14} color="#10b981" />
+                  Quick Unlock Demo Shop
+                </button>
+              </div>
+
               <button
                 type="submit"
                 className="ws-primary"
                 style={{
                   width: '100%',
                   minHeight: '46px',
-                  marginTop: '8px',
+                  marginTop: '4px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -669,7 +744,7 @@ export default function App() {
                 }}
               >
                 <Unlock size={18} />
-                Unlock Print Bot Software
+                Open workstation preview
               </button>
             </form>
           )}
@@ -678,7 +753,7 @@ export default function App() {
           {loginMode === 'ADMIN' && (
             <form onSubmit={handleAdminLogin} style={{ display: 'grid', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 750, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--pb-text)', marginBottom: '8px' }}>
                   Admin Username
                 </label>
                 <input
@@ -687,11 +762,24 @@ export default function App() {
                   value={adminUsername}
                   onChange={(e) => setAdminUsername(e.target.value)}
                   required
+                  style={{
+                    height: '48px',
+                    width: '100%',
+                    border: '1.5px solid var(--pb-border-gold)',
+                    borderRadius: '12px',
+                    padding: '12px 16px',
+                    background: 'var(--pb-surface)',
+                    color: 'var(--pb-text)',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    outline: 'none',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
+                  }}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 750, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--pb-text)', marginBottom: '8px' }}>
                   Admin Key / Password
                 </label>
                 <input
@@ -700,6 +788,19 @@ export default function App() {
                   value={adminKey}
                   onChange={(e) => setAdminKey(e.target.value)}
                   required
+                  style={{
+                    height: '48px',
+                    width: '100%',
+                    border: '1.5px solid var(--pb-border-gold)',
+                    borderRadius: '12px',
+                    padding: '12px 16px',
+                    background: 'var(--pb-surface)',
+                    color: 'var(--pb-text)',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    outline: 'none',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
+                  }}
                 />
               </div>
 
@@ -716,13 +817,43 @@ export default function App() {
                 Super Admin credentials: <code>admin</code> / <code>admin@123</code>
               </div>
 
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminUsername('admin');
+                    setAdminKey('admin@123');
+                    setActiveSession({ role: 'ADMIN', username: 'admin' });
+                    localStorage.setItem('printbot_session', JSON.stringify({ role: 'ADMIN', username: 'admin' }));
+                  }}
+                  style={{
+                    flex: 1,
+                    minHeight: '38px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--pb-border-gold)',
+                    background: 'var(--pb-surface)',
+                    color: 'var(--pb-text)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <ShieldCheck size={14} color="#10b981" />
+                  Quick Unlock Platform Admin
+                </button>
+              </div>
+
               <button
                 type="submit"
                 className="ws-primary"
                 style={{
                   width: '100%',
                   minHeight: '46px',
-                  marginTop: '8px',
+                  marginTop: '4px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -784,7 +915,7 @@ export default function App() {
               <Sparkles size={24} />
             </div>
             <div>
-              <h1 style={{ fontSize: '24px', fontWeight: 800, margin: 0 }}>Shop Setup Wizard</h1>
+              <h1 style={{ fontSize: '24px', fontWeight: 800, margin: 0 }}>Make yourself at home.</h1>
               <p style={{ color: 'var(--pb-muted)', fontSize: '13px', margin: '4px 0 0' }}>
                 Key verified! Fill in your Xerox shop details to begin receiving customer orders.
               </p>
@@ -943,10 +1074,11 @@ export default function App() {
                 width: '38px',
                 height: '38px',
                 borderRadius: '10px',
-                background: 'var(--pb-text)',
-                color: '#fff',
+                background: 'var(--pb-accent-gradient)',
+                color: 'var(--pb-on-accent)',
                 display: 'grid',
                 placeItems: 'center',
+                boxShadow: '0 4px 12px rgba(181, 136, 28, 0.25)',
               }}
             >
               <ShieldCheck size={20} />
@@ -968,6 +1100,7 @@ export default function App() {
                 background: 'var(--pb-accent-soft)',
                 color: 'var(--pb-accent)',
                 fontWeight: 700,
+                border: '1px solid var(--pb-border-gold)',
               }}
             >
               Logged in: admin
@@ -978,6 +1111,23 @@ export default function App() {
             </button>
           </div>
         </header>
+
+        {adminNotice && (
+          <div className="ws-notice-bar" role="status">
+            <div className="ws-notice-content">
+              <CheckCircle2 size={16} className="ws-notice-icon" />
+              <span>{adminNotice}</span>
+            </div>
+            <button
+              onClick={() => setAdminNotice('')}
+              className="ws-notice-dismiss"
+              title="Dismiss notice"
+              aria-label="Dismiss notice"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        )}
 
         {/* Admin Content */}
         <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 24px' }}>
@@ -1017,7 +1167,7 @@ export default function App() {
 
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                  Shop Owner Username
+                  Shop owner username
                 </label>
                 <input
                   type="text"
@@ -1067,10 +1217,12 @@ export default function App() {
                 </div>
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(generatedKey);
-                    alert('License Key copied to clipboard!');
+                    if (generatedKey) {
+                      navigator.clipboard.writeText(generatedKey);
+                      setAdminNotice('License Key copied to clipboard!');
+                    }
                   }}
-                  style={{ minHeight: '38px', fontSize: '12px' }}
+                  style={{ minHeight: '38px', fontSize: '12px', gap: '6px' }}
                 >
                   <Copy size={16} /> Copy Key
                 </button>
@@ -1104,13 +1256,13 @@ export default function App() {
                 </thead>
                 <tbody>
                   {Object.values(licenses).map((lic) => (
-                    <tr key={lic.username} style={{ borderBottom: '1px solid var(--pb-rule)' }}>
+                    <tr key={lic.username} style={{ borderBottom: '1px solid var(--pb-border)' }}>
                       <td style={{ padding: '14px 16px', fontWeight: 700 }}>{lic.shopName}</td>
                       <td style={{ padding: '14px 16px' }}>
                         <code>{lic.username}</code>
                       </td>
                       <td style={{ padding: '14px 16px' }}>
-                        <code style={{ background: 'var(--pb-raised)', padding: '4px 8px', borderRadius: '4px' }}>
+                        <code style={{ background: 'var(--pb-raised)', padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--pb-border)' }}>
                           {lic.licenseKey}
                         </code>
                       </td>
@@ -1121,8 +1273,9 @@ export default function App() {
                             borderRadius: '12px',
                             fontSize: '11px',
                             fontWeight: 700,
-                            background: lic.status === 'ACTIVE' ? '#ecfdf5' : '#fef2f2',
-                            color: lic.status === 'ACTIVE' ? '#047857' : '#b91c1c',
+                            background: lic.status === 'ACTIVE' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                            color: lic.status === 'ACTIVE' ? '#10b981' : '#ef4444',
+                            border: `1px solid ${lic.status === 'ACTIVE' ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`,
                           }}
                         >
                           {lic.status}
@@ -1135,7 +1288,8 @@ export default function App() {
                             padding: '6px 12px',
                             fontSize: '11px',
                             minHeight: '32px',
-                            color: lic.status === 'ACTIVE' ? '#b91c1c' : '#047857',
+                            color: lic.status === 'ACTIVE' ? '#ef4444' : '#10b981',
+                            borderColor: lic.status === 'ACTIVE' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)',
                           }}
                         >
                           {lic.status === 'ACTIVE' ? 'Revoke Key' : 'Reactivate Key'}
@@ -1177,17 +1331,17 @@ export default function App() {
       <aside className="ws-sidebar">
         <a href="#brand" className="ws-brand" onClick={(e) => e.preventDefault()}>
           <span>
-            <Printer size={24} />
+            <PrintBotLogo size={43} />
           </span>
           <div>
             Print Bot
-            <small>COUNTER WORKSPACE</small>
+            <small>Counter studio</small>
           </div>
         </a>
 
         {currentShop && (
           <div className="ws-shop">
-            <span className="ws-eyebrow">ACTIVE LICENSED SHOP</span>
+            <span className="ws-eyebrow">Current shop preview</span>
             <strong>{currentShop.shopName}</strong>
             <small>{currentShop.location}</small>
           </div>
@@ -1244,7 +1398,7 @@ export default function App() {
         <header className="ws-topbar">
           <div>
             <span className="ws-eyebrow">WORKSTATION</span>
-            <strong>Counter-PC-01 ({currentShop?.username})</strong>
+            <strong>Your workstation ({currentShop?.username})</strong>
           </div>
 
           <div className="ws-top-actions">
@@ -1259,21 +1413,18 @@ export default function App() {
         </header>
 
         {notice && (
-          <div
-            style={{
-              padding: '10px 24px',
-              background: 'var(--pb-accent-soft)',
-              color: 'var(--pb-accent)',
-              fontSize: '12px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              borderBottom: '1px solid var(--pb-border)',
-            }}
-          >
-            <span>{notice}</span>
-            <button onClick={() => setNotice('')} style={{ border: 0, padding: '4px', minHeight: '28px' }}>
-              <X size={14} />
+          <div className="ws-notice-bar" role="status">
+            <div className="ws-notice-content">
+              <CheckCircle2 size={16} className="ws-notice-icon" />
+              <span>{notice}</span>
+            </div>
+            <button
+              onClick={() => setNotice('')}
+              className="ws-notice-dismiss"
+              title="Dismiss notice"
+              aria-label="Dismiss notice"
+            >
+              <X size={15} />
             </button>
           </div>
         )}
@@ -1284,8 +1435,8 @@ export default function App() {
             <div className="ws-view">
               <div className="ws-page-heading">
                 <div>
-                  <span className="ws-eyebrow">PRINT STUDIO / OPERATIONS</span>
-                  <h1>A clear view of your queue.</h1>
+                  <span className="ws-eyebrow">Your daily workspace</span>
+                  <h1>A little clarity. A better counter.</h1>
                   <p>Review incoming customer orders. Keep every job moving with care.</p>
                 </div>
 
@@ -1458,6 +1609,23 @@ export default function App() {
                         <dd>{prn.supports_duplex ? 'Automatic Duplex' : 'Manual duplex'}</dd>
                       </div>
                     </dl>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setNotice(`Test page dispatched to spooler for ${prn.name} (${prn.port}).`)}
+                        style={{ flex: 1, minHeight: '38px', fontSize: '12px' }}
+                      >
+                        Print Test Page
+                      </button>
+                      <button
+                        type="button"
+                        className="ws-primary"
+                        onClick={() => setNotice(`${prn.name} configured as primary counter spooler.`)}
+                        style={{ minHeight: '38px', fontSize: '12px', padding: '0 12px' }}
+                      >
+                        Make Default
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1498,9 +1666,9 @@ export default function App() {
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(`https://printbot-57e1.vercel.app/?qr=shop_anna_univ_01`);
-                        alert('Copied shop QR link!');
+                        setNotice('Shop portal QR link copied to clipboard!');
                       }}
-                      style={{ border: 0, padding: '4px 8px', fontSize: '11px' }}
+                      style={{ border: '1px solid var(--pb-border)', padding: '6px 12px', fontSize: '11px', borderRadius: '6px' }}
                     >
                       Copy Link
                     </button>
