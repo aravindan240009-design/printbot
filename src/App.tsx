@@ -26,7 +26,6 @@ import { FloatingDecorations } from './components/FloatingDecorations';
 import { InteractiveExperience } from './components/InteractiveExperience';
 import { MarqueeShowcase } from './components/MarqueeShowcase';
 import { ShopRoiCalculator } from './components/ShopRoiCalculator';
-import { PortalDock } from './components/PortalDock';
 import { TypingClosingSection } from './components/TypingClosingSection';
 import { SplashScreen } from './components/SplashScreen';
 import { SubscriptionModal } from './components/SubscriptionModal';
@@ -558,9 +557,6 @@ export default function App() {
         onClose={() => setDialog(false)}
         initialPlan={billing}
       />
-
-      {/* Floating Portal Dock */}
-      <PortalDock />
     </>
   );
 }
