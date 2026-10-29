@@ -147,6 +147,16 @@ function Console() {
     setNotice(`Order ${orderId}: Approved by staff without delay.`);
   }
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+    const main = document.getElementById('main');
+    if (main) main.scrollTop = 0;
+    const consoleBody = document.querySelector('.console-body');
+    if (consoleBody) consoleBody.scrollTop = 0;
+  }, [tab]);
+
   function confirm(type: 'mode' | 'reject' | 'cash_paid', nextMode?: Mode) {
     setPending({ type, mode: nextMode });
     setReason(type === 'reject' ? 'Poor scan / blurred document' : '');
@@ -189,7 +199,10 @@ function Console() {
               key={title}
               className={tab === title ? 'nav-active' : ''}
               aria-current={tab === title ? 'page' : undefined}
-              onClick={() => setTab(title)}
+              onClick={() => {
+                setTab(title);
+                window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+              }}
             >
               <Icon size={19} />
               {title}

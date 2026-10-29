@@ -477,6 +477,16 @@ export default function App() {
     setRejectionModalJobId(null);
   };
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+    const wsMain = document.querySelector('.ws-main');
+    if (wsMain) wsMain.scrollTop = 0;
+    const wsView = document.querySelector('.ws-view');
+    if (wsView) wsView.scrollTop = 0;
+  }, [activeTab]);
+
   const handleSimulateNewCustomerJob = () => {
     const randomId = 'job-' + Math.floor(1000 + Math.random() * 9000);
     const newJob: PrintJob = {

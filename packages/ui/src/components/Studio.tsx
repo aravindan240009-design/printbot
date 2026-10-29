@@ -1,11 +1,25 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { PrintBotLogo } from './PrintBotLogo';
 import { ThemeSwitch } from '../theme';
 
 export function MotionSurface({ children, className, transitionKey = 'surface' }: { children: React.ReactNode; className?: string; transitionKey?: string | number }) {
   const reduced = useReducedMotion();
+
+  useEffect(() => {
+    // Reset window and root document scroll
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+
+    // Reset all potential layout scroll containers
+    const scrollContainers = document.querySelectorAll('.console-body, main, #main, .workstation, .ws-shell, .customer-shell, .customer-app, .ws-main, .ws-view');
+    scrollContainers.forEach((el) => {
+      el.scrollTop = 0;
+    });
+  }, [transitionKey]);
+
   return <motion.div key={transitionKey} className={className} initial={reduced ? false : { opacity: 0, y: 14, rotateX: 1.5 }} animate={{ opacity: 1, y: 0, rotateX: 0 }} transition={{ duration: reduced ? 0 : .42, ease: [.16, 1, .3, 1] }}>{children}</motion.div>;
 }
 
