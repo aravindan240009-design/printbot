@@ -83,18 +83,33 @@ export const CustomerShopPortal: React.FC<CustomerShopPortalProps> = ({ shopId, 
 
     async function loadShop() {
       try {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('pilot_applications')
           .select('shop_name, city, contact_number, plan, notes, generated_username')
           .or(`generated_username.ilike.${cleanId},shop_name.ilike.${cleanId}`)
           .maybeSingle();
 
-        if (!error && data) {
+        let appData = data;
+        if (!appData) {
+          const { data: allApproved } = await supabase
+            .from('pilot_applications')
+            .select('shop_name, city, contact_number, plan, notes, generated_username')
+            .eq('status', 'APPROVED');
+          if (allApproved) {
+            appData = allApproved.find(
+              (s) =>
+                s.shop_name?.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanId ||
+                s.generated_username?.toLowerCase() === cleanId
+            ) || null;
+          }
+        }
+
+        if (appData) {
           let customBw = 1.5;
           let customColor = 10.0;
           try {
-            if (data.notes) {
-              const parsed = typeof data.notes === 'string' ? JSON.parse(data.notes) : data.notes;
+            if (appData.notes) {
+              const parsed = typeof appData.notes === 'string' ? JSON.parse(appData.notes) : appData.notes;
               if (parsed.bwRate !== undefined) customBw = Number(parsed.bwRate);
               if (parsed.colorRate !== undefined) customColor = Number(parsed.colorRate);
             }
@@ -102,10 +117,10 @@ export const CustomerShopPortal: React.FC<CustomerShopPortalProps> = ({ shopId, 
 
           setRates({ bw: customBw, color: customColor });
           setShopDetails({
-            name: data.shop_name || shopId.toUpperCase(),
-            city: data.city || 'Counter Station',
-            phone: data.contact_number || '',
-            plan: data.plan || 'Commercial Plan',
+            name: appData.shop_name || shopId.toUpperCase(),
+            city: appData.city || 'Counter Station',
+            phone: appData.contact_number || '',
+            plan: appData.plan || 'Commercial Plan',
           });
         }
       } catch {
@@ -127,7 +142,8 @@ export const CustomerShopPortal: React.FC<CustomerShopPortalProps> = ({ shopId, 
             const row = payload.new;
             const matchesShop =
               row.generated_username?.toLowerCase() === cleanId ||
-              row.shop_name?.toLowerCase() === cleanId;
+              row.shop_name?.toLowerCase() === cleanId ||
+              row.shop_name?.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanId;
             if (matchesShop && row.notes) {
               try {
                 const parsed = typeof row.notes === 'string' ? JSON.parse(row.notes) : row.notes;

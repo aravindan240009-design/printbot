@@ -404,12 +404,15 @@ export default function App() {
 
   const [websiteQrDataUrl, setWebsiteQrDataUrl] = useState<string>('');
   useEffect(() => {
-    const shopSub = (currentShop?.username || 'shop').toLowerCase();
-    const shopPortalUrl = `https://printbotak.vercel.app/?shop=${shopSub}`;
-    QRCode.toDataURL(shopPortalUrl, { width: 280, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
+    const shopSlug = (currentShop?.shopName || currentShop?.username || 'shop')
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]/g, '');
+    const shopSubdomainUrl = `https://${shopSlug}.printbotak.vercel.app/`;
+    QRCode.toDataURL(shopSubdomainUrl, { width: 280, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
       .then(setWebsiteQrDataUrl)
       .catch((err) => console.warn('QR code generation error:', err));
-  }, [currentShop?.username]);
+  }, [currentShop?.shopName, currentShop?.username]);
 
   const handleSaveSetup = (e: React.FormEvent) => {
     e.preventDefault();
@@ -3990,11 +3993,13 @@ export default function App() {
 
           {/* TAB: WEBSITE (SHOP DOMAIN & CUSTOMER ACCESS) */}
           {activeTab === 'website' && (() => {
-            const shopSub = (currentShop?.username || 'shop').toLowerCase();
+            const shopSlug = (currentShop?.shopName || currentShop?.username || 'shop')
+              .toLowerCase()
+              .trim()
+              .replace(/[^a-z0-9]/g, '');
             const mainDomain = 'https://printbotak.vercel.app';
-            const shopSubdomainUrl = `https://${shopSub}.printbotak.vercel.app`;
-            const shopPortalUrl = `${mainDomain}/?shop=${shopSub}`;
-            const qrImageUrl = websiteQrDataUrl || `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(shopPortalUrl)}`;
+            const shopSubdomainUrl = `https://${shopSlug}.printbotak.vercel.app`;
+            const qrImageUrl = websiteQrDataUrl || `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(shopSubdomainUrl)}`;
 
             return (
               <div className="ws-view">
@@ -4013,49 +4018,30 @@ export default function App() {
                       <Globe size={20} color="var(--pb-accent)" />
                       <div>
                         <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 750 }}>Customer Access Links</h3>
-                        <small style={{ color: 'var(--pb-muted)' }}>Share these links with customers to upload from their phones</small>
+                        <small style={{ color: 'var(--pb-muted)' }}>Share your shop link with customers to upload from their phones</small>
                       </div>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                      {/* Shop Subdomain */}
+                      {/* Shop Subdomain (Created from Shop Name) */}
                       <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--pb-raised)', border: '1px solid var(--pb-accent)' }}>
                         <div style={{ marginBottom: '6px' }}>
                           <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-accent)' }}>YOUR DEDICATED SHOP WEBSITE</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <code style={{ fontSize: '14px', fontWeight: 750, color: 'var(--pb-accent)' }}>{shopSubdomainUrl}/</code>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(`${shopSubdomainUrl}/`);
-                              setNotice('Copied shop website URL to clipboard.');
-                            }}
-                            style={{ border: 0, padding: '4px 10px', fontSize: '11px', gap: '4px' }}
-                          >
-                            <Copy size={12} /> Copy
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Direct Customer Web Portal Link */}
-                      <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
-                        <div style={{ marginBottom: '6px' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-muted)' }}>DIRECT MOBILE PORTAL ROUTE</span>
-                        </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
-                          <code style={{ fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shopPortalUrl}</code>
+                          <code style={{ fontSize: '14px', fontWeight: 750, color: 'var(--pb-accent)' }}>{shopSubdomainUrl}/</code>
                           <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                             <button
                               onClick={() => {
-                                navigator.clipboard.writeText(shopPortalUrl);
-                                setNotice('Copied direct customer portal link to clipboard.');
+                                navigator.clipboard.writeText(`${shopSubdomainUrl}/`);
+                                setNotice('Copied shop website URL to clipboard.');
                               }}
-                              style={{ border: 0, padding: '4px 8px', fontSize: '11px', gap: '4px' }}
+                              style={{ border: 0, padding: '4px 10px', fontSize: '11px', gap: '4px' }}
                             >
                               <Copy size={12} /> Copy
                             </button>
                             <a
-                              href={shopPortalUrl}
+                              href={shopSubdomainUrl}
                               target="_blank"
                               rel="noreferrer"
                               style={{
@@ -4153,32 +4139,13 @@ export default function App() {
 
                       <button
                         onClick={() => {
-                          navigator.clipboard.writeText(shopPortalUrl);
-                          setNotice('Copied shop portal URL for customers.');
+                          navigator.clipboard.writeText(`${shopSubdomainUrl}/`);
+                          setNotice('Copied shop website URL for customers.');
                         }}
                         style={{ width: '100%', justifyContent: 'center', minHeight: '38px', gap: '6px' }}
                       >
                         <Copy size={14} /> Copy Customer Link
                       </button>
-
-                      <a
-                        href={shopPortalUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          padding: '8px',
-                          fontSize: '12px',
-                          color: 'var(--pb-accent)',
-                          textDecoration: 'none',
-                          fontWeight: 650
-                        }}
-                      >
-                        <ExternalLink size={13} /> Test Customer Mobile Experience
-                      </a>
                     </div>
                   </div>
                 </div>
