@@ -19,7 +19,8 @@ import {
   IndianRupee,
   Layers,
   ChevronRight,
-  Clock
+  Clock,
+  X
 } from 'lucide-react';
 import { PrintBotLogo, ThemeProvider, MotionSurface, StudioHeader, useGsapStagger } from '@xerox/ui';
 import '@xerox/ui/src/studio.css';
@@ -132,9 +133,23 @@ function Console() {
     }, 2800);
   }
 
-  function confirm(type: 'mode' | 'approve' | 'reject' | 'cash_paid', nextMode?: Mode) {
+  function handleApprove(orderId: string) {
+    setOrders(items =>
+      items.map(o =>
+        o.id === orderId
+          ? {
+              ...o,
+              status: o.payment.includes('Verified') || o.payment.includes('Paid') ? 'Queued' : 'Payment hold',
+            }
+          : o
+      )
+    );
+    setNotice(`Order ${orderId}: Approved by staff without delay.`);
+  }
+
+  function confirm(type: 'mode' | 'reject' | 'cash_paid', nextMode?: Mode) {
     setPending({ type, mode: nextMode });
-    setReason('');
+    setReason(type === 'reject' ? 'Poor scan / blurred document' : '');
     dialog.current?.showModal();
   }
 
@@ -147,10 +162,10 @@ function Console() {
     } else if (pending.type === 'cash_paid') {
       setOrders(items => items.map(o => o.id === selected ? { ...o, status: 'Queued', payment: 'Cash collected at counter (verified by staff)' } : o));
       setNotice(`Order ${selected}: Cash payment verified at counter. Dispatched to fleet queue.`);
-    } else {
-      if (!reason.trim()) return;
-      setOrders(items => items.map(o => o.id === selected ? { ...o, status: pending.type === 'reject' ? 'Rejected' : 'Payment hold' } : o));
-      setNotice(`${selected}: local ${pending.type === 'reject' ? 'rejection' : 'approval'} recorded.`);
+    } else if (pending.type === 'reject') {
+      const finalReason = reason.trim() || 'Staff rejected at counter';
+      setOrders(items => items.map(o => o.id === selected ? { ...o, status: 'Rejected' } : o));
+      setNotice(`Order ${selected}: Rejected. Reason: ${finalReason}`);
     }
     dialog.current?.close();
     setPending(null);
@@ -362,16 +377,19 @@ function Console() {
                       {order.status === 'Needs approval' && (
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button
-                            onClick={() => confirm('approve')}
-                            style={{ flex: 1 }}
+                            className="primary"
+                            onClick={() => handleApprove(order.id)}
+                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                           >
-                            Approve
+                            <CheckCircle2 size={16} />
+                            Approve Order
                           </button>
                           <button
                             onClick={() => confirm('reject')}
-                            style={{ flex: 1, borderColor: '#ef4444', color: '#ef4444' }}
+                            style={{ flex: 1, borderColor: '#ef4444', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                           >
-                            Reject
+                            <X size={16} />
+                            Reject Order
                           </button>
                         </div>
                       )}
@@ -659,39 +677,87 @@ function Console() {
               ? 'Update Shop Order Mode?'
               : pending?.type === 'cash_paid'
               ? `Confirm Counter Cash for ${selected}?`
-              : pending?.type === 'reject'
-              ? `Reject ${selected}?`
-              : `Approve ${selected}?`}
+              : `Reject Order ${selected}?`}
           </h2>
           <p>
             {pending?.type === 'cash_paid'
               ? 'Marking as paid verifies cash collection at the counter and dispatches the document directly to the printer.'
               : pending?.type === 'mode'
               ? 'Only future submitted orders use this mode. Accepted orders retain their original policy.'
-              : 'Record this staff action with an audited reason.'}
+              : 'Select or enter a clear reason so the customer understands why their print was rejected:'}
           </p>
 
-          {pending?.type !== 'cash_paid' && (
-            <>
-              <label htmlFor="action-reason">Reason (required)</label>
+          {pending?.type === 'reject' && (
+            <div style={{ margin: '14px 0' }}>
+              <label htmlFor="action-reason" style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '6px' }}>
+                Rejection Reason (Customer Notification)
+              </label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                {[
+                  'Poor scan / blurred document',
+                  'Paper or binding unavailable',
+                  'Customer requested cancellation',
+                  'Corrupted or password-locked file',
+                ].map(preset => (
+                  <button
+                    key={preset}
+                    type="button"
+                    style={{
+                      fontSize: '11px',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      background: reason === preset ? 'var(--pb-accent, #67283f)' : 'rgba(128,128,128,0.1)',
+                      color: reason === preset ? '#ffffff' : 'inherit',
+                      border: '1px solid rgba(128,128,128,0.2)',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setReason(preset)}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
               <textarea
                 id="action-reason"
                 required
                 maxLength={500}
-                rows={3}
+                rows={2}
                 value={reason}
                 onChange={e => setReason(e.target.value)}
-                placeholder="Reason for audit ledger..."
+                placeholder="Specify reason for customer..."
+                style={{ width: '100%', boxSizing: 'border-box' }}
               />
-            </>
+            </div>
           )}
 
-          <div className="actions" style={{ marginTop: '16px' }}>
+          {pending?.type === 'mode' && (
+            <div style={{ margin: '14px 0' }}>
+              <label htmlFor="action-reason" style={{ display: 'block', fontSize: '11px', fontWeight: 600, marginBottom: '6px' }}>
+                Administrative Audit Reason (required)
+              </label>
+              <textarea
+                id="action-reason"
+                required
+                maxLength={500}
+                rows={2}
+                value={reason}
+                onChange={e => setReason(e.target.value)}
+                placeholder="Reason for audit log..."
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+          )}
+
+          <div className="actions" style={{ marginTop: '16px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
             <button type="button" onClick={() => { dialog.current?.close(); setPending(null); }}>
               Cancel
             </button>
-            <button className="primary" disabled={pending?.type !== 'cash_paid' && !reason.trim()}>
-              Confirm Action
+            <button
+              className="primary"
+              disabled={(pending?.type === 'mode' || pending?.type === 'reject') && !reason.trim()}
+              style={pending?.type === 'reject' ? { background: '#ef4444', borderColor: '#ef4444' } : undefined}
+            >
+              {pending?.type === 'reject' ? 'Confirm Rejection' : 'Confirm Action'}
             </button>
           </div>
         </form>
