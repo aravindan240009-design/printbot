@@ -147,8 +147,8 @@ export default function PrecisionPrinter({
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1.18;
-      renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.shadowMap.enabled = false; // Shadows removed per user request for ultra-clean rendering
+      renderer.localClippingEnabled = true; // Enables realistic internal paper clipping without rubber stretching
 
       // Immediate sizing to prevent 0x0 or 300x150 flash on launch/reload
       const initialRect = el.getBoundingClientRect();
@@ -230,8 +230,6 @@ export default function PrecisionPrinter({
     ) {
       const mesh = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, radius), material);
       mesh.position.set(x, y, z);
-      mesh.castShadow = w > 1.0 && h > 0.05;
-      mesh.receiveShadow = true;
       group.add(mesh);
       return mesh;
     }
@@ -520,64 +518,94 @@ export default function PrecisionPrinter({
     artTexture.wrapS = THREE.ClampToEdgeWrapping;
     artTexture.wrapT = THREE.ClampToEdgeWrapping;
 
+    // Slot exit aperture boundary for hardware clipping (prevents internal paper poke-through)
+    const slotExitZ = 1.30;
+    const slotExitY = 0.095;
+    const slotClipPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -slotExitZ);
+
     const sheetMaterial = standard({
       map: artTexture,
-      roughness: 0.85,
+      roughness: 0.82,
       metalness: 0,
       side: THREE.DoubleSide,
     });
+    sheetMaterial.clippingPlanes = [slotClipPlane];
 
-    // Flexible sheet mesh with subdivision along length
-    const sheetGeo = new THREE.PlaneGeometry(2.26, 1.5, 16, 32);
+    // Fixed physical paper dimensions - NEVER STRETCHES OR UNROLLS
+    const SHEET_W = 2.22;
+    const SHEET_L = 1.62;
+    const COLS = 16;
+    const ROWS = 36;
+    const sheetGeo = new THREE.PlaneGeometry(SHEET_W, SHEET_L, COLS, ROWS);
     const sheet = new THREE.Mesh(sheetGeo, sheetMaterial);
-    sheet.castShadow = true;
-    sheet.receiveShadow = true;
     group.add(sheet);
 
+    // Save initial undeformed positions
     const posAttr = sheetGeo.attributes.position;
-    const uvAttr = sheetGeo.attributes.uv;
+    const origPos = new Float32Array(posAttr.array);
 
-    // Physically realistic paper feed function:
-    // Curve begins in internal slot, bends gently over output roller, and glides along the tray bed
-    function updatePaperFeed(feedLength: number) {
-      const trayAngle = 0.075;
-      const slotY = 0.09;
-      const slotZ = 1.35;
+    // Realistic stacked printed sheets already resting in the output tray
+    const stackMat = standard({
+      color: 0xf8f6f2,
+      roughness: 0.88,
+      metalness: 0,
+      side: THREE.DoubleSide,
+    });
+    const stack1 = new THREE.Mesh(new THREE.PlaneGeometry(SHEET_W, SHEET_L), stackMat);
+    stack1.rotation.x = -Math.PI / 2 + 0.065;
+    stack1.position.set(0.015, -0.078, 2.12);
+    group.add(stack1);
 
+    const stack2 = new THREE.Mesh(new THREE.PlaneGeometry(SHEET_W, SHEET_L), stackMat);
+    stack2.rotation.x = -Math.PI / 2 + 0.065;
+    stack2.rotation.z = -0.014;
+    stack2.position.set(-0.012, -0.072, 2.14);
+    group.add(stack2);
+
+    // 100% physically authentic rigid paper feed kinematics:
+    // Vertices move forward at constant physical spacing, sliding out of internal rollers and draping onto tray
+    function updatePaperFeed(feedDistance: number) {
       for (let i = 0; i < posAttr.count; i++) {
-        const u = uvAttr.getX(i);
-        const v = 1 - uvAttr.getY(i); // 0 at leading edge, 1 at trailing edge
-        const dist = v * feedLength;
+        const origX = origPos[i * 3];
+        const origY = origPos[i * 3 + 1];
+        // Exact distance along sheet from leading edge (0 to SHEET_L)
+        const s = (0.5 - origY / SHEET_L) * SHEET_L;
 
-        const x = (u - 0.5) * 2.22;
-        // Natural S-curve from slot onto tray:
-        // When dist is near 0 (near slot), it stays near slotY. As dist extends, it ramps down to tray level
-        const trayZ = slotZ + dist;
-        const traySurfaceY = -0.10 + dist * Math.sin(trayAngle);
-        const curveDrop = Math.sin(Math.min(dist / 0.5, 1) * Math.PI * 0.5);
-        const y = slotY * (1 - curveDrop) + traySurfaceY * curveDrop;
+        const zTarget = slotExitZ + feedDistance - s;
+        let yTarget = slotExitY;
 
-        posAttr.setXYZ(i, x, y, trayZ);
+        if (zTarget >= slotExitZ) {
+          const distPast = zTarget - slotExitZ;
+          const yTray = -0.075 + distPast * Math.sin(0.065);
+          // Smooth paper beam stiffness drape over exit roller
+          const drape = Math.sin(Math.min(distPast / 0.42, 1.0) * Math.PI * 0.5);
+          yTarget = slotExitY * (1 - drape) + yTray * drape;
+
+          // Trailing edge drop when tail exits roller
+          if (feedDistance >= SHEET_L && s > SHEET_L - 0.40) {
+            const tailExit = Math.min((feedDistance - SHEET_L) / 0.12, 1.0);
+            const tailWeight = (s - (SHEET_L - 0.40)) / 0.40;
+            const dropFactor = Math.sin(tailExit * Math.PI * 0.5);
+            yTarget = yTarget * (1 - tailWeight * dropFactor) + yTray * (tailWeight * dropFactor);
+          }
+        }
+
+        posAttr.setXYZ(i, origX, yTarget, zTarget);
       }
       posAttr.needsUpdate = true;
       sheetGeo.computeVertexNormals();
-
-      // Progressive ink print reveal
-      artTexture.repeat.y = Math.max(feedLength / 2.0, 0.01);
-      artTexture.offset.y = 1 - artTexture.repeat.y;
     }
 
-    updatePaperFeed(1.4);
+    updatePaperFeed(1.74);
 
     // ==============================================================
-    // 7. SLEEK TURNTABLE PEDESTAL & SHADOWS
+    // 7. SLEEK TURNTABLE PEDESTAL (SHADOWLESS PER USER REQUEST)
     // ==============================================================
     const platform = new THREE.Mesh(
       new THREE.CylinderGeometry(2.85, 3.0, 0.11, 64),
       standard({ color: 0x1b1917, metalness: 0.65, roughness: 0.28 })
     );
     platform.position.set(0, -1.04, 0.2);
-    platform.receiveShadow = true;
     scene.add(platform);
 
     const platformRim = new THREE.Mesh(
@@ -588,39 +616,25 @@ export default function PrecisionPrinter({
     platformRim.position.set(0, -0.985, 0.2);
     scene.add(platformRim);
 
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(40, 40),
-      new THREE.ShadowMaterial({ opacity: 0.22 })
-    );
-    materials.push(ground.material);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -1.105;
-    ground.receiveShadow = true;
-    scene.add(ground);
-
     // ==============================================================
-    // 8. LUXURY STUDIO LIGHTING
+    // 8. LUXURY STUDIO LIGHTING (SHADOW MAPS DISABLED FOR CLEAN AESTHETIC)
     // ==============================================================
-    scene.add(new THREE.HemisphereLight(0xfff8ed, 0x241d24, 2.2));
+    scene.add(new THREE.HemisphereLight(0xfff8ed, 0x241d24, 2.4));
 
-    const key = new THREE.DirectionalLight(0xfff3e2, 3.6);
+    const key = new THREE.DirectionalLight(0xfff3e2, 3.8);
     key.position.set(-3.5, 7.5, 5.5);
-    key.castShadow = true;
-    key.shadow.mapSize.set(1024, 1024);
-    key.shadow.camera.left = -6;
-    key.shadow.camera.right = 6;
-    key.shadow.camera.top = 6;
-    key.shadow.camera.bottom = -6;
-    key.shadow.bias = -0.0004;
-    key.shadow.normalBias = 0.02;
     scene.add(key);
 
     const rim = new THREE.DirectionalLight(0xd4e2f5, 2.2);
     rim.position.set(4.5, 2.5, -4.5);
     scene.add(rim);
 
+    const frontFill = new THREE.DirectionalLight(0xffe8cf, 1.5);
+    frontFill.position.set(0, 1.5, 6.0);
+    scene.add(frontFill);
+
     // ==============================================================
-    // 9. ANIMATION LOOP & AUDIO COORDINATION
+    // 9. ANIMATION LOOP, MOUSE ROTATION & AUDIO COORDINATION
     // ==============================================================
     let frame = 0;
     let visible = true;
@@ -629,10 +643,21 @@ export default function PrecisionPrinter({
     let elapsed = 0;
     let cycle = 2.0;
     let restart = controls.current.restart;
-    let targetX = 0;
-    let targetY = 0;
     let lastMotorTick = 0;
     let hasPlayedDrop = false;
+
+    // Interactive 360° mouse & touch drag rotation state
+    let currentRotY = 0;
+    let currentRotX = 0;
+    let targetRotY = 0;
+    let targetRotX = 0;
+    let velY = 0;
+    let velX = 0;
+    let isDragging = false;
+    let activePointerId = -1;
+    let lastPointerX = 0;
+    let lastPointerY = 0;
+    let lastInteractionTime = performance.now();
 
     function request() {
       if (!frame && !disposed && visible && !document.hidden) {
@@ -661,43 +686,79 @@ export default function PrecisionPrinter({
         cycle = (cycle + dt) % 10.0;
       }
 
-      // Elegant subtle turntable sway
-      const turn = Math.sin(elapsed * 0.22) * 0.44;
-      group.rotation.y += (turn + targetY - group.rotation.y) * 0.055;
-      group.rotation.x += (targetX - group.rotation.x) * 0.07;
+      // Smooth 360° mouse & touch drag rotation with inertia
+      if (isDragging) {
+        currentRotY += (targetRotY - currentRotY) * 0.45;
+        currentRotX += (targetRotX - currentRotX) * 0.45;
+        group.rotation.y = currentRotY;
+        group.rotation.x = currentRotX;
+      } else {
+        if (Math.abs(velY) > 0.0001) {
+          targetRotY += velY;
+          velY *= 0.92;
+        }
+        if (Math.abs(velX) > 0.0001) {
+          targetRotX = THREE.MathUtils.clamp(targetRotX + velX, -0.25, 0.42);
+          velX *= 0.92;
+        }
+        currentRotY += (targetRotY - currentRotY) * 0.18;
+        currentRotX += (targetRotX - currentRotX) * 0.18;
 
-      // Feed progress: 0 to 1 between cycle 0.6s and 5.5s
-      const isPrintingActive = cycle >= 0.5 && cycle < 6.0;
-      const progress = THREE.MathUtils.clamp((cycle - 0.5) / 5.0, 0, 1);
-      const feedDistance = 0.06 + progress * 1.58;
-      updatePaperFeed(feedDistance);
+        const idleSecs = (performance.now() - lastInteractionTime) / 1000;
+        if (idleSecs > 2.5 && !controls.current.paused) {
+          const blend = Math.min((idleSecs - 2.5) / 2.0, 1.0);
+          const ambientSway = Math.sin(elapsed * 0.22) * 0.35 * blend;
+          group.rotation.y = currentRotY + ambientSway;
+        } else {
+          group.rotation.y = currentRotY;
+        }
+        group.rotation.x = currentRotX;
+      }
 
-      // Carriage sweep animation while printing
+      // 100% physically realistic paper feed animation:
+      // Rigid sheet advances millimeter-by-millimeter out of slot rollers with micro-stepper pulses
+      const isPrintingActive = cycle >= 0.4 && cycle < 5.8;
+      let feedDistance = 0.02;
+      let printProgress = 0;
+
       if (isPrintingActive) {
-        carriage.position.x = Math.sin(cycle * 14.0) * 0.9;
-        // Status LED pulses cyan/amber
-        statusMesh.material = ledActive;
-        statusMesh.scale.x = 1.0 + Math.sin(elapsed * 8) * 0.25;
+        printProgress = THREE.MathUtils.clamp((cycle - 0.4) / 5.2, 0, 1);
+        const microStep = Math.sin(printProgress * 48 * Math.PI) * 0.003;
+        feedDistance = 0.02 + printProgress * (SHEET_L + 0.12) + microStep;
+        updatePaperFeed(feedDistance);
 
-        // Sound: Stepper motor ticking in rhythm
+        // Carriage sweep animation while printing
+        carriage.position.x = Math.sin(cycle * 16.0) * 0.92;
+        statusMesh.material = ledActive;
+        statusMesh.scale.x = 1.0 + Math.sin(elapsed * 9) * 0.25;
+
+        // Stepper motor ticking in rhythm
         if (
           controls.current.soundEnabled &&
           audioEngine.current &&
-          now - lastMotorTick > 140
+          now - lastMotorTick > 130
         ) {
           audioEngine.current.playMotorStep();
           lastMotorTick = now;
         }
-      } else {
+      } else if (cycle >= 5.8) {
+        // Fully printed & resting on the tray
+        feedDistance = SHEET_L + 0.12;
+        updatePaperFeed(feedDistance);
         carriage.position.x = 0;
         statusMesh.material = ledReady;
         statusMesh.scale.x = 1.0;
 
-        // Paper landing rustle sound once when done
-        if (!hasPlayedDrop && progress >= 1.0 && controls.current.soundEnabled) {
+        if (!hasPlayedDrop && controls.current.soundEnabled) {
           audioEngine.current?.playTrayLanding();
           hasPlayedDrop = true;
         }
+      } else {
+        feedDistance = 0.02;
+        updatePaperFeed(feedDistance);
+        carriage.position.x = 0;
+        statusMesh.material = ledReady;
+        statusMesh.scale.x = 1.0;
       }
 
       // Update interactive screen canvas
@@ -715,13 +776,13 @@ export default function PrecisionPrinter({
           screenCtx.fill();
           screenCtx.fillStyle = '#ffffff';
           screenCtx.font = 'bold 28px Georgia, serif';
-          screenCtx.fillText(`Printing: ${Math.round(progress * 100)}%`, 28, 108);
+          screenCtx.fillText(`Printing: ${Math.round(printProgress * 100)}%`, 28, 108);
 
           // Progress bar track & fill
           screenCtx.fillStyle = '#1c2830';
           screenCtx.fillRect(28, 142, 456, 10);
           screenCtx.fillStyle = '#0a84ff';
-          screenCtx.fillRect(28, 142, 456 * progress, 10);
+          screenCtx.fillRect(28, 142, 456 * printProgress, 10);
 
           screenCtx.fillStyle = '#8ca8b8';
           screenCtx.font = '18px monospace';
@@ -749,8 +810,11 @@ export default function PrecisionPrinter({
 
       if (
         !controls.current.paused ||
-        Math.abs(targetX - group.rotation.x) > 0.001 ||
-        Math.abs(turn + targetY - group.rotation.y) > 0.001
+        isDragging ||
+        Math.abs(velY) > 0.0001 ||
+        Math.abs(velX) > 0.0001 ||
+        Math.abs(targetRotY - currentRotY) > 0.001 ||
+        Math.abs(targetRotX - currentRotX) > 0.001
       ) {
         request();
       }
@@ -783,17 +847,50 @@ export default function PrecisionPrinter({
     });
     observer.observe(el);
 
-    const move = (event: PointerEvent) => {
-      if (event.pointerType === 'touch') return;
-      const rect = el.getBoundingClientRect();
-      targetY = ((event.clientX - rect.left) / rect.width - 0.5) * 0.35;
-      targetX = ((event.clientY - rect.top) / rect.height - 0.5) * 0.09;
+    // Interactive 360° mouse & touch drag rotation
+    const onPointerDown = (event: PointerEvent) => {
+      isDragging = true;
+      activePointerId = event.pointerId;
+      lastPointerX = event.clientX;
+      lastPointerY = event.clientY;
+      velY = 0;
+      velX = 0;
+      lastInteractionTime = performance.now();
+      try {
+        el.setPointerCapture(event.pointerId);
+      } catch {}
+      el.classList.add('is-dragging');
       request();
     };
 
-    const leave = () => {
-      targetX = targetY = 0;
-      request();
+    const onPointerMove = (event: PointerEvent) => {
+      if (isDragging && event.pointerId === activePointerId) {
+        const dx = event.clientX - lastPointerX;
+        const dy = event.clientY - lastPointerY;
+        lastPointerX = event.clientX;
+        lastPointerY = event.clientY;
+
+        targetRotY += dx * 0.008;
+        targetRotX = THREE.MathUtils.clamp(targetRotX + dy * 0.004, -0.25, 0.42);
+
+        velY = dx * 0.008;
+        velX = dy * 0.004;
+        lastInteractionTime = performance.now();
+        request();
+      }
+    };
+
+    const onPointerUp = (event: PointerEvent) => {
+      if (event.pointerId === activePointerId) {
+        isDragging = false;
+        activePointerId = -1;
+        try {
+          el.releasePointerCapture(event.pointerId);
+        } catch {}
+        el.classList.remove('is-dragging');
+        lastInteractionTime = performance.now();
+        request();
+      }
     };
 
     const visibility = () => {
@@ -820,8 +917,10 @@ export default function PrecisionPrinter({
       }
     };
 
-    el.addEventListener('pointermove', move);
-    el.addEventListener('pointerleave', leave);
+    el.addEventListener('pointerdown', onPointerDown);
+    el.addEventListener('pointermove', onPointerMove);
+    el.addEventListener('pointerup', onPointerUp);
+    el.addEventListener('pointercancel', onPointerUp);
     document.addEventListener('visibilitychange', visibility);
     renderer.domElement.addEventListener('webglcontextlost', lost);
     renderer.domElement.addEventListener('webglcontextrestored', restored);
@@ -833,8 +932,10 @@ export default function PrecisionPrinter({
       invalidate.current = () => {};
       resize.disconnect();
       observer.disconnect();
-      el.removeEventListener('pointermove', move);
-      el.removeEventListener('pointerleave', leave);
+      el.removeEventListener('pointerdown', onPointerDown);
+      el.removeEventListener('pointermove', onPointerMove);
+      el.removeEventListener('pointerup', onPointerUp);
+      el.removeEventListener('pointercancel', onPointerUp);
       document.removeEventListener('visibilitychange', visibility);
       renderer.domElement.removeEventListener('webglcontextlost', lost);
       renderer.domElement.removeEventListener('webglcontextrestored', restored);
@@ -844,7 +945,6 @@ export default function PrecisionPrinter({
       materials.forEach((m) => m.dispose());
       textures.forEach((t) => t.dispose());
       if (environment) environment.dispose();
-      key.shadow.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     };

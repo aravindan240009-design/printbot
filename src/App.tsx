@@ -236,7 +236,7 @@ export default function App() {
             </div>
 
             <div className="scene-label">
-              <span>Designed around your workflow.</span>
+              <span>Drag to rotate 360° · Designed around your workflow</span>
               <span>
                 Ready when you are <span className="signal" />
               </span>

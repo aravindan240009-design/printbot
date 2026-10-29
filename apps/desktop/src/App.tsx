@@ -1407,7 +1407,7 @@ export default function App() {
       </aside>
 
       {/* Main Panel */}
-      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, height: '100vh', overflowY: 'auto' }}>
+      <div className="ws-main-scroll">
         {/* Topbar */}
         <header className="ws-topbar">
           <div>
@@ -1477,22 +1477,22 @@ export default function App() {
               <div className="ws-stats">
                 <div className="ws-stat">
                   <span>Awaiting review</span>
-                  <strong>{pendingCount.toString().padStart(2, '0')}</strong>
+                  <strong>{pendingCount}</strong>
                   <small>Your next decisions</small>
                 </div>
                 <div className="ws-stat">
                   <span>In the queue</span>
-                  <strong>{queuedCount.toString().padStart(2, '0')}</strong>
+                  <strong>{queuedCount}</strong>
                   <small>Ready to dispatch</small>
                 </div>
                 <div className="ws-stat">
                   <span>Completed today</span>
-                  <strong>{completedCount.toString().padStart(2, '0')}</strong>
+                  <strong>{completedCount}</strong>
                   <small>Total customer prints</small>
                 </div>
                 <div className="ws-stat">
                   <span>Needs attention</span>
-                  <strong>{attentionCount.toString().padStart(2, '0')}</strong>
+                  <strong>{attentionCount}</strong>
                   <small>Supervised reconciliation</small>
                 </div>
               </div>

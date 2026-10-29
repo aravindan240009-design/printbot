@@ -8,9 +8,6 @@ interface RealisticPrinterFallbackProps {
 export function RealisticPrinterFallback({ printing = false, paused = false }: RealisticPrinterFallbackProps) {
   return (
     <div className="realistic-printer-fallback" aria-hidden="true">
-      {/* Ambient pedestal drop shadow */}
-      <div className="fallback-pedestal-shadow" />
-
       {/* Turntable circular luxury base with gold metallic rim */}
       <div className="fallback-pedestal">
         <div className="fallback-pedestal-rim" />
