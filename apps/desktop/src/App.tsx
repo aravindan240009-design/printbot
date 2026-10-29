@@ -333,7 +333,7 @@ export default function App() {
           orderMode: 'MANUAL_APPROVAL',
           status: 'ACTIVE',
           expiresAt: expiry.toISOString().split('T')[0],
-          isConfigured: false,
+          isConfigured: true,
           duration: duration,
           deviceId: null,
           totalOrdersCount: 0,
@@ -357,16 +357,29 @@ export default function App() {
     setLoginError('');
   };
 
-  // --- Setup Wizard State (Fill Details) ---
+  // --- Shop Configuration State (Auto-filled by License Key & Managed in Settings) ---
   const [setupShopName, setSetupShopName] = useState(currentShop?.shopName || '');
   const [setupLocation, setSetupLocation] = useState(currentShop?.location || '');
   const [setupPhone, setSetupPhone] = useState(currentShop?.phone || '');
-  const [setupUpi, setSetupUpi] = useState(currentShop?.upiId || '');
-  const [setupBwRate, setSetupBwRate] = useState(currentShop?.rates.bwPerSideRupees || 1.5);
-  const [setupColorRate, setSetupColorRate] = useState(currentShop?.rates.colorPerSideRupees || 10.0);
+  const [setupBwRate, setSetupBwRate] = useState(currentShop?.rates?.bwPerSideRupees ?? 1.5);
+  const [setupColorRate, setSetupColorRate] = useState(currentShop?.rates?.colorPerSideRupees ?? 10.0);
   const [setupOrderMode, setSetupOrderMode] = useState<'MANUAL_APPROVAL' | 'FULL_AUTOMATIC'>(
     currentShop?.orderMode || 'MANUAL_APPROVAL'
   );
+
+  // Automatically pre-fill all configuration details from active License Key
+  useEffect(() => {
+    if (currentShop) {
+      if (currentShop.shopName) setSetupShopName(currentShop.shopName);
+      if (currentShop.location) setSetupLocation(currentShop.location);
+      if (currentShop.phone) setSetupPhone(currentShop.phone);
+      if (currentShop.rates) {
+        setSetupBwRate(currentShop.rates.bwPerSideRupees ?? 1.5);
+        setSetupColorRate(currentShop.rates.colorPerSideRupees ?? 10.0);
+      }
+      if (currentShop.orderMode) setSetupOrderMode(currentShop.orderMode);
+    }
+  }, [currentShop]);
 
   const handleSaveSetup = (e: React.FormEvent) => {
     e.preventDefault();
@@ -376,16 +389,9 @@ export default function App() {
       ...prev,
       [u]: {
         ...prev[u],
-        shopName: setupShopName || 'My Xerox Shop',
-        location: setupLocation || 'Counter 01',
-        phone: setupPhone || '+91 99999 99999',
-        upiId: setupUpi || 'shop@upi',
-        rates: {
-          bwPerSideRupees: Number(setupBwRate) || 1.5,
-          colorPerSideRupees: Number(setupColorRate) || 10.0,
-          duplexDiscountPercent: 15,
-        },
-        orderMode: setupOrderMode,
+        shopName: setupShopName || prev[u]?.shopName || 'My Xerox Shop',
+        location: setupLocation || prev[u]?.location || 'Counter 01',
+        phone: setupPhone || prev[u]?.phone || '+91 99999 99999',
         isConfigured: true,
       },
     }));
@@ -500,7 +506,7 @@ export default function App() {
                     orderMode: 'MANUAL_APPROVAL',
                     status: 'ACTIVE',
                     expiresAt: expiry.toISOString().split('T')[0],
-                    isConfigured: false,
+                    isConfigured: true,
                     duration: duration,
                     deviceId: null,
                     totalOrdersCount: 0,
@@ -643,7 +649,7 @@ export default function App() {
       orderMode: 'MANUAL_APPROVAL',
       status: 'ACTIVE',
       expiresAt: expiryStr,
-      isConfigured: false,
+      isConfigured: true,
       duration: duration,
       deviceId: null,
       totalOrdersCount: 0,
@@ -829,7 +835,7 @@ export default function App() {
       orderMode: 'MANUAL_APPROVAL',
       status: 'ACTIVE',
       expiresAt: expiryStr,
-      isConfigured: false,
+      isConfigured: true,
       duration: newDuration,
       deviceId: null,
       totalOrdersCount: 0,
@@ -1202,7 +1208,7 @@ export default function App() {
           </div>
 
           <form onSubmit={handleSaveSetup} style={{ display: 'grid', gap: '20px' }}>
-            {/* Identity */}
+            {/* Identity (Auto-filled by License Key) */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
@@ -1230,89 +1236,35 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                  Contact Phone *
-                </label>
-                <input
-                  type="text"
-                  placeholder="+91 98401 23456"
-                  value={setupPhone}
-                  onChange={(e) => setSetupPhone(e.target.value)}
-                  required
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                  Shop UPI ID for Customer Payments *
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. yourname@okaxis"
-                  value={setupUpi}
-                  onChange={(e) => setSetupUpi(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Pricing */}
-            <div
-              style={{
-                borderTop: '1px solid var(--pb-border)',
-                paddingTop: '20px',
-              }}
-            >
-              <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '12px' }}>
-                Per-Page Pricing Rates (INR ₹)
-              </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                    Black & White Rate per Page (₹)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0.5"
-                    value={setupBwRate}
-                    onChange={(e) => setSetupBwRate(Number(e.target.value))}
-                    required
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                    Full Color Rate per Page (₹)
-                  </label>
-                  <input
-                    type="number"
-                    step="1"
-                    min="1"
-                    value={setupColorRate}
-                    onChange={(e) => setSetupColorRate(Number(e.target.value))}
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Operating Mode */}
             <div>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                Workstation Order Dispatch Mode
+                Contact Phone *
               </label>
-              <select
-                value={setupOrderMode}
-                onChange={(e) => setSetupOrderMode(e.target.value as 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC')}
-              >
-                <option value="MANUAL_APPROVAL">
-                  Manual Approval (Operator reviews & clicks Approve before printing)
-                </option>
-                <option value="FULL_AUTOMATIC">
-                  Full Automatic (Directly prints once customer UPI payment is verified)
-                </option>
-              </select>
+              <input
+                type="text"
+                placeholder="+91 98401 23456"
+                value={setupPhone}
+                onChange={(e) => setSetupPhone(e.target.value)}
+                required
+              />
+            </div>
+
+            {/* Auto-filled by License Key Note */}
+            <div
+              style={{
+                background: 'var(--pb-raised)',
+                border: '1px solid var(--pb-border)',
+                borderRadius: '12px',
+                padding: '16px',
+                fontSize: '12.5px',
+                lineHeight: 1.5,
+                color: 'var(--pb-muted)',
+              }}
+            >
+              <strong style={{ color: 'var(--pb-text)', display: 'block', marginBottom: '4px' }}>
+                ✓ Configured from License Key:
+              </strong>
+              Per-page rates (<strong>₹{setupBwRate} B&amp;W</strong>, <strong>₹{setupColorRate} Color</strong>) and Order Dispatch Mode (<strong>{setupOrderMode === 'FULL_AUTOMATIC' ? 'Full Automatic' : 'Manual Approval'}</strong>) have been automatically initialized from your License Key. You can adjust rates and dispatch preferences at any time under the <strong>Settings</strong> page.
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
@@ -1320,7 +1272,7 @@ export default function App() {
                 Cancel / Log Out
               </button>
               <button type="submit" className="ws-primary" style={{ minWidth: '180px' }}>
-                Save & Open Queue →
+                Open Workstation Queue →
               </button>
             </div>
           </form>
@@ -4032,8 +3984,8 @@ export default function App() {
               <div className="ws-page-heading">
                 <div>
                   <span className="ws-eyebrow">CONFIGURATION</span>
-                  <h1>Shop settings & rates.</h1>
-                  <p>Update your per-page billing rates, dispatch mode, and shop contact details.</p>
+                  <h1>Shop settings &amp; rates.</h1>
+                  <p>Update your per-page billing rates, order dispatch mode, and shop contact details.</p>
                 </div>
               </div>
 
@@ -4047,10 +3999,9 @@ export default function App() {
                       ...prev,
                       [u]: {
                         ...prev[u],
-                        shopName: setupShopName,
-                        location: setupLocation,
-                        phone: setupPhone,
-                        upiId: setupUpi,
+                        shopName: setupShopName || prev[u]?.shopName || 'My Xerox Shop',
+                        location: setupLocation || prev[u]?.location || 'Counter 01',
+                        phone: setupPhone || prev[u]?.phone || '+91 99999 99999',
                         rates: {
                           bwPerSideRupees: Number(setupBwRate) || 1.5,
                           colorPerSideRupees: Number(setupColorRate) || 10.0,
@@ -4059,68 +4010,105 @@ export default function App() {
                         orderMode: setupOrderMode,
                       },
                     }));
-                    setNotice('Shop preferences and rates updated successfully.');
+                    setNotice('Shop preferences, pricing rates, and dispatch mode updated successfully.');
                   }}
-                  style={{ display: 'grid', gap: '16px' }}
+                  style={{ display: 'grid', gap: '20px' }}
                 >
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                      Shop Name
-                    </label>
-                    <input
-                      type="text"
-                      value={setupShopName}
-                      onChange={(e) => setSetupShopName(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                      Branch Location
-                    </label>
-                    <input
-                      type="text"
-                      value={setupLocation}
-                      onChange={(e) => setSetupLocation(e.target.value)}
-                    />
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                        B&W Rate (₹/pg)
+                        Shop Name
                       </label>
                       <input
-                        type="number"
-                        step="0.5"
-                        value={setupBwRate}
-                        onChange={(e) => setSetupBwRate(Number(e.target.value))}
+                        type="text"
+                        value={setupShopName}
+                        onChange={(e) => setSetupShopName(e.target.value)}
+                        placeholder="e.g. Metro Xerox & Digital Prints"
                       />
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                        Color Rate (₹/pg)
+                        Branch Location
                       </label>
                       <input
-                        type="number"
-                        step="1"
-                        value={setupColorRate}
-                        onChange={(e) => setSetupColorRate(Number(e.target.value))}
+                        type="text"
+                        value={setupLocation}
+                        onChange={(e) => setSetupLocation(e.target.value)}
+                        placeholder="e.g. Counter 01, Main Road"
                       />
                     </div>
                   </div>
 
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                      Order Dispatch Mode
+                      Contact Phone
+                    </label>
+                    <input
+                      type="text"
+                      value={setupPhone}
+                      onChange={(e) => setSetupPhone(e.target.value)}
+                      placeholder="+91 98401 23456"
+                    />
+                  </div>
+
+                  {/* Per-Page Pricing Rates (INR ₹) */}
+                  <div style={{ borderTop: '1px solid var(--pb-border)', paddingTop: '16px' }}>
+                    <h3 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px' }}>
+                      Per-Page Pricing Rates (INR ₹)
+                    </h3>
+                    <p style={{ color: 'var(--pb-muted)', fontSize: '12px', margin: '0 0 12px' }}>
+                      These rates calculate customer preview quotes and counter receipts.
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                          Black &amp; White Rate per Page (₹)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="0.5"
+                          value={setupBwRate}
+                          onChange={(e) => setSetupBwRate(Number(e.target.value))}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                          Full Color Rate per Page (₹)
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          min="1"
+                          value={setupColorRate}
+                          onChange={(e) => setSetupColorRate(Number(e.target.value))}
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Workstation Order Dispatch Mode */}
+                  <div style={{ borderTop: '1px solid var(--pb-border)', paddingTop: '16px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                      Workstation Order Dispatch Mode
                     </label>
                     <select
                       value={setupOrderMode}
                       onChange={(e) => setSetupOrderMode(e.target.value as 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC')}
+                      style={{ width: '100%' }}
                     >
-                      <option value="MANUAL_APPROVAL">Manual Approval</option>
-                      <option value="FULL_AUTOMATIC">Full Automatic</option>
+                      <option value="MANUAL_APPROVAL">
+                        Manual Approval (Operator reviews &amp; clicks Approve before printing)
+                      </option>
+                      <option value="FULL_AUTOMATIC">
+                        Full Automatic (Directly prints once customer UPI payment is verified)
+                      </option>
                     </select>
+                    <small style={{ color: 'var(--pb-muted)', fontSize: '11px', display: 'block', marginTop: '6px' }}>
+                      Switch anytime based on your counter rush. Manual approval lets you inspect customer files first.
+                    </small>
                   </div>
 
                   <button type="submit" className="ws-primary" style={{ marginTop: '10px' }}>
