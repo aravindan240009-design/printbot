@@ -157,12 +157,6 @@ function Console() {
       <div className="console-body">
         <StudioHeader hideBrandIcon title="Platform Command" subtitle={`Super Admin · ${tab}`} />
         <main id="main">
-          <div className="workspace-context">
-            <span className="context-line" />
-            <span>SUPER-ADMINISTRATOR CONTROL PLANE</span>
-            <span>Multi-Tenant Fleet Isolation: Enforced</span>
-          </div>
-
           <div className="page-heading">
             <div>
               <span className="eyebrow">THE PLATFORM, IN PERSPECTIVE</span>

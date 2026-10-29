@@ -201,12 +201,6 @@ function Console() {
       <div className="console-body">
         <StudioHeader hideBrandIcon title="Anna Xerox & Stationery" subtitle={`Chennai, Guindy · ${tab}`} />
         <main id="main">
-          <div className="workspace-context">
-            <span className="context-line" />
-            <span>LOCAL INTERACTIVE PREVIEW</span>
-            <span>Shop ID: 11111111-1111-1111-1111-111111111111</span>
-          </div>
-
           <div className="page-heading">
             <div>
               <span className="eyebrow">YOUR COUNTER, IN CONTROL</span>
