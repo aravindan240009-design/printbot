@@ -25,9 +25,36 @@ interface UploadedDoc {
   finishing: 'none' | 'staple' | 'spiral' | 'hard_bind';
 }
 
+async function inspectFilePages(file: File): Promise<number> {
+  if (file.type.startsWith('image/')) return 1;
+
+  if (file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf') {
+    try {
+      const buffer = await file.arrayBuffer();
+      const text = new TextDecoder('latin1').decode(new Uint8Array(buffer));
+
+      // 1. Match /Type /Page
+      const pageMatches = text.match(/\/Type\s*\/Page\b/g);
+      if (pageMatches && pageMatches.length > 0) {
+        return pageMatches.length;
+      }
+
+      // 2. Catalog /Pages /Count fallback
+      const countMatch = text.match(/\/Count\s+(\d+)/);
+      if (countMatch && parseInt(countMatch[1], 10) > 0) {
+        return parseInt(countMatch[1], 10);
+      }
+    } catch (err) {
+      console.warn('PDF page inspection fallback:', err);
+    }
+  }
+  return 1;
+}
+
 export const CustomerShopPortal: React.FC<CustomerShopPortalProps> = ({ shopId, onBackToHome }) => {
   const [lang, setLang] = useState<'en' | 'ta' | 'hi'>('en');
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [rates, setRates] = useState<{ bw: number; color: number }>({ bw: 1.5, color: 10.0 });
   const [shopDetails, setShopDetails] = useState<{
     name: string;
     city: string;
@@ -50,17 +77,28 @@ export const CustomerShopPortal: React.FC<CustomerShopPortalProps> = ({ shopId, 
     sheets: number;
   } | null>(null);
 
-  // Fetch registered shop details from Supabase
+  // Fetch registered shop details & pricing rates from Supabase
   useEffect(() => {
     async function loadShop() {
       try {
         const { data, error } = await supabase
           .from('pilot_applications')
-          .select('shop_name, city, contact_number, plan')
+          .select('shop_name, city, contact_number, plan, notes')
           .eq('generated_username', shopId.toLowerCase())
           .maybeSingle();
 
         if (!error && data) {
+          let customBw = 1.5;
+          let customColor = 10.0;
+          try {
+            if (data.notes) {
+              const parsed = JSON.parse(data.notes);
+              if (parsed.bwRate) customBw = Number(parsed.bwRate);
+              if (parsed.colorRate) customColor = Number(parsed.colorRate);
+            }
+          } catch {}
+
+          setRates({ bw: customBw, color: customColor });
           setShopDetails({
             name: data.shop_name || shopId.toUpperCase(),
             city: data.city || 'Counter Station',
@@ -77,20 +115,26 @@ export const CustomerShopPortal: React.FC<CustomerShopPortalProps> = ({ shopId, 
 
   const activeDoc = files.find((f) => f.id === activeFileId) || files[0];
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
-    const newDocs: UploadedDoc[] = Array.from(e.target.files).map((file) => ({
-      id: crypto.randomUUID ? crypto.randomUUID() : 'f_' + Math.random().toString(36).slice(2, 9),
-      name: file.name,
-      size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
-      pageCount: file.name.toLowerCase().endsWith('.pdf') ? 4 : 1,
-      copies: 1,
-      colorMode: 'bw',
-      duplex: 'simplex',
-      paperSize: 'A4',
-      pageRange: 'all',
-      finishing: 'none',
-    }));
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const selected = Array.from(e.target.files);
+
+    const newDocs: UploadedDoc[] = [];
+    for (const file of selected) {
+      const detectedPages = await inspectFilePages(file);
+      newDocs.push({
+        id: crypto.randomUUID ? crypto.randomUUID() : 'f_' + Math.random().toString(36).slice(2, 9),
+        name: file.name,
+        size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+        pageCount: Math.max(1, detectedPages),
+        copies: 1,
+        colorMode: 'bw',
+        duplex: 'simplex',
+        paperSize: 'A4',
+        pageRange: 'all',
+        finishing: 'none',
+      });
+    }
 
     setFiles((prev) => [...prev, ...newDocs]);
     if (!activeFileId && newDocs.length > 0) {
@@ -113,7 +157,7 @@ export const CustomerShopPortal: React.FC<CustomerShopPortalProps> = ({ shopId, 
     let totalLogical = 0;
 
     files.forEach((f) => {
-      let pages = f.pageCount;
+      let pages = Math.max(1, f.pageCount);
       if (f.pageRange === 'odd' || f.pageRange === 'even') {
         pages = Math.ceil(pages / 2);
       }
@@ -124,10 +168,10 @@ export const CustomerShopPortal: React.FC<CustomerShopPortalProps> = ({ shopId, 
       const sheetsPerCopy = isDuplex ? Math.ceil(pages / 2) : pages;
       totalSheets += sheetsPerCopy * copies;
 
-      const ratePerSide = f.colorMode === 'color' ? 10.0 : f.colorMode === 'grayscale' ? 2.0 : 1.5;
+      const ratePerSide = f.colorMode === 'color' ? rates.color : f.colorMode === 'grayscale' ? 2.0 : rates.bw;
 
       let docCost = 0;
-      if (isDuplex) {
+      if (isDuplex && pages > 1) {
         const fullSheets = Math.floor(pages / 2);
         const oddSide = pages % 2 !== 0;
         docCost = (fullSheets * (ratePerSide + ratePerSide * 0.85) + (oddSide ? ratePerSide : 0)) * copies;
@@ -147,7 +191,7 @@ export const CustomerShopPortal: React.FC<CustomerShopPortalProps> = ({ shopId, 
       sheets: totalSheets,
       logical: totalLogical,
     };
-  }, [files]);
+  }, [files, rates]);
 
   const handlePlaceOrder = () => {
     const pin = String(Math.floor(1000 + Math.random() * 9000));
@@ -330,7 +374,7 @@ export const CustomerShopPortal: React.FC<CustomerShopPortalProps> = ({ shopId, 
                   }}
                 >
                   <div>Black &amp; White</div>
-                  <div style={{ fontSize: '12px', color: '#9ca3af' }}>₹1.50 per side</div>
+                  <div style={{ fontSize: '12px', color: '#9ca3af' }}>₹{rates.bw.toFixed(2)} per side</div>
                 </button>
 
                 <button
@@ -348,7 +392,7 @@ export const CustomerShopPortal: React.FC<CustomerShopPortalProps> = ({ shopId, 
                   }}
                 >
                   <div style={{ color: '#ec4899' }}>Full Color</div>
-                  <div style={{ fontSize: '12px', color: '#9ca3af' }}>₹10.00 per side</div>
+                  <div style={{ fontSize: '12px', color: '#9ca3af' }}>₹{rates.color.toFixed(2)} per side</div>
                 </button>
               </div>
             </div>
@@ -391,8 +435,22 @@ export const CustomerShopPortal: React.FC<CustomerShopPortalProps> = ({ shopId, 
               </div>
             </div>
 
-            {/* Copies & Paper Size */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '18px' }}>
+            {/* Pages, Copies & Paper Size */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '18px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#9ca3af', marginBottom: '6px' }}>
+                  DOCUMENT PAGES
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="9999"
+                  value={activeDoc.pageCount}
+                  onChange={(e) => updateActiveDoc({ pageCount: Math.max(1, parseInt(e.target.value) || 1) })}
+                  style={{ width: '100%', padding: '10px', borderRadius: '8px', background: '#1f2937', border: '1px solid #374151', color: '#fff', fontSize: '14px' }}
+                />
+              </div>
+
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#9ca3af', marginBottom: '6px' }}>COPIES</label>
                 <input
@@ -422,7 +480,9 @@ export const CustomerShopPortal: React.FC<CustomerShopPortalProps> = ({ shopId, 
             {/* Live Pricing Summary Box */}
             <div style={{ background: '#1f2937', borderRadius: '12px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div>
-                <span style={{ fontSize: '12px', color: '#9ca3af' }}>Estimated Total ({quote.sheets} physical sheets)</span>
+                <span style={{ fontSize: '12px', color: '#9ca3af' }}>
+                  Estimated Total ({quote.sheets} {quote.sheets === 1 ? 'physical sheet' : 'physical sheets'} · {quote.logical} {quote.logical === 1 ? 'page' : 'pages'})
+                </span>
                 <div style={{ fontSize: '24px', fontWeight: 800, color: '#10b981' }}>₹{quote.rupees.toFixed(2)}</div>
               </div>
               <button

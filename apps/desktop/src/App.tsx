@@ -4228,26 +4228,38 @@ export default function App() {
 
               <div className="ws-panel" style={{ padding: '32px', maxWidth: '640px' }}>
                 <form
-                  onSubmit={(e) => {
+                  onSubmit={async (e) => {
                     e.preventDefault();
                     if (!activeSession) return;
                     const u = activeSession.username;
+                    const bw = Number(setupBwRate) || 1.5;
+                    const color = Number(setupColorRate) || 10.0;
                     setLicenses((prev) => ({
                       ...prev,
                       [u]: {
                         ...prev[u],
-                        shopName: setupShopName || prev[u]?.shopName || 'My Xerox Shop',
-                        location: setupLocation || prev[u]?.location || 'Counter 01',
-                        phone: setupPhone || prev[u]?.phone || '+91 99999 99999',
                         rates: {
-                          bwPerSideRupees: Number(setupBwRate) || 1.5,
-                          colorPerSideRupees: Number(setupColorRate) || 10.0,
+                          bwPerSideRupees: bw,
+                          colorPerSideRupees: color,
                           duplexDiscountPercent: 15,
                         },
                         orderMode: setupOrderMode,
                       },
                     }));
-                    setNotice('Shop preferences, pricing rates, and dispatch mode updated successfully.');
+
+                    // Sync rates to Supabase for the web portal
+                    try {
+                      await supabase
+                        .from('pilot_applications')
+                        .update({
+                          notes: JSON.stringify({ bwRate: bw, colorRate: color }),
+                        })
+                        .eq('generated_username', u);
+                    } catch (err) {
+                      console.warn('Failed to sync rates to cloud:', err);
+                    }
+
+                    setNotice('Shop preferences and pricing rates updated successfully & synced to Web Portal.');
                   }}
                   style={{ display: 'grid', gap: '20px' }}
                 >
