@@ -468,12 +468,12 @@ export default function App() {
         setCloudSyncStatus('OFFLINE');
       } else if (data) {
         const mapped = data.map(mapSupabaseRowToApp);
-        if (mapped.length > 0) {
-          setApplications(mapped);
-          try {
-            localStorage.setItem('printbot_pilot_requests', JSON.stringify(mapped));
-          } catch {}
+        setApplications(mapped);
+        try {
+          localStorage.setItem('printbot_pilot_requests', JSON.stringify(mapped));
+        } catch {}
 
+        if (mapped.length > 0) {
           // Automatically hydrate licenses for any approved shops from the cloud database
           setLicenses((prev) => {
             let changed = false;
@@ -716,14 +716,44 @@ export default function App() {
   };
 
   const handleDeleteApp = async (appId: string) => {
-    if (!window.confirm('Delete this pilot application record?')) return;
+    if (!window.confirm('Delete this pilot application record permanently from Cloud and Workstation?')) return;
+    
+    // 1. Optimistic removal from state
     setApplications((prev) => prev.filter((a) => a.id !== appId));
+
+    // 2. Immediate synchronization to local storage cache
     try {
-      await supabase.from('pilot_applications').delete().eq('id', appId);
-    } catch (err) {
-      console.warn('Failed to delete application from Supabase:', err);
+      const saved = localStorage.getItem('printbot_pilot_requests');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const filtered = parsed.filter((a: any) => a.id !== appId);
+          localStorage.setItem('printbot_pilot_requests', JSON.stringify(filtered));
+        }
+      }
+    } catch {}
+
+    // 3. Delete from Supabase Cloud Database
+    try {
+      const { data, error } = await supabase.from('pilot_applications').delete().eq('id', appId).select();
+      if (error) {
+        console.error('Failed to delete application from Supabase:', error.message);
+        setAdminNotice(`Cloud delete error: ${error.message}`);
+        // Re-fetch to synchronize state
+        fetchApplicationsFromCloud();
+        return;
+      }
+      if (!data || data.length === 0) {
+        console.warn('Supabase delete returned 0 rows affected (RLS policy may be blocking anon delete)');
+        setAdminNotice('Notice: Cloud RLS policy did not permit delete. Please run DELETE policy SQL in Supabase.');
+      } else {
+        logAdminAction('KEY_DELETED', `Permanently deleted application record ${appId}`);
+        setAdminNotice('Application permanently deleted from Cloud.');
+      }
+    } catch (err: any) {
+      console.warn('Network offline while deleting from Supabase:', err);
+      setAdminNotice(`Delete notice: ${err?.message || 'Network offline'}`);
     }
-    setAdminNotice('Application record deleted.');
   };
 
   // Auto-dismiss admin notice after 5 seconds
