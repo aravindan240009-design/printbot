@@ -49,6 +49,7 @@ import {
 import { ThemeProvider, ThemeSwitch, MotionSurface, PaperScene, PrinterScene, useGsapStagger } from '@xerox/ui';
 import { discoverPrinters, type NativePrinterInfo } from './native';
 import { supabase } from './supabase';
+import QRCode from 'qrcode';
 
 // --- Models & Contracts ---
 
@@ -400,6 +401,15 @@ export default function App() {
       if (currentShop.orderMode) setSetupOrderMode(currentShop.orderMode);
     }
   }, [currentShop]);
+
+  const [websiteQrDataUrl, setWebsiteQrDataUrl] = useState<string>('');
+  useEffect(() => {
+    const shopSub = (currentShop?.username || 'shop').toLowerCase();
+    const shopPortalUrl = `https://printbotak.vercel.app/?shop=${shopSub}`;
+    QRCode.toDataURL(shopPortalUrl, { width: 280, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
+      .then(setWebsiteQrDataUrl)
+      .catch((err) => console.warn('QR code generation error:', err));
+  }, [currentShop?.username]);
 
   const handleSaveSetup = (e: React.FormEvent) => {
     e.preventDefault();
@@ -3666,7 +3676,7 @@ export default function App() {
             onClick={() => setActiveTab('settings')}
           >
             <Settings size={18} />
-            Preferences
+            Settings
           </button>
         </nav>
 
@@ -3978,176 +3988,119 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB: WEBSITE (SHOP DOMAIN & IMMUTABLE CREDENTIALS) */}
+          {/* TAB: WEBSITE (SHOP DOMAIN & CUSTOMER ACCESS) */}
           {activeTab === 'website' && (() => {
             const shopSub = (currentShop?.username || 'shop').toLowerCase();
             const mainDomain = 'https://printbotak.vercel.app';
             const shopSubdomainUrl = `https://${shopSub}.printbotak.vercel.app`;
             const shopPortalUrl = `${mainDomain}/?shop=${shopSub}`;
-            const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(shopPortalUrl)}`;
+            const qrImageUrl = websiteQrDataUrl || `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(shopPortalUrl)}`;
 
             return (
               <div className="ws-view">
                 <div className="ws-page-heading">
                   <div>
-                    <span className="ws-eyebrow">ONLINE SHOP PORTAL &amp; SUBDOMAIN</span>
-                    <h1>Shop Website &amp; Domain</h1>
-                    <p>Your shop's dedicated online print portal under the Print Bot platform. All parameters are cryptographically locked and immutable.</p>
+                    <span className="ws-eyebrow">ONLINE ACCESS</span>
+                    <h1>Shop Website &amp; QR Code</h1>
+                    <p>Customers can upload and print directly using your dedicated web address or counter stand QR code.</p>
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr', gap: '24px', alignItems: 'start' }}>
-                  {/* Left Column: Domain & Immutable Shop Parameters */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    {/* Domain Architecture Card */}
-                    <div className="ws-panel" style={{ padding: '24px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                        <Globe size={22} color="var(--pb-accent)" />
-                        <div>
-                          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 750 }}>Domain &amp; Routing Architecture</h3>
-                          <small style={{ color: 'var(--pb-muted)' }}>Hosted on High-Performance Vercel Edge Network</small>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                        {/* Main Domain */}
-                        <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-muted)' }}>MAIN PLATFORM DOMAIN</span>
-                            <span style={{ fontSize: '10px', background: 'var(--pb-accent-soft)', color: 'var(--pb-accent)', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
-                              🔒 Immutable
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <code style={{ fontSize: '13px', fontWeight: 650 }}>{mainDomain}/</code>
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(`${mainDomain}/`);
-                                setNotice('Copied main platform domain to clipboard.');
-                              }}
-                              style={{ border: 0, padding: '4px 8px', fontSize: '11px', gap: '4px' }}
-                            >
-                              <Copy size={12} /> Copy
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Shop Subdomain */}
-                        <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--pb-raised)', border: '1px solid var(--pb-accent)', boxShadow: '0 0 0 1px var(--pb-accent)' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-accent)' }}>SHOP DEDICATED SUBDOMAIN</span>
-                            <span style={{ fontSize: '10px', background: 'var(--pb-accent)', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
-                              🔒 Active Subdomain
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <code style={{ fontSize: '14px', fontWeight: 750, color: 'var(--pb-accent)' }}>{shopSubdomainUrl}/</code>
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(`${shopSubdomainUrl}/`);
-                                setNotice('Copied shop subdomain to clipboard.');
-                              }}
-                              style={{ border: 0, padding: '4px 8px', fontSize: '11px', gap: '4px' }}
-                            >
-                              <Copy size={12} /> Copy
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Direct Customer Web Portal Link */}
-                        <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-muted)' }}>DIRECT CUSTOMER PORTAL ROUTE</span>
-                            <span style={{ fontSize: '10px', background: 'var(--pb-accent-soft)', color: 'var(--pb-accent)', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
-                              🔒 Scannable Target
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
-                            <code style={{ fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shopPortalUrl}</code>
-                            <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                              <button
-                                onClick={() => {
-                                  navigator.clipboard.writeText(shopPortalUrl);
-                                  setNotice('Copied direct customer portal link to clipboard.');
-                                }}
-                                style={{ border: 0, padding: '4px 8px', fontSize: '11px', gap: '4px' }}
-                              >
-                                <Copy size={12} /> Copy
-                              </button>
-                              <a
-                                href={shopPortalUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  padding: '4px 8px',
-                                  fontSize: '11px',
-                                  borderRadius: '6px',
-                                  background: 'var(--pb-accent)',
-                                  color: '#fff',
-                                  textDecoration: 'none',
-                                  fontWeight: 650
-                                }}
-                              >
-                                <ExternalLink size={12} /> Visit
-                              </a>
-                            </div>
-                          </div>
-                        </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', alignItems: 'start' }}>
+                  {/* Left Column: Domain & Access Links */}
+                  <div className="ws-panel" style={{ padding: '24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
+                      <Globe size={20} color="var(--pb-accent)" />
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 750 }}>Customer Access Links</h3>
+                        <small style={{ color: 'var(--pb-muted)' }}>Share these links with customers to upload from their phones</small>
                       </div>
                     </div>
 
-                    {/* Immutable Shop Details Card */}
-                    <div className="ws-panel" style={{ padding: '24px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Lock size={18} color="var(--pb-accent)" />
-                          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 750 }}>Immutable Shop Parameters</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      {/* Shop Subdomain */}
+                      <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--pb-raised)', border: '1px solid var(--pb-accent)' }}>
+                        <div style={{ marginBottom: '6px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-accent)' }}>YOUR DEDICATED SHOP WEBSITE</span>
                         </div>
-                        <span style={{ fontSize: '11px', color: 'var(--pb-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <ShieldCheck size={14} color="#059669" /> Cryptographically Locked
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                        <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
-                          <span style={{ display: 'block', fontSize: '10px', color: 'var(--pb-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Shop Legal Name</span>
-                          <strong style={{ fontSize: '13px' }}>{currentShop?.shopName || '—'}</strong>
-                        </div>
-                        <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
-                          <span style={{ display: 'block', fontSize: '10px', color: 'var(--pb-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Subdomain ID / Username</span>
-                          <strong style={{ fontSize: '13px' }}>{currentShop?.username || '—'}</strong>
-                        </div>
-                        <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
-                          <span style={{ display: 'block', fontSize: '10px', color: 'var(--pb-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Branch Location</span>
-                          <strong style={{ fontSize: '13px' }}>{currentShop?.location || '—'}</strong>
-                        </div>
-                        <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
-                          <span style={{ display: 'block', fontSize: '10px', color: 'var(--pb-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Official Contact</span>
-                          <strong style={{ fontSize: '13px' }}>{currentShop?.phone || '—'}</strong>
-                        </div>
-                        <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
-                          <span style={{ display: 'block', fontSize: '10px', color: 'var(--pb-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Workstation Terminal</span>
-                          <strong style={{ fontSize: '13px' }}>Counter-PC-01 (Hardware Bound)</strong>
-                        </div>
-                        <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
-                          <span style={{ display: 'block', fontSize: '10px', color: 'var(--pb-muted)', fontWeight: 700, textTransform: 'uppercase' }}>License Key</span>
-                          <strong style={{ fontSize: '13px', letterSpacing: '0.5px' }}>{currentShop?.licenseKey || '—'}</strong>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <code style={{ fontSize: '14px', fontWeight: 750, color: 'var(--pb-accent)' }}>{shopSubdomainUrl}/</code>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${shopSubdomainUrl}/`);
+                              setNotice('Copied shop website URL to clipboard.');
+                            }}
+                            style={{ border: 0, padding: '4px 10px', fontSize: '11px', gap: '4px' }}
+                          >
+                            <Copy size={12} /> Copy
+                          </button>
                         </div>
                       </div>
 
-                      <div style={{ marginTop: '16px', padding: '10px 12px', borderRadius: '8px', background: 'var(--pb-accent-soft)', border: '1px solid var(--pb-border)', fontSize: '11px', color: 'var(--pb-accent)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Lock size={14} />
-                        <span>These parameters are securely linked to your license and cannot be altered from this PC. To request changes, contact Super Admin.</span>
+                      {/* Direct Customer Web Portal Link */}
+                      <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
+                        <div style={{ marginBottom: '6px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-muted)' }}>DIRECT MOBILE PORTAL ROUTE</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                          <code style={{ fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shopPortalUrl}</code>
+                          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(shopPortalUrl);
+                                setNotice('Copied direct customer portal link to clipboard.');
+                              }}
+                              style={{ border: 0, padding: '4px 8px', fontSize: '11px', gap: '4px' }}
+                            >
+                              <Copy size={12} /> Copy
+                            </button>
+                            <a
+                              href={shopPortalUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                fontSize: '11px',
+                                borderRadius: '6px',
+                                background: 'var(--pb-accent)',
+                                color: '#fff',
+                                textDecoration: 'none',
+                                fontWeight: 650
+                              }}
+                            >
+                              <ExternalLink size={12} /> Visit
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Main Platform Domain */}
+                      <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
+                        <div style={{ marginBottom: '6px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-muted)' }}>PLATFORM MAIN DOMAIN</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <code style={{ fontSize: '13px', fontWeight: 650 }}>{mainDomain}/</code>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${mainDomain}/`);
+                              setNotice('Copied platform main domain to clipboard.');
+                            }}
+                            style={{ border: 0, padding: '4px 8px', fontSize: '11px', gap: '4px' }}
+                          >
+                            <Copy size={12} /> Copy
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Right Column: Counter Stand QR Code & Print Badge */}
+                  {/* Right Column: Counter Stand QR Code */}
                   <div className="ws-panel" style={{ padding: '28px', textAlign: 'center' }}>
-                    <div style={{ display: 'inline-flex', padding: '12px', borderRadius: '16px', background: '#fff', border: '1px solid var(--pb-border)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', marginBottom: '18px' }}>
+                    <div style={{ display: 'inline-flex', padding: '14px', borderRadius: '16px', background: '#fff', border: '1px solid var(--pb-border)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', marginBottom: '18px' }}>
                       <img
                         src={qrImageUrl}
                         alt="Shop Counter Stand QR"
@@ -4157,7 +4110,7 @@ export default function App() {
 
                     <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px' }}>Counter Stand QR Code</h3>
                     <p style={{ fontSize: '12px', color: 'var(--pb-muted)', margin: '0 0 20px', lineHeight: 1.5 }}>
-                      Customers scan this QR code with any phone camera to upload and pay without app installation.
+                      Customers scan this QR code with their phone camera to upload and pay without downloading an app.
                     </p>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -4308,17 +4261,14 @@ export default function App() {
                       console.warn('Failed to sync rates to cloud:', err);
                     }
 
-                    setNotice('Shop preferences and pricing rates updated successfully & synced to Web Portal.');
+                    setNotice('Shop settings and pricing rates updated successfully & synced to Web Portal.');
                   }}
                   style={{ display: 'grid', gap: '20px' }}
                 >
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                     <div>
-                      <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                        <span>Shop Name</span>
-                        <span style={{ fontSize: '10px', color: 'var(--pb-accent)', background: 'var(--pb-accent-soft)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
-                          🔒 Immutable
-                        </span>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                        Shop Name
                       </label>
                       <input
                         type="text"
@@ -4330,11 +4280,8 @@ export default function App() {
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                        <span>Branch Location</span>
-                        <span style={{ fontSize: '10px', color: 'var(--pb-accent)', background: 'var(--pb-accent-soft)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
-                          🔒 Immutable
-                        </span>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                        Branch Location
                       </label>
                       <input
                         type="text"
@@ -4348,11 +4295,8 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                      <span>Contact Phone</span>
-                      <span style={{ fontSize: '10px', color: 'var(--pb-accent)', background: 'var(--pb-accent-soft)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
-                        🔒 Immutable
-                      </span>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                      Contact Phone
                     </label>
                     <input
                       type="text"
@@ -4425,7 +4369,7 @@ export default function App() {
                   </div>
 
                   <button type="submit" className="ws-primary" style={{ marginTop: '10px' }}>
-                    Save Preferences
+                    Save Settings
                   </button>
                 </form>
               </div>

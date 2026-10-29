@@ -18,11 +18,13 @@
     "@xerox/contracts": "workspace:*",
     "@xerox/ui": "workspace:*",
     "lucide-react": "^0.378.0",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0-rc",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.2.1",
