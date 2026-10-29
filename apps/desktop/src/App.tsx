@@ -7,6 +7,7 @@ import {
   Search,
   FileText,
   Eye,
+  EyeOff,
   RefreshCw,
   Volume2,
   VolumeX,
@@ -120,7 +121,8 @@ export interface AdminAuditEntry {
     | 'BROADCAST_PUBLISHED'
     | 'PASSWORD_UPDATED'
     | 'SHOP_SETUP_SAVED'
-    | 'JOB_APPROVED';
+    | 'JOB_APPROVED'
+    | 'LOGIN_LOCKOUT';
   details: string;
   actor: string;
 }
@@ -273,19 +275,63 @@ export default function App() {
     return localStorage.getItem('printbot_admin_key') || 'admin@123';
   });
 
+  // --- Audit Trail State ---
+  const [auditLogs, setAuditLogs] = useState<AdminAuditEntry[]>(() => {
+    try {
+      const saved = localStorage.getItem('printbot_audit_logs');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('printbot_audit_logs', JSON.stringify(auditLogs));
+  }, [auditLogs]);
+
+  const logAdminAction = (action: AdminAuditEntry['action'], details: string) => {
+    const entry: AdminAuditEntry = {
+      id: `AUD-${Date.now().toString().slice(-4)}`,
+      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+      action,
+      details,
+      actor: 'admin',
+    };
+    setAuditLogs((prev) => [entry, ...prev]);
+  };
+
   // --- Unified Lock Screen Form State ---
   const [loginUsername, setLoginUsername] = useState('');
   const [loginKey, setLoginKey] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutUntil, setLockoutUntil] = useState<Date | null>(null);
+
+  // Auto-uppercase and key formatting helper
+  const handleKeyChange = (val: string) => {
+    let formatted = val.toUpperCase();
+    if (formatted.startsWith('PBKEY') && !formatted.startsWith('PB-KEY-')) {
+      formatted = formatted.replace(/^PBKEY/, 'PB-KEY-');
+    } else if (formatted.startsWith('PB-KEY') && !formatted.startsWith('PB-KEY-') && formatted.length > 6) {
+      formatted = formatted.replace(/^PB-KEY/, 'PB-KEY-');
+    }
+    setLoginKey(formatted);
+  };
 
   const handleUnifiedLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (lockoutUntil && new Date() < lockoutUntil) {
+      setLoginError(`System locked due to failed attempts. Please wait ${Math.ceil((lockoutUntil.getTime() - Date.now()) / 1000)}s.`);
+      return;
+    }
     setLoginError('');
     const u = loginUsername.trim().toLowerCase();
     const k = loginKey.trim();
 
     // 1. Admin Authentication Check (Matches custom password or default admin@123)
     if (u === 'admin' && (k === adminCustomPassword || k === 'admin@123')) {
+      setFailedAttempts(0);
+      setLockoutUntil(null);
       setActiveSession({ role: 'ADMIN', username: 'admin' });
       return;
     }
@@ -297,6 +343,8 @@ export default function App() {
         setLoginError('This license key has been revoked by the Admin.');
         return;
       }
+      setFailedAttempts(0);
+      setLockoutUntil(null);
       setActiveSession({ role: 'SHOP_OWNER', username: u });
       return;
     }
@@ -363,6 +411,8 @@ export default function App() {
           [canonicalUsername]: newLic,
           [app.shopName.toLowerCase()]: newLic,
         }));
+        setFailedAttempts(0);
+        setLockoutUntil(null);
         setActiveSession({ role: 'SHOP_OWNER', username: canonicalUsername });
         return;
       }
@@ -370,7 +420,17 @@ export default function App() {
       console.warn('Cloud authentication check error:', err);
     }
 
-    setLoginError('Invalid Username or Key. Please check your credentials or contact Admin.');
+    // Increment failed attempts and lockout if needed
+    const nextAttempts = failedAttempts + 1;
+    setFailedAttempts(nextAttempts);
+    if (nextAttempts >= 5) {
+      const lockUntil = new Date(Date.now() + 60000);
+      setLockoutUntil(lockUntil);
+      logAdminAction('LOGIN_LOCKOUT', `Brute-force lockout triggered for "${u || 'unknown'}" after 5 failed attempts`);
+      setLoginError('Too many failed attempts. Login locked for 60 seconds.');
+    } else {
+      setLoginError(`Invalid Username or Key. (${5 - nextAttempts} attempts remaining before temporary lockout)`);
+    }
   };
 
   const handleLogout = () => {
@@ -408,8 +468,8 @@ export default function App() {
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9]/g, '');
-    const shopSubdomainUrl = `https://${shopSlug}.printbotak.vercel.app/`;
-    QRCode.toDataURL(shopSubdomainUrl, { width: 280, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
+    const customerPortalUrl = `https://printbotak.vercel.app/?shop=${shopSlug}`;
+    QRCode.toDataURL(customerPortalUrl, { width: 280, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
       .then(setWebsiteQrDataUrl)
       .catch((err) => console.warn('QR code generation error:', err));
   }, [currentShop?.shopName, currentShop?.username]);
@@ -796,29 +856,6 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [adminNotice]);
 
-  // --- Audit Trail State ---
-  const [auditLogs, setAuditLogs] = useState<AdminAuditEntry[]>(() => {
-    try {
-      const saved = localStorage.getItem('printbot_audit_logs');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return [];
-  });
-
-  useEffect(() => {
-    localStorage.setItem('printbot_audit_logs', JSON.stringify(auditLogs));
-  }, [auditLogs]);
-
-  const logAdminAction = (action: AdminAuditEntry['action'], details: string) => {
-    const entry: AdminAuditEntry = {
-      id: `AUD-${Date.now().toString().slice(-4)}`,
-      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
-      action,
-      details,
-      actor: 'admin',
-    };
-    setAuditLogs((prev) => [entry, ...prev]);
-  };
 
   // --- Global Broadcast State ---
   const [globalBroadcast, setGlobalBroadcast] = useState<GlobalBroadcast>(() => {
@@ -1173,13 +1210,38 @@ export default function App() {
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
                 Key / Password
               </label>
-              <input
-                type="password"
-                placeholder="Enter key (e.g. PB-KEY-2026-XEROX or admin@123)"
-                value={loginKey}
-                onChange={(e) => setLoginKey(e.target.value)}
-                required
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Enter key (e.g. PB-KEY-2026-XEROX or admin@123)"
+                  value={loginKey}
+                  onChange={(e) => handleKeyChange(e.target.value)}
+                  disabled={Boolean(lockoutUntil && new Date() < lockoutUntil)}
+                  style={{ paddingRight: '40px', width: '100%' }}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  style={{
+                    position: 'absolute',
+                    right: '8px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '6px',
+                    cursor: 'pointer',
+                    color: 'var(--pb-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             <div
@@ -1203,6 +1265,7 @@ export default function App() {
             <button
               type="submit"
               className="ws-primary"
+              disabled={Boolean(lockoutUntil && new Date() < lockoutUntil)}
               style={{
                 width: '100%',
                 minHeight: '46px',
@@ -1212,12 +1275,19 @@ export default function App() {
                 justifyContent: 'center',
                 gap: '8px',
                 fontSize: '14px',
+                opacity: lockoutUntil && new Date() < lockoutUntil ? 0.6 : 1,
+                cursor: lockoutUntil && new Date() < lockoutUntil ? 'not-allowed' : 'pointer',
               }}
             >
               <Unlock size={18} />
               Unlock Print Bot Software
             </button>
           </form>
+          {lockoutUntil && new Date() < lockoutUntil && (
+            <p style={{ color: '#ef4444', marginTop: '12px', fontSize: '12px', textAlign: 'center', fontWeight: 650 }}>
+              Too many failed attempts. Login locked for {Math.max(1, Math.ceil((lockoutUntil.getTime() - Date.now()) / 1000))}s.
+            </p>
+          )}
         </div>
       </div>
     );
@@ -3998,8 +4068,10 @@ export default function App() {
               .trim()
               .replace(/[^a-z0-9]/g, '');
             const mainDomain = 'https://printbotak.vercel.app';
+            const customerPortalUrl = `https://printbotak.vercel.app/?shop=${shopSlug}`;
+            const cleanPathUrl = `https://printbotak.vercel.app/shop/${shopSlug}`;
             const shopSubdomainUrl = `https://${shopSlug}.printbotak.vercel.app`;
-            const qrImageUrl = websiteQrDataUrl || `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(shopSubdomainUrl)}`;
+            const qrImageUrl = websiteQrDataUrl || `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(customerPortalUrl)}`;
 
             return (
               <div className="ws-view">
@@ -4023,32 +4095,33 @@ export default function App() {
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                      {/* Shop Subdomain (Created from Shop Name) */}
+                      {/* Customer Dedicated Portal (Guaranteed Live SSL) */}
                       <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--pb-raised)', border: '1px solid var(--pb-accent)' }}>
-                        <div style={{ marginBottom: '6px' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-accent)' }}>YOUR DEDICATED SHOP WEBSITE</span>
+                        <div style={{ marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-accent)' }}>YOUR DEDICATED CUSTOMER PORTAL</span>
+                          <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', fontWeight: 700 }}>LIVE SSL</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
-                          <code style={{ fontSize: '14px', fontWeight: 750, color: 'var(--pb-accent)' }}>{shopSubdomainUrl}/</code>
+                          <code style={{ fontSize: '13px', fontWeight: 750, color: 'var(--pb-accent)' }}>{customerPortalUrl}</code>
                           <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                             <button
                               onClick={() => {
-                                navigator.clipboard.writeText(`${shopSubdomainUrl}/`);
-                                setNotice('Copied shop website URL to clipboard.');
+                                navigator.clipboard.writeText(customerPortalUrl);
+                                setNotice('Copied customer portal link to clipboard.');
                               }}
                               style={{ border: 0, padding: '4px 10px', fontSize: '11px', gap: '4px' }}
                             >
                               <Copy size={12} /> Copy
                             </button>
                             <a
-                              href={shopSubdomainUrl}
+                              href={customerPortalUrl}
                               target="_blank"
                               rel="noreferrer"
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px',
-                                padding: '4px 8px',
+                                padding: '4px 10px',
                                 fontSize: '11px',
                                 borderRadius: '6px',
                                 background: 'var(--pb-accent)',
@@ -4058,6 +4131,47 @@ export default function App() {
                               }}
                             >
                               <ExternalLink size={12} /> Visit
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Direct Clean Path Route */}
+                      <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
+                        <div style={{ marginBottom: '6px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-muted)' }}>DIRECT PATH ROUTE</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                          <code style={{ fontSize: '13px', fontWeight: 650 }}>{cleanPathUrl}</code>
+                          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(cleanPathUrl);
+                                setNotice('Copied clean path route to clipboard.');
+                              }}
+                              style={{ border: 0, padding: '4px 8px', fontSize: '11px', gap: '4px' }}
+                            >
+                              <Copy size={12} /> Copy
+                            </button>
+                            <a
+                              href={cleanPathUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                fontSize: '11px',
+                                borderRadius: '6px',
+                                background: 'var(--pb-raised)',
+                                border: '1px solid var(--pb-border)',
+                                color: 'var(--pb-text)',
+                                textDecoration: 'none',
+                                fontWeight: 650
+                              }}
+                            >
+                              <ExternalLink size={12} /> Open
                             </a>
                           </div>
                         </div>
@@ -4115,7 +4229,7 @@ export default function App() {
                                     h1 { margin: 0 0 8px; font-size: 24px; font-weight: 800; }
                                     p { color: #52525b; margin: 0 0 24px; font-size: 14px; }
                                     img { width: 240px; height: 240px; border-radius: 12px; }
-                                    .sub { margin-top: 20px; font-size: 12px; font-weight: 700; color: #18181b; }
+                                    .sub { margin-top: 20px; font-size: 12px; font-weight: 700; color: #18181b; word-break: break-all; }
                                   </style>
                                 </head>
                                 <body>
@@ -4123,7 +4237,7 @@ export default function App() {
                                     <h1>${currentShop?.shopName || 'Print Shop'}</h1>
                                     <p>Scan to Upload &amp; Print from Phone</p>
                                     <img src="${qrImageUrl}" alt="QR Code" />
-                                    <div class="sub">${shopSubdomainUrl}/</div>
+                                    <div class="sub">${customerPortalUrl}</div>
                                   </div>
                                   <script>window.onload = function() { window.print(); };</script>
                                 </body>
@@ -4139,8 +4253,8 @@ export default function App() {
 
                       <button
                         onClick={() => {
-                          navigator.clipboard.writeText(`${shopSubdomainUrl}/`);
-                          setNotice('Copied shop website URL for customers.');
+                          navigator.clipboard.writeText(customerPortalUrl);
+                          setNotice('Copied shop portal URL for customers.');
                         }}
                         style={{ width: '100%', justifyContent: 'center', minHeight: '38px', gap: '6px' }}
                       >

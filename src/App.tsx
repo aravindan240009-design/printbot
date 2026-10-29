@@ -22,6 +22,16 @@ export const App: React.FC = () => {
     const qShop = params.get('shop') || params.get('qr');
     if (qShop) return qShop.trim().toLowerCase();
 
+    // Check path routing: /shop/:slug or /s/:slug or /:slug
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    if ((pathParts[0] === 'shop' || pathParts[0] === 's') && pathParts[1]) {
+      return pathParts[1].trim().toLowerCase();
+    }
+    const reservedPaths = ['api', 'assets', 'favicon.svg', 'index.html', 'download', 'docs'];
+    if (pathParts.length === 1 && !reservedPaths.includes(pathParts[0].toLowerCase())) {
+      return pathParts[0].trim().toLowerCase();
+    }
+
     const host = window.location.hostname.toLowerCase();
     const mainDomain = 'printbotak.vercel.app';
     if (host.endsWith(mainDomain) && host !== mainDomain && host !== `www.${mainDomain}`) {

@@ -4,6 +4,11 @@
   "private": true,
   "description": "Mobile web customer portal for Print Bot (no app/no mandatory login)",
   "type": "module",
+  "main": "./src/App.tsx",
+  "exports": {
+    ".": "./src/App.tsx",
+    "./css": "./src/index.css"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
@@ -11,6 +16,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "@xerox/printplan-contract": "workspace:*",
     "@xerox/ui": "workspace:*",
     "lucide-react": "^0.378.0",
