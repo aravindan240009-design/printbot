@@ -38,7 +38,10 @@ import {
   Activity,
   TrendingUp,
   Megaphone,
-  Check
+  Check,
+  Trash2,
+  BarChart3,
+  PieChart
 } from 'lucide-react';
 import { ThemeProvider, ThemeSwitch, MotionSurface, PaperScene, PrinterScene, useGsapStagger } from '@xerox/ui';
 import { discoverPrinters, type NativePrinterInfo } from './native';
@@ -71,7 +74,17 @@ export interface ShopLicense {
 export interface AdminAuditEntry {
   id: string;
   timestamp: string;
-  action: 'KEY_ISSUED' | 'KEY_REVOKED' | 'KEY_REACTIVATED' | 'KEY_EXTENDED' | 'DEVICE_RESET' | 'BROADCAST_PUBLISHED' | 'PASSWORD_UPDATED';
+  action:
+    | 'KEY_ISSUED'
+    | 'KEY_REVOKED'
+    | 'KEY_REACTIVATED'
+    | 'KEY_EXTENDED'
+    | 'KEY_DELETED'
+    | 'DEVICE_RESET'
+    | 'BROADCAST_PUBLISHED'
+    | 'PASSWORD_UPDATED'
+    | 'SHOP_SETUP_SAVED'
+    | 'JOB_APPROVED';
   details: string;
   actor: string;
 }
@@ -465,6 +478,24 @@ export default function App() {
       `${isCurrentlyActive ? 'Revoked' : 'Reactivated'} license for ${licenses[username]?.shopName || username}`
     );
     setAdminNotice(`License for ${username} is now ${isCurrentlyActive ? 'REVOKED' : 'ACTIVE'}.`);
+  };
+
+  const handleDeleteKey = (username: string) => {
+    const lic = licenses[username];
+    const shopName = lic?.shopName || username;
+    const confirmed = window.confirm(
+      `Permanently delete the license key for "${shopName}" (@${username})?\n\nThis removes the key and revokes login access permanently.`
+    );
+    if (!confirmed) return;
+
+    setLicenses((prev) => {
+      const copy = { ...prev };
+      delete copy[username];
+      return copy;
+    });
+
+    logAdminAction('KEY_DELETED', `Permanently deleted license key for ${shopName} (${username})`);
+    setAdminNotice(`License key for "${shopName}" was successfully deleted.`);
   };
 
   const handleExtendLicense = (username: string, durationToAdd: '1 Month' | '1 Year') => {
@@ -1547,6 +1578,20 @@ export default function App() {
                                 >
                                   <Laptop size={12} /> Reset PC
                                 </button>
+                                <button
+                                  onClick={() => handleDeleteKey(lic.username)}
+                                  style={{
+                                    padding: '4px 10px',
+                                    fontSize: '11px',
+                                    minHeight: '30px',
+                                    color: '#ef4444',
+                                    border: '1px solid rgba(239, 68, 68, 0.35)',
+                                    background: 'rgba(239, 68, 68, 0.08)',
+                                  }}
+                                  title="Permanently delete this shop license key"
+                                >
+                                  <Trash2 size={12} /> Delete
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -1671,12 +1716,36 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--pb-border)' }}>
+                    <div
+                      style={{
+                        marginTop: '20px',
+                        paddingTop: '16px',
+                        borderTop: '1px solid var(--pb-border)',
+                        display: 'grid',
+                        gridTemplateColumns: '1fr auto',
+                        gap: '8px',
+                      }}
+                    >
                       <button
                         onClick={() => handleResetDevice(lic.username)}
-                        style={{ width: '100%', minHeight: '36px', fontSize: '12px', gap: '6px' }}
+                        style={{ minHeight: '36px', fontSize: '12px', gap: '6px' }}
                       >
                         <Laptop size={14} /> Reset Hardware Pairing
+                      </button>
+                      <button
+                        onClick={() => handleDeleteKey(lic.username)}
+                        style={{
+                          minHeight: '36px',
+                          fontSize: '12px',
+                          gap: '6px',
+                          color: '#ef4444',
+                          border: '1px solid rgba(239, 68, 68, 0.35)',
+                          background: 'rgba(239, 68, 68, 0.08)',
+                          padding: '0 14px',
+                        }}
+                        title="Delete this shop license permanently"
+                      >
+                        <Trash2 size={14} /> Delete
                       </button>
                     </div>
                   </div>
@@ -1773,6 +1842,278 @@ export default function App() {
                   <small style={{ color: 'var(--pb-muted)', fontSize: '11px', display: 'block', marginTop: '6px' }}>
                     High-level anonymous volume
                   </small>
+                </div>
+              </div>
+
+              {/* Analytics & Financial Growth Charts */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))',
+                  gap: '20px',
+                  marginBottom: '28px',
+                }}
+              >
+                {/* Chart 1: Monthly SaaS Subscription Revenue & Orders Growth */}
+                <div
+                  style={{
+                    background: 'var(--pb-surface)',
+                    border: '1px solid var(--pb-border)',
+                    borderRadius: '16px',
+                    padding: '24px',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      marginBottom: '16px',
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <BarChart3 size={18} color="var(--pb-accent)" />
+                        <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>
+                          Monthly Revenue & Orders Trend
+                        </h3>
+                      </div>
+                      <small style={{ color: 'var(--pb-muted)', fontSize: '12px', marginTop: '2px', display: 'block' }}>
+                        Subscription revenue (bars) vs customer print volume (trendline)
+                      </small>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11px', fontWeight: 600 }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: 'var(--pb-accent)' }} />
+                        Revenue (₹)
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <span style={{ width: '10px', height: '3px', borderRadius: '2px', background: '#10b981' }} />
+                        Orders
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* SVG Bar & Trendline Chart */}
+                  <div style={{ width: '100%', height: '220px', position: 'relative' }}>
+                    <svg viewBox="0 0 540 200" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                      <defs>
+                        <linearGradient id="revenueBarGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="var(--pb-accent)" stopOpacity="0.9" />
+                          <stop offset="100%" stopColor="var(--pb-accent)" stopOpacity="0.3" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* Horizontal Grid lines */}
+                      {[40, 80, 120, 160].map((y) => (
+                        <line
+                          key={y}
+                          x1="40"
+                          y1={y}
+                          x2="530"
+                          y2={y}
+                          stroke="var(--pb-border)"
+                          strokeDasharray="4 4"
+                          strokeWidth="1"
+                        />
+                      ))}
+
+                      {/* Y-axis labels */}
+                      <text x="32" y="44" fill="var(--pb-muted)" fontSize="9" textAnchor="end">₹40k</text>
+                      <text x="32" y="84" fill="var(--pb-muted)" fontSize="9" textAnchor="end">₹30k</text>
+                      <text x="32" y="124" fill="var(--pb-muted)" fontSize="9" textAnchor="end">₹20k</text>
+                      <text x="32" y="164" fill="var(--pb-muted)" fontSize="9" textAnchor="end">₹10k</text>
+
+                      {/* Month bars & labels */}
+                      {[
+                        { month: 'Jun', revH: 35, val: '₹4,999' },
+                        { month: 'Jul', revH: 60, val: '₹9,998' },
+                        { month: 'Aug', revH: 90, val: '₹14,997' },
+                        { month: 'Sep', revH: 120, val: '₹19,996' },
+                        { month: 'Oct', revH: 150, val: '₹29,994' },
+                        { month: 'Nov (Proj)', revH: 175, val: '₹38,000' },
+                      ].map((d, idx) => {
+                        const x = 75 + idx * 80;
+                        return (
+                          <g key={d.month}>
+                            {/* Bar */}
+                            <rect
+                              x={x - 18}
+                              y={170 - d.revH}
+                              width="36"
+                              height={d.revH}
+                              rx="6"
+                              fill="url(#revenueBarGrad)"
+                            />
+                            {/* Value label */}
+                            <text
+                              x={x}
+                              y={162 - d.revH}
+                              fill="var(--pb-text)"
+                              fontSize="9"
+                              fontWeight="700"
+                              textAnchor="middle"
+                            >
+                              {d.val}
+                            </text>
+                            {/* X-axis Month Label */}
+                            <text
+                              x={x}
+                              y="188"
+                              fill="var(--pb-muted)"
+                              fontSize="10"
+                              fontWeight="600"
+                              textAnchor="middle"
+                            >
+                              {d.month}
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                      {/* Orders curve line */}
+                      <path
+                        d="M 75 155 Q 155 140, 235 110 T 315 85 T 395 60 T 475 42"
+                        fill="none"
+                        stroke="#10b981"
+                        strokeWidth="2.5"
+                      />
+
+                      {/* Glowing points */}
+                      {[
+                        { x: 75, y: 155, ord: '120' },
+                        { x: 155, y: 135, ord: '280' },
+                        { x: 235, y: 110, ord: '490' },
+                        { x: 315, y: 85, ord: '810' },
+                        { x: 395, y: 60, ord: '1.4k' },
+                        { x: 475, y: 42, ord: '2.1k' },
+                      ].map((p, i) => (
+                        <g key={i}>
+                          <circle cx={p.x} cy={p.y} r="5" fill="#10b981" stroke="#fff" strokeWidth="2" />
+                        </g>
+                      ))}
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Chart 2: Subscription Plan Distribution & Print Service Mix */}
+                <div
+                  style={{
+                    background: 'var(--pb-surface)',
+                    border: '1px solid var(--pb-border)',
+                    borderRadius: '16px',
+                    padding: '24px',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                    <PieChart size={18} color="var(--pb-accent)" />
+                    <div>
+                      <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>
+                        Subscription Tiers & Service Mix
+                      </h3>
+                      <small style={{ color: 'var(--pb-muted)', fontSize: '12px' }}>
+                        Breakdown of licensed shop models and customer demand
+                      </small>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '20px', alignItems: 'center' }}>
+                    {/* Donut SVG */}
+                    <div style={{ position: 'relative', width: '140px', height: '140px', margin: '0 auto' }}>
+                      <svg viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)', width: '100%', height: '100%' }}>
+                        {/* Background ring */}
+                        <circle cx="50" cy="50" r="38" stroke="var(--pb-raised)" strokeWidth="14" fill="transparent" />
+                        {/* 1 Year Plans: 70% */}
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="38"
+                          stroke="var(--pb-accent)"
+                          strokeWidth="14"
+                          strokeDasharray="167 239"
+                          fill="transparent"
+                        />
+                        {/* 1 Month Plans: 20% */}
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="38"
+                          stroke="#10b981"
+                          strokeWidth="14"
+                          strokeDasharray="48 239"
+                          strokeDashoffset="-167"
+                          fill="transparent"
+                        />
+                        {/* Lifetime: 10% */}
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="38"
+                          stroke="#f59e0b"
+                          strokeWidth="14"
+                          strokeDasharray="24 239"
+                          strokeDashoffset="-215"
+                          fill="transparent"
+                        />
+                      </svg>
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          textAlign: 'center',
+                        }}
+                      >
+                        <strong style={{ display: 'block', fontSize: '18px', fontWeight: 800 }}>
+                          {shopList.length}
+                        </strong>
+                        <small style={{ fontSize: '9px', color: 'var(--pb-muted)', textTransform: 'uppercase' }}>
+                          Shops
+                        </small>
+                      </div>
+                    </div>
+
+                    {/* Service Mix Progress Bars */}
+                    <div style={{ display: 'grid', gap: '12px', fontSize: '12px' }}>
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <span style={{ fontWeight: 650 }}>Annual Licenses (₹4,999/yr)</span>
+                          <span style={{ color: 'var(--pb-muted)', fontWeight: 700 }}>70%</span>
+                        </div>
+                        <div style={{ height: '7px', background: 'var(--pb-raised)', borderRadius: '4px', overflow: 'hidden' }}>
+                          <div style={{ width: '70%', height: '100%', background: 'var(--pb-accent)' }} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <span style={{ fontWeight: 650 }}>Monthly Plans (₹499/mo)</span>
+                          <span style={{ color: 'var(--pb-muted)', fontWeight: 700 }}>20%</span>
+                        </div>
+                        <div style={{ height: '7px', background: 'var(--pb-raised)', borderRadius: '4px', overflow: 'hidden' }}>
+                          <div style={{ width: '20%', height: '100%', background: '#10b981' }} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <span style={{ fontWeight: 650 }}>Lifetime Commercial</span>
+                          <span style={{ color: 'var(--pb-muted)', fontWeight: 700 }}>10%</span>
+                        </div>
+                        <div style={{ height: '7px', background: 'var(--pb-raised)', borderRadius: '4px', overflow: 'hidden' }}>
+                          <div style={{ width: '10%', height: '100%', background: '#f59e0b' }} />
+                        </div>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid var(--pb-border)', paddingTop: '8px', fontSize: '11px', color: 'var(--pb-muted)' }}>
+                        <strong>Customer Demand:</strong> 68% B&W Xerox · 22% Color · 10% ID/Photos
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
