@@ -79,11 +79,11 @@ html, body, #root, .pb-theme-root {
 
 .workstation button:hover:not(:disabled),
 .ws-dialog button:hover:not(:disabled) {
-  background: var(--pb-raised);
-  border-color: var(--pb-border-gold);
-  color: var(--pb-text);
+  background: var(--pb-surface) !important;
+  border-color: var(--pb-accent) !important;
+  color: var(--pb-accent) !important;
   transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 14px rgba(121, 45, 71, 0.1);
 }
 
 .workstation button:active:not(:disabled),
@@ -94,20 +94,20 @@ html, body, #root, .pb-theme-root {
 /* Primary Button Styling */
 .workstation .ws-primary,
 .ws-dialog .ws-primary {
-  background: linear-gradient(135deg, #d4af37 0%, #b5881c 100%) !important;
-  color: #0b0f17 !important;
-  border: 1.5px solid #d4af37 !important;
+  background: linear-gradient(135deg, #792d47 0%, #5d1d33 100%) !important;
+  color: #ffffff !important;
+  border: 1.5px solid #8e3855 !important;
   font-weight: 800 !important;
-  box-shadow: 0 4px 16px rgba(181, 136, 28, 0.28) !important;
+  box-shadow: 0 4px 16px rgba(121, 45, 71, 0.25) !important;
 }
 
 .workstation .ws-primary:hover:not(:disabled),
 .ws-dialog .ws-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #f6d860 0%, #d4af37 100%) !important;
-  color: #07090e !important;
-  border-color: #f6d860 !important;
+  background: linear-gradient(135deg, #913454 0%, #6d223c 100%) !important;
+  color: #ffffff !important;
+  border-color: #b54d6f !important;
   transform: translateY(-1.5px) !important;
-  box-shadow: 0 8px 24px rgba(181, 136, 28, 0.42) !important;
+  box-shadow: 0 8px 24px rgba(121, 45, 71, 0.38) !important;
 }
 
 /* Universal Disabled State with High Contrast */
@@ -563,11 +563,20 @@ a:focus-visible {
   gap: 20px;
   padding: 24px 28px;
   border-top: 1px solid var(--pb-border);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .ws-job:hover {
-  background: var(--pb-raised);
+  background: rgba(121, 45, 71, 0.035) !important;
+  box-shadow: inset 4px 0 0 var(--pb-accent), 0 2px 10px rgba(121, 45, 71, 0.04) !important;
+  border-top-color: var(--pb-border-gold) !important;
+}
+
+[data-theme="dark"] .ws-job:hover {
+  background: rgba(226, 193, 139, 0.05) !important;
+  box-shadow: inset 4px 0 0 var(--pb-accent), 0 2px 10px rgba(0, 0, 0, 0.2) !important;
+  border-top-color: var(--pb-border-strong) !important;
 }
 
 .ws-file-icon {
@@ -633,20 +642,39 @@ a:focus-visible {
 .ws-job-actions button {
   font-size: 12px;
   min-height: 36px;
-  padding: 6px 14px;
+  padding: 6px 16px;
   border-radius: 10px;
 }
 
-.btn-job-approve:hover {
-  background: rgba(16, 185, 129, 0.12) !important;
-  color: #10b981 !important;
-  border-color: rgba(16, 185, 129, 0.4) !important;
+.btn-job-approve {
+  background: linear-gradient(135deg, #792d47 0%, #5d1d33 100%) !important;
+  color: #ffffff !important;
+  border: 1.5px solid #8e3855 !important;
+  font-weight: 750 !important;
+  box-shadow: 0 2px 8px rgba(121, 45, 71, 0.2) !important;
 }
 
-.btn-job-reject:hover {
-  background: rgba(239, 68, 68, 0.12) !important;
-  color: #ef4444 !important;
-  border-color: rgba(239, 68, 68, 0.4) !important;
+.btn-job-approve:hover:not(:disabled) {
+  background: linear-gradient(135deg, #913454 0%, #6d223c 100%) !important;
+  color: #ffffff !important;
+  border-color: #b54d6f !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 16px rgba(121, 45, 71, 0.32) !important;
+}
+
+.btn-job-reject {
+  background: var(--pb-surface) !important;
+  color: var(--pb-text) !important;
+  border: 1.5px solid var(--pb-border) !important;
+  font-weight: 650 !important;
+}
+
+.btn-job-reject:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.08) !important;
+  color: #dc2626 !important;
+  border-color: rgba(239, 68, 68, 0.35) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.12) !important;
 }
 
 .ws-price {

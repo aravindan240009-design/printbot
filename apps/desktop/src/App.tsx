@@ -1560,12 +1560,13 @@ export default function App() {
                         {job.status === 'PENDING_APPROVAL' && (
                           <div className="ws-job-actions">
                             <button
-                              className="ws-primary"
+                              className="ws-primary btn-job-approve"
                               onClick={() => handleApproveJob(job.id)}
                             >
                               Approve & Print
                             </button>
                             <button
+                              className="btn-job-reject"
                               onClick={() => {
                                 setRejectionModalJobId(job.id);
                               }}
