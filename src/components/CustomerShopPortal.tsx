@@ -1,6 +1,6 @@
 import React from 'react';
-import CustomerWebApp from '@xerox/customer-web';
-import '@xerox/customer-web/css';
+import CustomerWebApp from '../../apps/customer-web/src/App';
+import '../../apps/customer-web/src/index.css';
 
 export interface CustomerShopPortalProps {
   shopId: string;
