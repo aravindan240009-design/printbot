@@ -1,123 +1,63 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { ArrowUpRight, ArrowRight, Printer, ScanLine, ShieldCheck, Check, Plus, Minus, Menu, X, MoveUpRight, Monitor, RotateCcw, Pause, Play, Sun, Moon } from 'lucide-react';
+import { PrintBotLogo } from '../packages/ui/src/components/PrintBotLogo';
+import { LuxuryEditorial } from './components/LuxuryEditorial';
+import { FloatingDecorations } from './components/FloatingDecorations';
+import { InteractiveExperience } from './components/InteractiveExperience';
+import { MarqueeShowcase } from './components/MarqueeShowcase';
 import { getInstallerConfig } from './utils/installer';
-import { Navbar } from './components/Navbar';
-import { Hero } from './components/Hero';
-import { TheProblem } from './components/TheProblem';
-import { Intro } from './components/Intro';
-import { HowItWorks } from './components/HowItWorks';
-import { Features } from './components/Features';
-import { Pricing } from './components/Pricing';
-import { DownloadSection } from './components/DownloadSection';
-import { Requirements } from './components/Requirements';
-import { Faq } from './components/Faq';
-import { CtaSection } from './components/CtaSection';
-import { Footer } from './components/Footer';
-import { PilotModal } from './components/PilotModal';
-
-export const App: React.FC = () => {
-  const installerConfig = useMemo(() => getInstallerConfig(), []);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalTab, setModalTab] = useState<'request_pilot' | 'installer_info'>('request_pilot');
-  const [preselectedPlan, setPreselectedPlan] = useState<string | undefined>(undefined);
-
+const PrinterScene = lazy(() => import('./components/PrecisionPrinter'));
+function Poster() { return <div className="printer-poster" aria-hidden="true"><div className="poster-top"/><div className="poster-body"><span>PRINT BOT</span><i/><div className="poster-slot"/></div><div className="poster-paper"><b>Make<br/>an impression.</b><span>Print Bot / Precision in every page</span><div className="paper-art"/></div></div>; }
+export default function App() {
+  const [menu, setMenu] = useState(false);
+  const [siteTheme, setSiteTheme] = useState<'light'|'dark'>(() => document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
+  useEffect(() => { document.documentElement.dataset.theme = siteTheme; document.documentElement.style.colorScheme = siteTheme; try { localStorage.setItem('printbot-theme-v1',siteTheme); } catch {} }, [siteTheme]);
+  const [mode, setMode] = useState<'automatic'|'manual'>('automatic');
+  const [billing, setBilling] = useState<'monthly'|'annual'>('monthly');
+  const [dialog, setDialog] = useState(false);
+  const [printed, setPrinted] = useState(false);
+  const [motionPaused, setMotionPaused] = useState(false);
+  useEffect(() => { document.documentElement.dataset.motion = motionPaused ? 'paused' : 'playing'; return () => { delete document.documentElement.dataset.motion; }; }, [motionPaused]);
+  const [webgl, setWebgl] = useState(false);
+  const [faq, setFaq] = useState<number|null>(0);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const previousFocus = useRef<HTMLElement|null>(null);
+  const installer = getInstallerConfig();
   useEffect(() => {
-    // Staggered reveal observer for sections and cards
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('is-in');
-          }
-        });
-      },
-      {
-        threshold: 0.08,
-        rootMargin: '0px 0px -20px 0px',
-      }
-    );
-
-    const revealElements = document.querySelectorAll('[data-reveal]');
-    revealElements.forEach((el, index) => {
-      (el as HTMLElement).style.transitionDelay = `${(index % 4) * 60}ms`;
-      observer.observe(el);
-    });
-
-    return () => {
-      observer.disconnect();
-    };
+    const media = matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setWebgl(!media.matches && innerWidth > 760 && !('connection' in navigator && (navigator as Navigator & {connection?: {saveData:boolean}}).connection?.saveData));
+    update(); media.addEventListener('change', update); window.addEventListener('resize', update);
+    const observer = new IntersectionObserver(entries => entries.forEach(entry => { if(entry.isIntersecting) { entry.target.classList.add('visible'); observer.unobserve(entry.target); } }), {threshold: .12});
+    document.querySelectorAll('[data-reveal]').forEach(el => observer.observe(el));
+    return () => { observer.disconnect(); media.removeEventListener('change', update); window.removeEventListener('resize', update); };
   }, []);
-
-  const handleDownloadClick = () => {
-    if (installerConfig.status === 'available' && installerConfig.url) {
-      window.location.assign(installerConfig.url);
-    } else {
-      setModalTab('installer_info');
-      setIsModalOpen(true);
-    }
-  };
-
-  const handleRequestAccessClick = (planName?: string) => {
-    setModalTab('request_pilot');
-    setPreselectedPlan(planName);
-    setIsModalOpen(true);
-  };
-
-  return (
-    <div className="page-root">
-      <Navbar
-        installerConfig={installerConfig}
-        onDownloadClick={handleDownloadClick}
-        onRequestAccessClick={() => handleRequestAccessClick()}
-      />
-
-      <main id="main-content">
-        <Hero
-          installerConfig={installerConfig}
-          onDownloadClick={handleDownloadClick}
-          onRequestAccessClick={() => handleRequestAccessClick()}
-        />
-
-        <TheProblem />
-
-        <Intro />
-
-        <HowItWorks />
-
-        <Features />
-
-        <Pricing
-          onRequestPilot={(plan) => handleRequestAccessClick(plan)}
-        />
-
-        <DownloadSection
-          installerConfig={installerConfig}
-          onDownloadClick={handleDownloadClick}
-        />
-
-        <Requirements />
-
-        <Faq />
-
-        <CtaSection
-          installerConfig={installerConfig}
-          onDownloadClick={handleDownloadClick}
-          onRequestAccessClick={() => handleRequestAccessClick()}
-        />
-      </main>
-
-      <Footer
-        onRequestAccessClick={() => handleRequestAccessClick()}
-      />
-
-      <PilotModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        installerConfig={installerConfig}
-        initialTab={modalTab}
-        preselectedPlan={preselectedPlan}
-      />
-    </div>
-  );
-};
-
-export default App;
+  useEffect(() => {
+    if(!dialog) return;
+    previousFocus.current = document.activeElement as HTMLElement;
+    closeRef.current?.focus(); const old = document.body.style.overflow; document.body.style.overflow = 'hidden';
+    const key = (e: KeyboardEvent) => { if(e.key === 'Escape') setDialog(false); if(e.key === 'Tab') { e.preventDefault(); closeRef.current?.focus(); } };
+    document.addEventListener('keydown', key);
+    return () => { document.body.style.overflow = old; document.removeEventListener('keydown', key); previousFocus.current?.focus(); };
+  }, [dialog]);
+  const download = () => { if(installer.url) window.location.assign(installer.url); else setDialog(true); };
+  return <>
+    <a className="skip-link" href="#main-content">Skip to content</a>
+    <header className="navigation shell"><a className="brand" href="#" aria-label="Print Bot home"><PrintBotLogo size={40}/>printbot<span className="brand-dot">®</span></a><nav aria-label="Main navigation" className={menu ? 'nav-links open' : 'nav-links'}><a href="#experience" onClick={() => setMenu(false)}>The experience</a><a href="#control" onClick={() => setMenu(false)}>Built for your shop</a><a href="#pricing" onClick={() => setMenu(false)}>One simple plan</a></nav><button className="nav-cta" onClick={() => setDialog(true)}>Let’s talk print <ArrowUpRight size={16}/></button><button className="landing-theme-switch" aria-label={siteTheme === "dark" ? "Switch to light theme" : "Switch to dark theme"} onClick={() => setSiteTheme(siteTheme === "dark" ? "light" : "dark")}>{siteTheme === "dark" ? <Sun size={18}/> : <Moon size={18}/>}</button><button className="menu-toggle" aria-label={menu?'Close navigation':'Open navigation'} aria-expanded={menu} onClick={() => setMenu(!menu)}>{menu?<X/>:<Menu/>}</button></header>
+    <main id="main-content">
+      <FloatingDecorations />
+      <section className="hero shell" aria-labelledby="hero-heading"><div className="hero-copy"><p className="intro-line"><span/> Less counter chaos. More possibility.</p><h1 id="hero-heading" aria-label="Big ideas. Beautifully printed."><span className="hero-line"><span>Big ideas.</span></span><span className="hero-line"><span>Beautifully</span></span><span className="hero-line accent-line"><span>printed.</span></span></h1><p className="hero-description">Your print shop, one step ahead. From a customer’s phone to your printer—one seamless, thoughtfully automated experience.</p><div className="hero-actions"><button className="button lime" onClick={() => setDialog(true)}>Meet your new print partner <ArrowUpRight size={19}/></button><a className="text-link" href="#experience">Explore the experience <ArrowRight size={17}/></a></div><div className="hero-note"><Monitor size={15}/> Built for Windows <span>·</span> Made for Indian print shops</div></div>
+      <div className="hero-art"><div className="orbit-frame" aria-hidden="true"><div className="orbit orbit-one"/><div className="orbit orbit-two"/></div><div className="art-caption"><span className="signal"/> Your next chapter. In print.</div><div className="scene"><Poster/>{webgl && <Suspense fallback={null}><PrinterScene printing={printed} paused={motionPaused} onFailure={() => setWebgl(false)}/></Suspense>}</div><div className="scene-label"><span>Designed around your workflow.</span><span>Ready when you are <span className="signal"/></span></div><button className={'print-trigger '+(printed?'printed':'')} onClick={() => { setPrinted(!printed); setMotionPaused(false); }} aria-pressed={printed}>{printed?<RotateCcw size={15}/>:<Printer size={15}/>} {printed?'Print another impression':'Make an impression'} <ArrowUpRight size={15}/></button><button className="motion-toggle" onClick={() => setMotionPaused(!motionPaused)} aria-pressed={motionPaused} aria-label={motionPaused ? "Resume site animations" : "Pause site animations"}>{motionPaused ? <Play size={13}/> : <Pause size={13}/>}<span>{motionPaused ? "Resume motion" : "Pause motion"}</span></button><span className="art-coordinate">Precision in motion. An automatic printing illustration.</span></div>
+      <div className="hero-bottom"><span>One connected workflow. Endless possibilities.</span><a href="#experience">Scroll to discover <span>↓</span></a></div></section>
+      <div className="capability-strip"><div className="shell"><span><ScanLine/> Scan. Upload. Print.</span><span><ShieldCheck/> Your shop. Your data.</span><span><Printer/> Unlimited printers.</span><span><Check/> No app needed.</span></div></div>
+      <LuxuryEditorial />
+      <InteractiveExperience />
+      <MarqueeShowcase />
+      <section id="control" className="control-section"><div className="shell control-grid section-space" data-reveal><div><h2>On autopilot.<br/>Or in your hands.</h2><p>Your counter, your call. Choose the order mode that fits the way you work.</p><div className="mode-switch" role="group" aria-label="Explore order modes"><button aria-pressed={mode==='automatic'} onClick={()=>setMode('automatic')}>Full automatic</button><button aria-pressed={mode==='manual'} onClick={()=>setMode('manual')}>Manual approval</button></div><p className="mode-explainer" aria-live="polite">{mode==='automatic'?'Eligible, compatible jobs with verified payment move into your print workflow without staff approval.':'Staff approve or reject every submitted job. You keep the final say before printing.'}</p><small>Demo selector only. Real mode changes require authorized, audited shop access.</small></div><div className="queue" data-ui><div className="queue-header"><div className="queue-mark"><Printer size={19}/></div><span>Your counter. Connected.</span><span className="queue-status">Illustration</span></div><div className="queue-title"><h3>A clear head.<br/>A clearer queue.</h3><span className="signal"/></div>{[{name:'Project proposal.pdf',detail:'A4 · Black & white · Duplex',label:mode==='automatic'?'Eligible for dispatch':'Awaiting approval'},{name:'Brand portfolio.pdf',detail:'A4 · Colour · 1 copy',label:'Payment verified'},{name:'Workshop notes.pdf',detail:'A4 · Black & white · 4 copies',label:'Awaiting payment'}].map((job,i)=><div className="queue-row" key={job.name}><div className="file-icon">PDF</div><div><strong>{job.name}</strong><span>{job.detail}</span></div><span className={i===2?'job-status pending':'job-status'}>{job.label}</span></div>)}<div className="queue-footer"><ShieldCheck size={16}/> Cash and unverified jobs follow your approval policy.</div></div></div></section>
+      <section className="details-section shell section-space" data-reveal><div className="section-heading"><h2>Small details.<br/>A big difference.</h2><p>Thoughtful where it matters.<br/>Powerful where you need it.</p></div><div className="detail-list">{[{title:'Your identity, on every interaction.',text:'Your logo, local language, pricing and preferences. A customer experience that feels like your shop.',tag:'Unmistakably yours'},{title:'More printers. Same plan.',text:'Connect compatible printers without a per-printer software fee. Route work around the way your counter runs.',tag:'Built to grow'},{title:'Privacy is part of the process.',text:'Shop-scoped access, private documents and configurable retention. Separate shops stay separate.',tag:'Protected by design'}].map(d=><article key={d.title}><span className="detail-tag">{d.tag}</span><h3>{d.title}</h3><p>{d.text}</p><MoveUpRight size={26}/></article>)}</div></section>
+      <section id="pricing" className="pricing-section shell" data-reveal><div><h2>One plan.<br/>The whole possibility.</h2><p>All features. Unlimited printers. No software commission on the pages you print.</p><div className="billing-switch" role="group" aria-label="Billing interval"><button aria-pressed={billing==='monthly'} onClick={()=>setBilling('monthly')}>Monthly</button><button aria-pressed={billing==='annual'} onClick={()=>setBilling('annual')}>Annual</button></div><p className="billing-copy" aria-live="polite">{billing==='monthly'?'A monthly subscription to the complete Print Bot experience.':'The same complete Print Bot plan, billed annually.'} Pricing will be confirmed during onboarding.</p></div><div className="plan-content"><span>The complete Print Bot plan</span><ul><li><Check/>Unlimited compatible printers</li><li><Check/>Customer QR & mobile web experience</li><li><Check/>Automatic or manual order approval</li><li><Check/>Shop branding, pricing & preferences</li><li><Check/>Windows workstation & shop management</li></ul><button className="button dark" onClick={()=>setDialog(true)}>Let’s build your better counter <ArrowUpRight size={19}/></button><small>Subscription, customer receipts and payment-provider fees are separate.</small></div></section>
+      <section className="faq-section shell section-space" data-reveal><h2>A few things<br/>you might be wondering.</h2><div className="faqs">{[{q:'Will it work with my printers?',a:'Print Bot uses a Windows workstation and compatible printer drivers. Specific models, paper sizes, finishing and duplex options require validation. Real-printer certification is a pilot gate; universal compatibility is not promised.'},{q:'Do my customers need an app?',a:'No. Customers scan your shop-specific QR and use their mobile browser. No mandatory login is required. English and Tamil are the initial languages, with Hindi support in scope.'},{q:'Can I still accept cash?',a:'Yes, when enabled for your shop. Cash and unverified payments never bypass the configured approval and payment policy.'},{q:'Can I download Print Bot today?',a:'Public installer availability depends on the configured release. Device pairing, shop login and an active subscription are required for authorized use. Production signing and hardware validation remain release gates.'}].map((f,i)=><div className="faq" key={f.q}><button aria-expanded={faq===i} aria-controls={'faq-'+i} onClick={()=>setFaq(faq===i?null:i)}>{f.q}{faq===i?<Minus size={19}/>:<Plus size={19}/>}</button><div id={'faq-'+i} hidden={faq!==i}><p>{f.a}</p></div></div>)}</div></section>
+      <section className="closing shell"><p>A better day at the counter starts here.</p><h2>Let’s make<br/>great impressions.</h2><button className="button lime" onClick={download}>Explore the Windows workstation <ArrowUpRight size={19}/></button><span className="closing-note">One shop. One connected experience. A whole new rhythm.</span></section>
+    </main><footer className="shell footer"><a className="brand" href="#"><PrintBotLogo size={40}/>printbot<span className="brand-dot">®</span></a><p>Good print. Better business.</p><span>© {new Date().getFullYear()} Print Bot</span><a href="#main-content">Back to top ↑</a></footer>
+    {dialog&&<div className="dialog-backdrop" onClick={e=>{if(e.target===e.currentTarget)setDialog(false);}}><section className="availability-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title" aria-describedby="dialog-description"><button ref={closeRef} className="dialog-close" aria-label="Close availability information" onClick={()=>setDialog(false)}><X/></button><Printer className="dialog-printer" size={40}/><h2 id="dialog-title">Your next chapter<br/>is taking shape.</h2><p id="dialog-description">Print Bot is preparing for shop pilots. Public signup and contact submission are not connected yet. No details have been collected or sent.</p><p>Printer compatibility, authorized device pairing and production release validation must be completed before live use.</p><span className="availability-label">{installer.status==='available'?'A configured Windows release is available from the workstation button.':'The public Windows installer is not available yet.'}</span></section></div>}
+  </>;
+}

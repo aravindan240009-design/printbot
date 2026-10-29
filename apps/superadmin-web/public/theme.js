@@ -1,10 +1,7 @@
-// Runs before paint. Only appearance is persisted; never document or tenant data.
+// Apply appearance before paint. Persist only appearance, never shop/document data.
 (function () {
-  var preference = 'light';
-  try { preference = localStorage.getItem('printbot-theme-v1') || 'light'; } catch (_) {}
-  var dark = preference === 'dark';
-  var root = document.documentElement;
-  root.dataset.theme = dark ? 'dark' : 'light';
-  root.style.colorScheme = dark ? 'dark' : 'light';
-  root.classList.toggle('dark', dark);
+ var preference;
+ try { var requested=new URLSearchParams(location.search).get('theme');var stored=localStorage.getItem('printbot-theme-v1');preference=requested==='light'||requested==='dark'?requested:stored==='light'||stored==='dark'?stored:null; } catch (_) {}
+ if(!preference)preference='light';
+ var root=document.documentElement;root.dataset.theme=preference;root.style.colorScheme=preference;root.classList.toggle('dark',preference==='dark');
 })();

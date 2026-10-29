@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { MotionConfig } from 'motion/react';
 import { Sun, Moon } from 'lucide-react';
+import { StudioBackdrop } from './components/PrintBotLogo';
 
 type Theme = 'light' | 'dark';
 const storageKey = 'printbot-theme-v1';
@@ -20,7 +21,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     };
     const pointer = (event: PointerEvent) => {
       if (!fine.matches || reduced.matches) { clear(); return; }
-      const button = (event.target as Element)?.closest?.('button');
+      const button = (event.target as Element)?.closest?.('button.primary,button.pb-button-primary,button.customer-primary,button.ws-primary') as HTMLButtonElement | null;
       if (button !== target) clear();
       if (!button || button.disabled) return;
       target = button;
@@ -39,8 +40,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let preference: Theme = 'light';
     try {
-      const stored = localStorage.getItem(storageKey);
-      preference = stored ? valid(stored) : 'light';
+      const params = new URLSearchParams(window.location.search);
+      const queryTheme = params.get('theme');
+      if (queryTheme === 'light' || queryTheme === 'dark') {
+        preference = queryTheme;
+        localStorage.setItem(storageKey, queryTheme);
+      } else {
+        const stored = localStorage.getItem(storageKey);
+        preference = stored ? valid(stored) : 'light';
+      }
     } catch { /* Privacy mode */ }
     const apply = () => {
       const dark = preference === 'dark';
@@ -63,14 +71,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     try { localStorage.setItem(storageKey, value); } catch { /* Still works without persistence */ }
     window.dispatchEvent(new CustomEvent('printbot-theme', { detail: value }));
   };
-  return <ThemeContext.Provider value={{ theme, setTheme }}><MotionConfig reducedMotion="user">{children}</MotionConfig></ThemeContext.Provider>;
+  return <ThemeContext.Provider value={{ theme, setTheme }}><MotionConfig reducedMotion="user"><div className="pb-theme-root"><StudioBackdrop />{children}</div></MotionConfig></ThemeContext.Provider>;
 }
 
 export function ThemeSwitch() {
   const { theme, setTheme } = useContext(ThemeContext);
   return <div className="pb-theme-switch" role="group" aria-label="Appearance">
     {([{ value: 'light', Icon: Sun, label: 'Light' }, { value: 'dark', Icon: Moon, label: 'Dark' }] as const).map(({ value, Icon, label }) =>
-      <button key={value} type="button" aria-label={`${label} theme`} aria-pressed={theme === value} title={`${label} theme`} onClick={() => setTheme(value)}><Icon size={16} aria-hidden="true" /><span>{label}</span></button>
+      <button id={`theme-btn-${value}`} key={value} type="button" aria-label={`${label} theme`} aria-pressed={theme === value} title={`${label} theme`} onClick={() => setTheme(value)}><Icon size={16} aria-hidden="true" /><span>{label}</span></button>
     )}
   </div>;
 }
