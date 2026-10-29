@@ -77,14 +77,15 @@ export const CustomerShopPortal: React.FC<CustomerShopPortalProps> = ({ shopId, 
     sheets: number;
   } | null>(null);
 
-  // Fetch registered shop details & pricing rates from Supabase
+  // Fetch registered shop details & pricing rates from Supabase with Live Realtime Listener
   useEffect(() => {
     async function loadShop() {
       try {
+        const cleanId = shopId.toLowerCase();
         const { data, error } = await supabase
           .from('pilot_applications')
-          .select('shop_name, city, contact_number, plan, notes')
-          .eq('generated_username', shopId.toLowerCase())
+          .select('shop_name, city, contact_number, plan, notes, generated_username')
+          .or(`generated_username.ilike.${cleanId},shop_name.ilike.${cleanId}`)
           .maybeSingle();
 
         if (!error && data) {
@@ -92,7 +93,7 @@ export const CustomerShopPortal: React.FC<CustomerShopPortalProps> = ({ shopId, 
           let customColor = 10.0;
           try {
             if (data.notes) {
-              const parsed = JSON.parse(data.notes);
+              const parsed = typeof data.notes === 'string' ? JSON.parse(data.notes) : data.notes;
               if (parsed.bwRate) customBw = Number(parsed.bwRate);
               if (parsed.colorRate) customColor = Number(parsed.colorRate);
             }
@@ -110,7 +111,33 @@ export const CustomerShopPortal: React.FC<CustomerShopPortalProps> = ({ shopId, 
         // Fallback to defaults
       }
     }
+
     loadShop();
+
+    // 1. Live Supabase Realtime Listener
+    const channel = supabase
+      .channel(`live_rates_${shopId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'pilot_applications' },
+        (payload) => {
+          console.info('Live rates update from Supabase:', payload);
+          loadShop();
+        }
+      )
+      .subscribe();
+
+    // 2. Auto-fetch whenever customer/operator clicks back into the browser tab
+    window.addEventListener('focus', loadShop);
+
+    // 3. Active background sync poll every 3 seconds
+    const interval = setInterval(loadShop, 3000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener('focus', loadShop);
+      clearInterval(interval);
+    };
   }, [shopId]);
 
   const activeDoc = files.find((f) => f.id === activeFileId) || files[0];

@@ -4247,14 +4247,16 @@ export default function App() {
                       },
                     }));
 
-                    // Sync rates to Supabase for the web portal
+                    // Sync rates to Supabase for the web portal (matching both generated_username and shop_name)
                     try {
+                      const shopName = currentShop?.shopName || u;
+                      const username = currentShop?.username || u;
                       await supabase
                         .from('pilot_applications')
                         .update({
                           notes: JSON.stringify({ bwRate: bw, colorRate: color }),
                         })
-                        .eq('generated_username', u);
+                        .or(`generated_username.eq.${username},shop_name.eq.${shopName},generated_username.eq.${u},shop_name.eq.${u}`);
                     } catch (err) {
                       console.warn('Failed to sync rates to cloud:', err);
                     }
