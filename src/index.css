@@ -1838,22 +1838,13 @@ html[data-motion=paused] [data-reveal],html[data-motion=paused] .section-heading
 }
 
 .fallback-pedestal {
-  position: absolute;
-  width: 410px;
-  height: 175px;
-  bottom: 35px;
-  border-radius: 50%;
-  background: radial-gradient(ellipse at 50% 35%, #2a2c2f 0%, #151618 70%);
-  border: 2.5px solid #c8a872;
-  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6), inset 0 2px 12px rgba(200, 168, 114, 0.3);
-  transform: rotateX(60deg);
+  display: none !important;
 }
 
 .fallback-printer-body {
   position: relative;
   width: 370px;
-  margin-top: -15px;
-  filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.45));
+  margin-top: 15px;
 }
 
 .fallback-scanner-lid {

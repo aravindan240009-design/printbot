@@ -411,7 +411,7 @@ export default function PrecisionPrinter({
     group.add(labelMesh);
 
     // ==============================================================
-    // 6. HIGH-PRECISION PRINTED DOCUMENT (NO RINGS, AUTHENTIC XEROX INVOICE)
+    // 6. HIGH-PRECISION 100% RIGID PRINTED DOCUMENT (NO UNROLLING)
     // ==============================================================
     const artData = canvasTexture(512, 724, (ctx) => {
       // Warm Ivory paper stock
@@ -518,10 +518,9 @@ export default function PrecisionPrinter({
     artTexture.wrapS = THREE.ClampToEdgeWrapping;
     artTexture.wrapT = THREE.ClampToEdgeWrapping;
 
-    // Slot exit aperture boundary for hardware clipping (prevents internal paper poke-through)
-    const slotExitZ = 1.30;
-    const slotExitY = 0.095;
-    const slotClipPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -slotExitZ);
+    // Slot exit aperture boundary: plane locked to printer slot aperture
+    // Only paper that has physically emerged past the slot aperture is visible
+    const slotClipPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -1.35);
 
     const sheetMaterial = standard({
       map: artTexture,
@@ -531,90 +530,38 @@ export default function PrecisionPrinter({
     });
     sheetMaterial.clippingPlanes = [slotClipPlane];
 
-    // Fixed physical paper dimensions - NEVER STRETCHES OR UNROLLS
-    const SHEET_W = 2.22;
-    const SHEET_L = 1.62;
-    const COLS = 16;
-    const ROWS = 36;
-    const sheetGeo = new THREE.PlaneGeometry(SHEET_W, SHEET_L, COLS, ROWS);
+    // 100% Rigid, flat physical paper dimensions (Laser Flat — Zero Unrolling)
+    const SHEET_W = 2.18;
+    const SHEET_L = 1.54;
+    const sheetGeo = new THREE.PlaneGeometry(SHEET_W, SHEET_L);
     const sheet = new THREE.Mesh(sheetGeo, sheetMaterial);
-    group.add(sheet);
+    sheet.rotation.x = -Math.PI / 2;
+    sheet.position.set(0, 0.034, 0.81);
+    trayGroup.add(sheet);
 
-    // Save initial undeformed positions
-    const posAttr = sheetGeo.attributes.position;
-    const origPos = new Float32Array(posAttr.array);
-
-    // Realistic stacked printed sheets already resting in the output tray
+    // Realistic stacked printed sheets already resting neatly inside output tray
     const stackMat = standard({
       color: 0xf8f6f2,
       roughness: 0.88,
       metalness: 0,
       side: THREE.DoubleSide,
     });
+    stackMat.clippingPlanes = [slotClipPlane];
     const stack1 = new THREE.Mesh(new THREE.PlaneGeometry(SHEET_W, SHEET_L), stackMat);
-    stack1.rotation.x = -Math.PI / 2 + 0.065;
-    stack1.position.set(0.015, -0.078, 2.12);
-    group.add(stack1);
+    stack1.rotation.x = -Math.PI / 2;
+    stack1.position.set(0.015, 0.022, 0.80);
+    trayGroup.add(stack1);
 
     const stack2 = new THREE.Mesh(new THREE.PlaneGeometry(SHEET_W, SHEET_L), stackMat);
-    stack2.rotation.x = -Math.PI / 2 + 0.065;
-    stack2.rotation.z = -0.014;
-    stack2.position.set(-0.012, -0.072, 2.14);
-    group.add(stack2);
-
-    // 100% physically authentic rigid paper feed kinematics:
-    // Vertices move forward at constant physical spacing, sliding out of internal rollers and draping onto tray
-    function updatePaperFeed(feedDistance: number) {
-      for (let i = 0; i < posAttr.count; i++) {
-        const origX = origPos[i * 3];
-        const origY = origPos[i * 3 + 1];
-        // Exact distance along sheet from leading edge (0 to SHEET_L)
-        const s = (0.5 - origY / SHEET_L) * SHEET_L;
-
-        const zTarget = slotExitZ + feedDistance - s;
-        let yTarget = slotExitY;
-
-        if (zTarget >= slotExitZ) {
-          const distPast = zTarget - slotExitZ;
-          const yTray = -0.075 + distPast * Math.sin(0.065);
-          // Smooth paper beam stiffness drape over exit roller
-          const drape = Math.sin(Math.min(distPast / 0.42, 1.0) * Math.PI * 0.5);
-          yTarget = slotExitY * (1 - drape) + yTray * drape;
-
-          // Trailing edge drop when tail exits roller
-          if (feedDistance >= SHEET_L && s > SHEET_L - 0.40) {
-            const tailExit = Math.min((feedDistance - SHEET_L) / 0.12, 1.0);
-            const tailWeight = (s - (SHEET_L - 0.40)) / 0.40;
-            const dropFactor = Math.sin(tailExit * Math.PI * 0.5);
-            yTarget = yTarget * (1 - tailWeight * dropFactor) + yTray * (tailWeight * dropFactor);
-          }
-        }
-
-        posAttr.setXYZ(i, origX, yTarget, zTarget);
-      }
-      posAttr.needsUpdate = true;
-      sheetGeo.computeVertexNormals();
-    }
-
-    updatePaperFeed(1.74);
+    stack2.rotation.x = -Math.PI / 2;
+    stack2.rotation.z = -0.012;
+    stack2.position.set(-0.012, 0.025, 0.81);
+    trayGroup.add(stack2);
 
     // ==============================================================
-    // 7. SLEEK TURNTABLE PEDESTAL (SHADOWLESS PER USER REQUEST)
+    // 7. ULTRA-CLEAN FLOATING HARDWARE (SHADOWS & PLATFORM REMOVED)
     // ==============================================================
-    const platform = new THREE.Mesh(
-      new THREE.CylinderGeometry(2.85, 3.0, 0.11, 64),
-      standard({ color: 0x1b1917, metalness: 0.65, roughness: 0.28 })
-    );
-    platform.position.set(0, -1.04, 0.2);
-    scene.add(platform);
-
-    const platformRim = new THREE.Mesh(
-      new THREE.TorusGeometry(2.86, 0.014, 8, 80),
-      gold
-    );
-    platformRim.rotation.x = Math.PI / 2;
-    platformRim.position.set(0, -0.985, 0.2);
-    scene.add(platformRim);
+    // Pedestal completely removed per user request for ultra-clean, floating presentation.
 
     // ==============================================================
     // 8. LUXURY STUDIO LIGHTING (SHADOW MAPS DISABLED FOR CLEAN AESTHETIC)
@@ -698,7 +645,7 @@ export default function PrecisionPrinter({
           velY *= 0.92;
         }
         if (Math.abs(velX) > 0.0001) {
-          targetRotX = THREE.MathUtils.clamp(targetRotX + velX, -0.25, 0.42);
+          targetRotX = THREE.MathUtils.clamp(targetRotX + velX, -0.65, 0.70);
           velX *= 0.92;
         }
         currentRotY += (targetRotY - currentRotY) * 0.18;
@@ -715,20 +662,40 @@ export default function PrecisionPrinter({
         group.rotation.x = currentRotX;
       }
 
-      // 100% physically realistic paper feed animation:
-      // Rigid sheet advances millimeter-by-millimeter out of slot rollers with micro-stepper pulses
+      // Dynamic clipping plane orientation sync:
+      // Keep clipping plane mathematically locked to slot aperture even when 360° rotated
+      const slotWorldPos = new THREE.Vector3();
+      const slotWorldQuat = new THREE.Quaternion();
+      const slotWorldNorm = new THREE.Vector3(0, 0, 1);
+      trayGroup.getWorldPosition(slotWorldPos);
+      trayGroup.getWorldQuaternion(slotWorldQuat);
+      slotWorldNorm.applyQuaternion(slotWorldQuat);
+      slotClipPlane.setFromNormalAndCoplanarPoint(slotWorldNorm, slotWorldPos);
+
+      // 100% physically authentic rigid laser sheet feed kinematics:
+      // Flat, rigid sheet advances millimeter-by-millimeter out of slot rollers with micro-stepper pulses
       const isPrintingActive = cycle >= 0.4 && cycle < 5.8;
-      let feedDistance = 0.02;
       let printProgress = 0;
 
       if (isPrintingActive) {
-        printProgress = THREE.MathUtils.clamp((cycle - 0.4) / 5.2, 0, 1);
-        const microStep = Math.sin(printProgress * 48 * Math.PI) * 0.003;
-        feedDistance = 0.02 + printProgress * (SHEET_L + 0.12) + microStep;
-        updatePaperFeed(feedDistance);
+        const rawP = THREE.MathUtils.clamp((cycle - 0.4) / 5.2, 0, 1);
+        printProgress = rawP;
 
-        // Carriage sweep animation while printing
-        carriage.position.x = Math.sin(cycle * 16.0) * 0.92;
+        // Stepper cadence: paper feeds in realistic stepped intervals synchronized with printhead passes
+        const numPasses = 32;
+        const passIndex = Math.floor(rawP * numPasses);
+        const passFrac = (rawP * numPasses) % 1;
+        const feedStroke = Math.min(passFrac / 0.45, 1.0);
+        const smoothFeed = 0.5 - 0.5 * Math.cos(feedStroke * Math.PI);
+        const steppedP = (passIndex + smoothFeed) / numPasses;
+
+        // Advance rigid sheet smoothly along tray bed from throat to front stop
+        sheet.position.x = 0;
+        sheet.position.z = THREE.MathUtils.lerp(-0.76, 0.81, steppedP);
+        sheet.position.y = 0.036;
+
+        // Sweeping carriage head inside throat
+        carriage.position.x = Math.sin(cycle * 18.0) * 0.95;
         statusMesh.material = ledActive;
         statusMesh.scale.x = 1.0 + Math.sin(elapsed * 9) * 0.25;
 
@@ -736,15 +703,17 @@ export default function PrecisionPrinter({
         if (
           controls.current.soundEnabled &&
           audioEngine.current &&
-          now - lastMotorTick > 130
+          now - lastMotorTick > 120
         ) {
           audioEngine.current.playMotorStep();
           lastMotorTick = now;
         }
       } else if (cycle >= 5.8) {
-        // Fully printed & resting on the tray
-        feedDistance = SHEET_L + 0.12;
-        updatePaperFeed(feedDistance);
+        // Fully printed & resting on the tray stack
+        printProgress = 1.0;
+        sheet.position.x = 0;
+        sheet.position.z = 0.81;
+        sheet.position.y = 0.028; // settled onto stack
         carriage.position.x = 0;
         statusMesh.material = ledReady;
         statusMesh.scale.x = 1.0;
@@ -754,8 +723,11 @@ export default function PrecisionPrinter({
           hasPlayedDrop = true;
         }
       } else {
-        feedDistance = 0.02;
-        updatePaperFeed(feedDistance);
+        // Pre-print / standby state inside rollers
+        printProgress = 0;
+        sheet.position.x = 0;
+        sheet.position.z = -0.76;
+        sheet.position.y = 0.036;
         carriage.position.x = 0;
         statusMesh.material = ledReady;
         statusMesh.scale.x = 1.0;
@@ -847,7 +819,11 @@ export default function PrecisionPrinter({
     });
     observer.observe(el);
 
-    // Interactive 360° mouse & touch drag rotation
+    // Interactive 360° mouse & touch drag rotation with inertia & wheel zoom
+    const dom = renderer.domElement;
+    dom.style.touchAction = 'none';
+    dom.style.cursor = 'grab';
+
     const onPointerDown = (event: PointerEvent) => {
       isDragging = true;
       activePointerId = event.pointerId;
@@ -856,41 +832,65 @@ export default function PrecisionPrinter({
       velY = 0;
       velX = 0;
       lastInteractionTime = performance.now();
+      dom.style.cursor = 'grabbing';
+      document.body.style.cursor = 'grabbing';
       try {
-        el.setPointerCapture(event.pointerId);
+        dom.setPointerCapture(event.pointerId);
       } catch {}
       el.classList.add('is-dragging');
       request();
     };
 
     const onPointerMove = (event: PointerEvent) => {
-      if (isDragging && event.pointerId === activePointerId) {
+      if (isDragging && (activePointerId === -1 || event.pointerId === activePointerId)) {
         const dx = event.clientX - lastPointerX;
         const dy = event.clientY - lastPointerY;
         lastPointerX = event.clientX;
         lastPointerY = event.clientY;
 
-        targetRotY += dx * 0.008;
-        targetRotX = THREE.MathUtils.clamp(targetRotX + dy * 0.004, -0.25, 0.42);
+        targetRotY += dx * 0.012;
+        targetRotX = THREE.MathUtils.clamp(targetRotX + dy * 0.007, -0.65, 0.70);
 
-        velY = dx * 0.008;
-        velX = dy * 0.004;
+        velY = dx * 0.012;
+        velX = dy * 0.007;
         lastInteractionTime = performance.now();
         request();
       }
     };
 
     const onPointerUp = (event: PointerEvent) => {
-      if (event.pointerId === activePointerId) {
+      if (isDragging && (activePointerId === -1 || event.pointerId === activePointerId)) {
         isDragging = false;
         activePointerId = -1;
+        dom.style.cursor = 'grab';
+        document.body.style.cursor = '';
         try {
-          el.releasePointerCapture(event.pointerId);
+          dom.releasePointerCapture(event.pointerId);
         } catch {}
         el.classList.remove('is-dragging');
         lastInteractionTime = performance.now();
         request();
       }
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      camera.position.z = THREE.MathUtils.clamp(camera.position.z + e.deltaY * 0.006, 5.5, 13.0);
+      camera.position.y = (camera.position.z / 9.0) * 4.6;
+      camera.lookAt(0, 0.05, 0.2);
+      lastInteractionTime = performance.now();
+      request();
+    };
+
+    const onDblClick = () => {
+      targetRotY = 0;
+      targetRotX = 0;
+      velY = 0;
+      velX = 0;
+      camera.position.set(6.4, 4.6, 9.0);
+      camera.lookAt(0, 0.05, 0.2);
+      lastInteractionTime = performance.now();
+      request();
     };
 
     const visibility = () => {
@@ -917,10 +917,12 @@ export default function PrecisionPrinter({
       }
     };
 
-    el.addEventListener('pointerdown', onPointerDown);
-    el.addEventListener('pointermove', onPointerMove);
-    el.addEventListener('pointerup', onPointerUp);
-    el.addEventListener('pointercancel', onPointerUp);
+    dom.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+    dom.addEventListener('wheel', onWheel, { passive: false });
+    dom.addEventListener('dblclick', onDblClick);
     document.addEventListener('visibilitychange', visibility);
     renderer.domElement.addEventListener('webglcontextlost', lost);
     renderer.domElement.addEventListener('webglcontextrestored', restored);
@@ -932,10 +934,13 @@ export default function PrecisionPrinter({
       invalidate.current = () => {};
       resize.disconnect();
       observer.disconnect();
-      el.removeEventListener('pointerdown', onPointerDown);
-      el.removeEventListener('pointermove', onPointerMove);
-      el.removeEventListener('pointerup', onPointerUp);
-      el.removeEventListener('pointercancel', onPointerUp);
+      dom.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+      dom.removeEventListener('wheel', onWheel);
+      dom.removeEventListener('dblclick', onDblClick);
+      document.body.style.cursor = '';
       document.removeEventListener('visibilitychange', visibility);
       renderer.domElement.removeEventListener('webglcontextlost', lost);
       renderer.domElement.removeEventListener('webglcontextrestored', restored);

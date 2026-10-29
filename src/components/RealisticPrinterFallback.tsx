@@ -8,12 +8,7 @@ interface RealisticPrinterFallbackProps {
 export function RealisticPrinterFallback({ printing = false, paused = false }: RealisticPrinterFallbackProps) {
   return (
     <div className="realistic-printer-fallback" aria-hidden="true">
-      {/* Turntable circular luxury base with gold metallic rim */}
-      <div className="fallback-pedestal">
-        <div className="fallback-pedestal-rim" />
-      </div>
-
-      {/* Main 2.5D Isometric Printer Body */}
+      {/* Main 2.5D Isometric Printer Body (Clean Floating Presentation — Zero Floor Shadow Pedestal) */}
       <div className="fallback-printer-body">
         {/* Top Scanner & ADF Lid */}
         <div className="fallback-scanner-lid">
