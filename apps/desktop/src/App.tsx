@@ -198,42 +198,35 @@ export default function App() {
   const currentShop: ShopLicense | undefined =
     activeSession?.role === 'SHOP_OWNER' ? licenses[activeSession.username] : undefined;
 
-  // --- Lock Screen Form State ---
-  const [loginMode, setLoginMode] = useState<'SHOP_OWNER' | 'ADMIN'>('SHOP_OWNER');
-  const [ownerUsername, setOwnerUsername] = useState('');
-  const [ownerKey, setOwnerKey] = useState('');
-  const [adminUsername, setAdminUsername] = useState('');
-  const [adminKey, setAdminKey] = useState('');
+  // --- Unified Lock Screen Form State ---
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginKey, setLoginKey] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  const handleShopLogin = (e: React.FormEvent) => {
+  const handleUnifiedLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
-    const u = ownerUsername.trim().toLowerCase();
-    const k = ownerKey.trim().toUpperCase();
+    const u = loginUsername.trim().toLowerCase();
+    const k = loginKey.trim();
 
-    const license = licenses[u];
-    if (!license || license.licenseKey !== k) {
-      setLoginError('Invalid Username or License Key. Please check with your Admin.');
-      return;
-    }
-
-    if (license.status === 'REVOKED') {
-      setLoginError('This license key has been revoked by the Admin.');
-      return;
-    }
-
-    setActiveSession({ role: 'SHOP_OWNER', username: u });
-  };
-
-  const handleAdminLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginError('');
-    if (adminUsername.trim() === 'admin' && adminKey.trim() === 'admin@123') {
+    // 1. Admin Authentication Check
+    if (u === 'admin' && k === 'admin@123') {
       setActiveSession({ role: 'ADMIN', username: 'admin' });
-    } else {
-      setLoginError('Invalid Admin credentials. Use admin and admin@123');
+      return;
     }
+
+    // 2. Shop Owner License Check (case-insensitive key comparison)
+    const license = licenses[u];
+    if (license && license.licenseKey.trim().toUpperCase() === k.toUpperCase()) {
+      if (license.status === 'REVOKED') {
+        setLoginError('This license key has been revoked by the Admin.');
+        return;
+      }
+      setActiveSession({ role: 'SHOP_OWNER', username: u });
+      return;
+    }
+
+    setLoginError('Invalid Username or Key. Please check your credentials or contact Admin.');
   };
 
   const handleLogout = () => {
@@ -535,56 +528,6 @@ export default function App() {
             </p>
           </div>
 
-          {/* Mode Switch Tabs */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '6px',
-              background: 'var(--pb-raised)',
-              padding: '4px',
-              borderRadius: '10px',
-              marginBottom: '24px',
-            }}
-          >
-            <button
-              style={{
-                border: 0,
-                background: loginMode === 'SHOP_OWNER' ? 'var(--pb-surface)' : 'transparent',
-                color: loginMode === 'SHOP_OWNER' ? 'var(--pb-text)' : 'var(--pb-muted)',
-                boxShadow: loginMode === 'SHOP_OWNER' ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
-                minHeight: '38px',
-                fontSize: '13px',
-                fontWeight: 650,
-                borderRadius: '8px',
-              }}
-              onClick={() => {
-                setLoginMode('SHOP_OWNER');
-                setLoginError('');
-              }}
-            >
-              Shop Owner
-            </button>
-            <button
-              style={{
-                border: 0,
-                background: loginMode === 'ADMIN' ? 'var(--pb-surface)' : 'transparent',
-                color: loginMode === 'ADMIN' ? 'var(--pb-text)' : 'var(--pb-muted)',
-                boxShadow: loginMode === 'ADMIN' ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
-                minHeight: '38px',
-                fontSize: '13px',
-                fontWeight: 650,
-                borderRadius: '8px',
-              }}
-              onClick={() => {
-                setLoginMode('ADMIN');
-                setLoginError('');
-              }}
-            >
-              Platform Admin
-            </button>
-          </div>
-
           {loginError && (
             <div
               style={{
@@ -605,132 +548,73 @@ export default function App() {
             </div>
           )}
 
-          {/* Shop Owner Login Form */}
-          {loginMode === 'SHOP_OWNER' && (
-            <form onSubmit={handleShopLogin} style={{ display: 'grid', gap: '16px' }}>
+          {/* Single Unified Login Form */}
+          <form onSubmit={handleUnifiedLogin} style={{ display: 'grid', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                Username
+              </label>
+              <input
+                type="text"
+                placeholder="Enter username (e.g. shopowner or admin)"
+                value={loginUsername}
+                onChange={(e) => setLoginUsername(e.target.value)}
+                autoFocus
+                required
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                Key / Password
+              </label>
+              <input
+                type="password"
+                placeholder="Enter key (e.g. PB-KEY-2026-XEROX or admin@123)"
+                value={loginKey}
+                onChange={(e) => setLoginKey(e.target.value)}
+                required
+              />
+            </div>
+
+            <div
+              style={{
+                background: 'var(--pb-raised)',
+                border: '1px solid var(--pb-border)',
+                borderRadius: '10px',
+                padding: '12px',
+                fontSize: '11px',
+                color: 'var(--pb-muted)',
+                lineHeight: '1.6',
+              }}
+            >
+              <strong>Default Access:</strong>
+              <div style={{ marginTop: '4px' }}>
+                • <strong>Shop Owner:</strong> Username: <code>shopowner</code> | Key: <code>PB-KEY-2026-XEROX</code>
+              </div>
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                  Shop Owner Username
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. shopowner"
-                  value={ownerUsername}
-                  onChange={(e) => setOwnerUsername(e.target.value)}
-                  required
-                />
+                • <strong>Platform Admin:</strong> Username: <code>admin</code> | Key: <code>admin@123</code>
               </div>
+            </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                  Activation / License Key
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. PB-KEY-2026-XEROX"
-                  value={ownerKey}
-                  onChange={(e) => setOwnerKey(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div
-                style={{
-                  background: 'var(--pb-raised)',
-                  border: '1px solid var(--pb-border)',
-                  borderRadius: '10px',
-                  padding: '12px',
-                  fontSize: '11px',
-                  color: 'var(--pb-muted)',
-                  lineHeight: '1.5',
-                }}
-              >
-                <strong>Pre-configured Demo Shop Key:</strong>
-                <br />
-                Username: <code>shopowner</code> | Key: <code>PB-KEY-2026-XEROX</code>
-              </div>
-
-              <button
-                type="submit"
-                className="ws-primary"
-                style={{
-                  width: '100%',
-                  minHeight: '46px',
-                  marginTop: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  fontSize: '14px',
-                }}
-              >
-                <Unlock size={18} />
-                Unlock Print Bot Software
-              </button>
-            </form>
-          )}
-
-          {/* Platform Admin Login Form */}
-          {loginMode === 'ADMIN' && (
-            <form onSubmit={handleAdminLogin} style={{ display: 'grid', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                  Admin Username
-                </label>
-                <input
-                  type="text"
-                  placeholder="admin"
-                  value={adminUsername}
-                  onChange={(e) => setAdminUsername(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                  Admin Key / Password
-                </label>
-                <input
-                  type="password"
-                  placeholder="admin@123"
-                  value={adminKey}
-                  onChange={(e) => setAdminKey(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div
-                style={{
-                  background: 'var(--pb-raised)',
-                  border: '1px solid var(--pb-border)',
-                  borderRadius: '10px',
-                  padding: '12px',
-                  fontSize: '11px',
-                  color: 'var(--pb-muted)',
-                }}
-              >
-                Super Admin credentials: <code>admin</code> / <code>admin@123</code>
-              </div>
-
-              <button
-                type="submit"
-                className="ws-primary"
-                style={{
-                  width: '100%',
-                  minHeight: '46px',
-                  marginTop: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  fontSize: '14px',
-                }}
-              >
-                <ShieldCheck size={18} />
-                Access Admin Portal
-              </button>
-            </form>
-          )}
+            <button
+              type="submit"
+              className="ws-primary"
+              style={{
+                width: '100%',
+                minHeight: '46px',
+                marginTop: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                fontSize: '14px',
+              }}
+            >
+              <Unlock size={18} />
+              Unlock Print Bot Software
+            </button>
+          </form>
         </div>
       </div>
     );
