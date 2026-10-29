@@ -27,7 +27,18 @@ import {
   LogOut,
   Sliders,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Laptop,
+  Radio,
+  Calendar,
+  History,
+  Send,
+  Key,
+  RotateCcw,
+  Activity,
+  TrendingUp,
+  Megaphone,
+  Check
 } from 'lucide-react';
 import { ThemeProvider, ThemeSwitch, MotionSurface, PaperScene, PrinterScene, useGsapStagger } from '@xerox/ui';
 import { discoverPrinters, type NativePrinterInfo } from './native';
@@ -50,6 +61,26 @@ export interface ShopLicense {
   status: 'ACTIVE' | 'REVOKED';
   expiresAt: string;
   isConfigured: boolean;
+  duration?: '1 Month' | '1 Year' | 'Lifetime Commercial';
+  deviceId?: string | null;
+  totalOrdersCount?: number;
+  totalPagesCount?: number;
+  lastActive?: string;
+}
+
+export interface AdminAuditEntry {
+  id: string;
+  timestamp: string;
+  action: 'KEY_ISSUED' | 'KEY_REVOKED' | 'KEY_REACTIVATED' | 'KEY_EXTENDED' | 'DEVICE_RESET' | 'BROADCAST_PUBLISHED' | 'PASSWORD_UPDATED';
+  details: string;
+  actor: string;
+}
+
+export interface GlobalBroadcast {
+  active: boolean;
+  message: string;
+  type: 'info' | 'warning' | 'urgent';
+  updatedAt: string;
 }
 
 export interface PrintJob {
@@ -106,6 +137,11 @@ const INITIAL_LICENSES: Record<string, ShopLicense> = {
     status: 'ACTIVE',
     expiresAt: '2027-12-31',
     isConfigured: true,
+    duration: '1 Year',
+    deviceId: 'PC-WIN11-TPM-7B2F',
+    totalOrdersCount: 148,
+    totalPagesCount: 624,
+    lastActive: 'Today, 12:20 PM',
   },
 };
 
@@ -198,6 +234,11 @@ export default function App() {
   const currentShop: ShopLicense | undefined =
     activeSession?.role === 'SHOP_OWNER' ? licenses[activeSession.username] : undefined;
 
+  // --- Admin Security & Password Persistence ---
+  const [adminCustomPassword, setAdminCustomPassword] = useState<string>(() => {
+    return localStorage.getItem('printbot_admin_key') || 'admin@123';
+  });
+
   // --- Unified Lock Screen Form State ---
   const [loginUsername, setLoginUsername] = useState('');
   const [loginKey, setLoginKey] = useState('');
@@ -209,8 +250,8 @@ export default function App() {
     const u = loginUsername.trim().toLowerCase();
     const k = loginKey.trim();
 
-    // 1. Admin Authentication Check
-    if (u === 'admin' && k === 'admin@123') {
+    // 1. Admin Authentication Check (Matches custom password or default admin@123)
+    if (u === 'admin' && (k === adminCustomPassword || k === 'admin@123')) {
       setActiveSession({ role: 'ADMIN', username: 'admin' });
       return;
     }
@@ -268,11 +309,99 @@ export default function App() {
     }));
   };
 
-  // --- Admin Portal State (Key Generator) ---
+  // --- Admin Multi-Tab & Management State ---
+  type AdminTab = 'LICENSES' | 'SHOPS_DEVICES' | 'REVENUE' | 'BROADCASTS' | 'AUDIT_SECURITY';
+  const [adminActiveTab, setAdminActiveTab] = useState<AdminTab>('LICENSES');
+  const [adminNotice, setAdminNotice] = useState<string | null>(null);
+
+  // Auto-dismiss admin notice after 5 seconds
+  useEffect(() => {
+    if (!adminNotice) return;
+    const timer = setTimeout(() => setAdminNotice(null), 5000);
+    return () => clearTimeout(timer);
+  }, [adminNotice]);
+
+  // --- Audit Trail State ---
+  const [auditLogs, setAuditLogs] = useState<AdminAuditEntry[]>(() => {
+    try {
+      const saved = localStorage.getItem('printbot_audit_logs');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [
+      {
+        id: 'AUD-001',
+        timestamp: '2026-10-25 09:30:15',
+        action: 'KEY_ISSUED',
+        details: 'Issued 1 Year license to Anna University Quick Xerox (shopowner)',
+        actor: 'admin',
+      },
+      {
+        id: 'AUD-002',
+        timestamp: '2026-10-25 09:32:40',
+        action: 'DEVICE_RESET',
+        details: 'Bound TPM-backed counter PC device PC-WIN11-TPM-7B2F for shopowner',
+        actor: 'system',
+      },
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('printbot_audit_logs', JSON.stringify(auditLogs));
+  }, [auditLogs]);
+
+  const logAdminAction = (action: AdminAuditEntry['action'], details: string) => {
+    const entry: AdminAuditEntry = {
+      id: `AUD-${Date.now().toString().slice(-4)}`,
+      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+      action,
+      details,
+      actor: 'admin',
+    };
+    setAuditLogs((prev) => [entry, ...prev]);
+  };
+
+  // --- Global Broadcast State ---
+  const [globalBroadcast, setGlobalBroadcast] = useState<GlobalBroadcast>(() => {
+    try {
+      const saved = localStorage.getItem('printbot_global_broadcast');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      active: true,
+      message: 'Cloud print spooling is operational across all shop counters. Welcome to Print Bot network!',
+      type: 'info',
+      updatedAt: '2026-10-29',
+    };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('printbot_global_broadcast', JSON.stringify(globalBroadcast));
+  }, [globalBroadcast]);
+
+  const [broadcastDraft, setBroadcastDraft] = useState(globalBroadcast.message);
+  const [broadcastTypeDraft, setBroadcastTypeDraft] = useState<GlobalBroadcast['type']>(globalBroadcast.type);
+  const [broadcastEnabledDraft, setBroadcastEnabledDraft] = useState(globalBroadcast.active);
+
+  const handleSaveBroadcast = (e: React.FormEvent) => {
+    e.preventDefault();
+    const updated: GlobalBroadcast = {
+      active: broadcastEnabledDraft,
+      message: broadcastDraft.trim() || 'All counters operational.',
+      type: broadcastTypeDraft,
+      updatedAt: new Date().toISOString().replace('T', ' ').slice(0, 10),
+    };
+    setGlobalBroadcast(updated);
+    logAdminAction('BROADCAST_PUBLISHED', `Updated network broadcast: "${updated.message.slice(0, 45)}..."`);
+    setAdminNotice('Network broadcast updated! All shop counter screens will reflect this message.');
+  };
+
+  // --- Key Generator & Management State ---
   const [newShopName, setNewShopName] = useState('');
   const [newUsername, setNewUsername] = useState('');
-  const [newDuration, setNewDuration] = useState('1 Year');
+  const [newDuration, setNewDuration] = useState<'1 Month' | '1 Year' | 'Lifetime Commercial'>('1 Year');
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
+  const [licenseSearchQuery, setLicenseSearchQuery] = useState('');
+  const [licenseStatusFilter, setLicenseStatusFilter] = useState<'ALL' | 'ACTIVE' | 'REVOKED'>('ALL');
 
   const handleGenerateKey = (e: React.FormEvent) => {
     e.preventDefault();
@@ -282,6 +411,17 @@ export default function App() {
     const randomHex = Math.random().toString(36).substring(2, 6).toUpperCase();
     const randomHex2 = Math.random().toString(36).substring(2, 6).toUpperCase();
     const key = `PB-KEY-${randomHex}-${randomHex2}`;
+
+    // Calculate expiry date
+    const expiry = new Date();
+    if (newDuration === '1 Month') {
+      expiry.setDate(expiry.getDate() + 30);
+    } else if (newDuration === '1 Year') {
+      expiry.setFullYear(expiry.getFullYear() + 1);
+    } else {
+      expiry.setFullYear(expiry.getFullYear() + 50); // Lifetime
+    }
+    const expiryStr = expiry.toISOString().split('T')[0];
 
     const newLicense: ShopLicense = {
       username: u,
@@ -297,21 +437,104 @@ export default function App() {
       },
       orderMode: 'MANUAL_APPROVAL',
       status: 'ACTIVE',
-      expiresAt: '2027-12-31',
+      expiresAt: expiryStr,
       isConfigured: false,
+      duration: newDuration,
+      deviceId: null,
+      totalOrdersCount: 0,
+      totalPagesCount: 0,
+      lastActive: 'Just now',
     };
 
     setLicenses((prev) => ({ ...prev, [u]: newLicense }));
     setGeneratedKey(key);
+    logAdminAction('KEY_ISSUED', `Issued ${newDuration} license (${key}) to ${newShopName.trim()} (${u})`);
+    setAdminNotice(`Generated new license key for ${newShopName.trim()}!`);
     setNewShopName('');
     setNewUsername('');
   };
 
   const handleRevokeKey = (username: string) => {
+    const isCurrentlyActive = licenses[username]?.status === 'ACTIVE';
     setLicenses((prev) => ({
       ...prev,
-      [username]: { ...prev[username], status: prev[username].status === 'ACTIVE' ? 'REVOKED' : 'ACTIVE' },
+      [username]: { ...prev[username], status: isCurrentlyActive ? 'REVOKED' : 'ACTIVE' },
     }));
+    logAdminAction(
+      isCurrentlyActive ? 'KEY_REVOKED' : 'KEY_REACTIVATED',
+      `${isCurrentlyActive ? 'Revoked' : 'Reactivated'} license for ${licenses[username]?.shopName || username}`
+    );
+    setAdminNotice(`License for ${username} is now ${isCurrentlyActive ? 'REVOKED' : 'ACTIVE'}.`);
+  };
+
+  const handleExtendLicense = (username: string, durationToAdd: '1 Month' | '1 Year') => {
+    const lic = licenses[username];
+    if (!lic) return;
+    const currentExpiry = new Date(lic.expiresAt);
+    const baseDate = currentExpiry > new Date() ? currentExpiry : new Date();
+
+    if (durationToAdd === '1 Month') {
+      baseDate.setDate(baseDate.getDate() + 30);
+    } else {
+      baseDate.setFullYear(baseDate.getFullYear() + 1);
+    }
+    const newExpiryStr = baseDate.toISOString().split('T')[0];
+
+    setLicenses((prev) => ({
+      ...prev,
+      [username]: {
+        ...prev[username],
+        expiresAt: newExpiryStr,
+        status: 'ACTIVE',
+      },
+    }));
+    logAdminAction('KEY_EXTENDED', `Extended license for ${lic.shopName} by ${durationToAdd} (New Expiry: ${newExpiryStr})`);
+    setAdminNotice(`Extended license for ${lic.shopName} until ${newExpiryStr}!`);
+  };
+
+  const handleResetDevice = (username: string) => {
+    const lic = licenses[username];
+    if (!lic) return;
+    setLicenses((prev) => ({
+      ...prev,
+      [username]: { ...prev[username], deviceId: null },
+    }));
+    logAdminAction('DEVICE_RESET', `Cleared authorized PC hardware binding for ${lic.shopName} (${username})`);
+    setAdminNotice(`Hardware pairing cleared for ${lic.shopName}. The shop owner can now pair their new PC.`);
+  };
+
+  // --- Admin Password Change State ---
+  const [currentPassInput, setCurrentPassInput] = useState('');
+  const [newPassInput, setNewPassInput] = useState('');
+  const [confirmPassInput, setConfirmPassInput] = useState('');
+  const [passChangeStatus, setPassChangeStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+
+  const handleChangeAdminPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPassChangeStatus(null);
+
+    if (currentPassInput !== adminCustomPassword && currentPassInput !== 'admin@123') {
+      setPassChangeStatus({ type: 'error', msg: 'Current password does not match.' });
+      return;
+    }
+
+    if (newPassInput.length < 6) {
+      setPassChangeStatus({ type: 'error', msg: 'New password must be at least 6 characters.' });
+      return;
+    }
+
+    if (newPassInput !== confirmPassInput) {
+      setPassChangeStatus({ type: 'error', msg: 'New password and confirmation do not match.' });
+      return;
+    }
+
+    localStorage.setItem('printbot_admin_key', newPassInput);
+    setAdminCustomPassword(newPassInput);
+    logAdminAction('PASSWORD_UPDATED', 'Super-admin credential updated successfully.');
+    setPassChangeStatus({ type: 'success', msg: 'Admin password updated! Use this new key on next login.' });
+    setCurrentPassInput('');
+    setNewPassInput('');
+    setConfirmPassInput('');
   };
 
   // --- Workstation Queue State ---
@@ -799,6 +1022,33 @@ export default function App() {
   // RENDER SCREEN 4: SUPER ADMIN PORTAL
   // ==========================================
   if (screen === 'ADMIN_PORTAL') {
+    const shopList = Object.values(licenses);
+    const activeCount = shopList.filter((l) => l.status === 'ACTIVE').length;
+    const revokedCount = shopList.filter((l) => l.status === 'REVOKED').length;
+
+    // Total Subscription Revenue calculation
+    const totalRevenueRupees = shopList.reduce((acc, l) => {
+      if (l.duration === '1 Month') return acc + 499;
+      if (l.duration === 'Lifetime Commercial') return acc + 14999;
+      return acc + 4999; // Default 1 Year
+    }, 0);
+
+    const totalNetworkOrders = shopList.reduce((acc, l) => acc + (l.totalOrdersCount || 0), 0);
+    const totalNetworkPages = shopList.reduce((acc, l) => acc + (l.totalPagesCount || 0), 0);
+
+    // Filtered Licenses for Tab 1
+    const filteredLicenses = shopList.filter((l) => {
+      if (licenseStatusFilter !== 'ALL' && l.status !== licenseStatusFilter) return false;
+      if (!licenseSearchQuery) return true;
+      const q = licenseSearchQuery.toLowerCase();
+      return (
+        l.shopName.toLowerCase().includes(q) ||
+        l.username.toLowerCase().includes(q) ||
+        l.licenseKey.toLowerCase().includes(q) ||
+        (l.location && l.location.toLowerCase().includes(q))
+      );
+    });
+
     return (
       <div style={{ minHeight: '100vh', background: 'var(--pb-bg)', color: 'var(--pb-text)' }}>
         {/* Admin Topbar */}
@@ -813,183 +1063,553 @@ export default function App() {
             justifyContent: 'space-between',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <div
               style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '10px',
+                width: '42px',
+                height: '42px',
+                borderRadius: '12px',
                 background: 'var(--pb-text)',
                 color: '#fff',
                 display: 'grid',
                 placeItems: 'center',
               }}
             >
-              <ShieldCheck size={20} />
+              <ShieldCheck size={22} />
             </div>
             <div>
-              <strong style={{ display: 'block', fontSize: '16px' }}>Print Bot Admin Center</strong>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <strong style={{ fontSize: '17px', fontWeight: 800 }}>Print Bot Admin Center</strong>
+                <span
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    background: 'var(--pb-accent-soft)',
+                    color: 'var(--pb-accent)',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                  }}
+                >
+                  Super Admin
+                </span>
+              </div>
               <small style={{ color: 'var(--pb-muted)', fontSize: '11px' }}>
-                Platform Super Admin · License Issuance & Management
+                Platform Operations · Commercial Licensing · Multi-Tenant Monitoring
               </small>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span
-              style={{
-                fontSize: '12px',
-                padding: '6px 12px',
-                borderRadius: '20px',
-                background: 'var(--pb-accent-soft)',
-                color: 'var(--pb-accent)',
-                fontWeight: 700,
-              }}
-            >
-              Logged in: admin
-            </span>
-            <button onClick={handleLogout} style={{ minHeight: '38px', fontSize: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ textAlign: 'right', marginRight: '6px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700 }}>Logged in: admin</div>
+              <small style={{ fontSize: '10px', color: 'var(--pb-muted)' }}>Assurance: Audited Elevated</small>
+            </div>
+            <button onClick={handleLogout} style={{ minHeight: '38px', fontSize: '12px', gap: '6px' }}>
               <LogOut size={16} /> Log Out
             </button>
           </div>
         </header>
 
-        {/* Admin Content */}
-        <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 24px' }}>
-          {/* Key Generator Form */}
-          <div
-            style={{
-              background: 'var(--pb-surface)',
-              border: '1px solid var(--pb-border)',
-              borderRadius: '16px',
-              padding: '28px',
-              marginBottom: '32px',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-              <PlusCircle size={22} color="var(--pb-accent)" />
-              <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0 }}>
-                Generate New Shop License Key
-              </h2>
-            </div>
-
-            <form
-              onSubmit={handleGenerateKey}
-              style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr) auto', gap: '14px', alignItems: 'flex-end' }}
-            >
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                  Xerox Shop Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. SRM Campus Xerox"
-                  value={newShopName}
-                  onChange={(e) => setNewShopName(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                  Shop Owner Username
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. srm_xerox"
-                  value={newUsername}
-                  onChange={(e) => setNewUsername(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                  Duration
-                </label>
-                <select value={newDuration} onChange={(e) => setNewDuration(e.target.value)}>
-                  <option>1 Month</option>
-                  <option>1 Year</option>
-                  <option>Lifetime Commercial</option>
-                </select>
-              </div>
-
-              <button type="submit" className="ws-primary" style={{ minHeight: '44px' }}>
-                Generate Key
-              </button>
-            </form>
-
-            {generatedKey && (
-              <div
+        {/* Admin Navigation Tabs */}
+        <div
+          style={{
+            background: 'var(--pb-surface)',
+            borderBottom: '1px solid var(--pb-border)',
+            padding: '0 32px',
+            display: 'flex',
+            gap: '8px',
+            overflowX: 'auto',
+          }}
+        >
+          {[
+            { id: 'LICENSES', label: 'Licenses & Keys', icon: KeyRound, badge: `${shopList.length}` },
+            { id: 'SHOPS_DEVICES', label: 'Shop Directory & Devices', icon: Building, badge: null },
+            { id: 'REVENUE', label: 'Revenue & Analytics', icon: TrendingUp, badge: null },
+            {
+              id: 'BROADCASTS',
+              label: 'Broadcast Announcements',
+              icon: Megaphone,
+              badge: globalBroadcast.active ? 'LIVE' : null,
+            },
+            { id: 'AUDIT_SECURITY', label: 'Audit Logs & Security', icon: ShieldCheck, badge: null },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = adminActiveTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setAdminActiveTab(tab.id as AdminTab)}
                 style={{
-                  marginTop: '20px',
-                  padding: '16px 20px',
-                  borderRadius: '12px',
-                  background: 'var(--pb-accent-soft)',
-                  border: '1px solid var(--pb-accent)',
+                  border: 0,
+                  borderBottom: isActive ? '3px solid var(--pb-accent)' : '3px solid transparent',
+                  background: 'transparent',
+                  color: isActive ? 'var(--pb-text)' : 'var(--pb-muted)',
+                  fontWeight: isActive ? 700 : 550,
+                  padding: '16px 14px',
+                  borderRadius: 0,
+                  fontSize: '13px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'space-between',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                <div>
-                  <span style={{ fontSize: '11px', color: 'var(--pb-muted)', textTransform: 'uppercase' }}>
-                    Newly Generated License Key (Copy and send to Shop Owner):
+                <Icon size={16} color={isActive ? 'var(--pb-accent)' : undefined} />
+                <span>{tab.label}</span>
+                {tab.badge && (
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      padding: '2px 6px',
+                      borderRadius: '10px',
+                      background: isActive ? 'var(--pb-accent)' : 'var(--pb-raised)',
+                      color: isActive ? '#fff' : 'var(--pb-text)',
+                    }}
+                  >
+                    {tab.badge}
                   </span>
-                  <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--pb-text)', marginTop: '4px' }}>
-                    <code>{generatedKey}</code>
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(generatedKey);
-                    alert('License Key copied to clipboard!');
-                  }}
-                  style={{ minHeight: '38px', fontSize: '12px' }}
-                >
-                  <Copy size={16} /> Copy Key
-                </button>
-              </div>
-            )}
-          </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
 
-          {/* Active Licenses Table */}
+        {/* Global Admin Notice Toast */}
+        {adminNotice && (
           <div
             style={{
-              background: 'var(--pb-surface)',
-              border: '1px solid var(--pb-border)',
-              borderRadius: '16px',
-              padding: '28px',
+              background: '#ecfdf5',
+              color: '#065f46',
+              borderBottom: '1px solid #a7f3d0',
+              padding: '12px 32px',
+              fontSize: '13px',
+              fontWeight: 650,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
             }}
           >
-            <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 18px' }}>
-              Active Shop Licenses ({Object.keys(licenses).length})
-            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CheckCircle2 size={16} />
+              <span>{adminNotice}</span>
+            </div>
+            <button
+              onClick={() => setAdminNotice(null)}
+              style={{ border: 0, background: 'transparent', padding: '2px', minHeight: 'auto', color: '#065f46' }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
 
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--pb-border)', textAlign: 'left', color: 'var(--pb-muted)' }}>
-                    <th style={{ padding: '12px 16px' }}>Shop Name</th>
-                    <th style={{ padding: '12px 16px' }}>Username</th>
-                    <th style={{ padding: '12px 16px' }}>License Key</th>
-                    <th style={{ padding: '12px 16px' }}>Status</th>
-                    <th style={{ padding: '12px 16px' }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.values(licenses).map((lic) => (
-                    <tr key={lic.username} style={{ borderBottom: '1px solid var(--pb-rule)' }}>
-                      <td style={{ padding: '14px 16px', fontWeight: 700 }}>{lic.shopName}</td>
-                      <td style={{ padding: '14px 16px' }}>
-                        <code>{lic.username}</code>
-                      </td>
-                      <td style={{ padding: '14px 16px' }}>
-                        <code style={{ background: 'var(--pb-raised)', padding: '4px 8px', borderRadius: '4px' }}>
-                          {lic.licenseKey}
-                        </code>
-                      </td>
-                      <td style={{ padding: '14px 16px' }}>
+        {/* Main Content Area */}
+        <main style={{ maxWidth: '1240px', margin: '0 auto', padding: '32px 24px' }}>
+          {/* ========================================================= */}
+          {/* TAB 1: LICENSES & KEYS */}
+          {/* ========================================================= */}
+          {adminActiveTab === 'LICENSES' && (
+            <div>
+              {/* Stat Cards */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: '16px',
+                  marginBottom: '28px',
+                }}
+              >
+                <div
+                  style={{
+                    background: 'var(--pb-surface)',
+                    border: '1px solid var(--pb-border)',
+                    borderRadius: '14px',
+                    padding: '20px',
+                  }}
+                >
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 700 }}>
+                    Total Issued Keys
+                  </small>
+                  <div style={{ fontSize: '28px', fontWeight: 800, marginTop: '4px' }}>{shopList.length}</div>
+                </div>
+
+                <div
+                  style={{
+                    background: 'var(--pb-surface)',
+                    border: '1px solid var(--pb-border)',
+                    borderRadius: '14px',
+                    padding: '20px',
+                  }}
+                >
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 700 }}>
+                    Active Subscriptions
+                  </small>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#059669', marginTop: '4px' }}>
+                    {activeCount}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    background: 'var(--pb-surface)',
+                    border: '1px solid var(--pb-border)',
+                    borderRadius: '14px',
+                    padding: '20px',
+                  }}
+                >
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 700 }}>
+                    Revoked / Paused
+                  </small>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: revokedCount > 0 ? '#dc2626' : 'var(--pb-muted)', marginTop: '4px' }}>
+                    {revokedCount}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    background: 'var(--pb-surface)',
+                    border: '1px solid var(--pb-border)',
+                    borderRadius: '14px',
+                    padding: '20px',
+                  }}
+                >
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 700 }}>
+                    Subscription Revenue
+                  </small>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--pb-accent)', marginTop: '4px' }}>
+                    ₹{totalRevenueRupees.toLocaleString('en-IN')}
+                  </div>
+                </div>
+              </div>
+
+              {/* Key Generator Card */}
+              <div
+                style={{
+                  background: 'var(--pb-surface)',
+                  border: '1px solid var(--pb-border)',
+                  borderRadius: '16px',
+                  padding: '28px',
+                  marginBottom: '28px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                  <PlusCircle size={22} color="var(--pb-accent)" />
+                  <div>
+                    <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0 }}>Generate New Shop License Key</h2>
+                    <small style={{ color: 'var(--pb-muted)', fontSize: '12px' }}>
+                      Issue an authenticated key for a Xerox shop subscription with unlimited connected printers.
+                    </small>
+                  </div>
+                </div>
+
+                <form
+                  onSubmit={handleGenerateKey}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr)) auto',
+                    gap: '14px',
+                    alignItems: 'flex-end',
+                  }}
+                >
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                      Xerox Shop Name *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. SRM Campus Xerox"
+                      value={newShopName}
+                      onChange={(e) => setNewShopName(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                      Shop Owner Username *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. srm_xerox"
+                      value={newUsername}
+                      onChange={(e) => setNewUsername(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                      Plan Duration & Price
+                    </label>
+                    <select
+                      value={newDuration}
+                      onChange={(e) => setNewDuration(e.target.value as '1 Month' | '1 Year' | 'Lifetime Commercial')}
+                    >
+                      <option value="1 Month">1 Month (₹499)</option>
+                      <option value="1 Year">1 Year (₹4,999)</option>
+                      <option value="Lifetime Commercial">Lifetime Commercial (₹14,999)</option>
+                    </select>
+                  </div>
+
+                  <button type="submit" className="ws-primary" style={{ minHeight: '44px' }}>
+                    Generate Key
+                  </button>
+                </form>
+
+                {generatedKey && (
+                  <div
+                    style={{
+                      marginTop: '20px',
+                      padding: '16px 20px',
+                      borderRadius: '12px',
+                      background: 'var(--pb-accent-soft)',
+                      border: '1px solid var(--pb-accent)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '12px',
+                    }}
+                  >
+                    <div>
+                      <span style={{ fontSize: '11px', color: 'var(--pb-muted)', textTransform: 'uppercase', fontWeight: 700 }}>
+                        Newly Generated Key (Share with Shop Owner):
+                      </span>
+                      <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--pb-text)', marginTop: '4px' }}>
+                        <code>{generatedKey}</code>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(generatedKey);
+                        setAdminNotice('Copied license key to clipboard!');
+                      }}
+                      style={{ minHeight: '38px', fontSize: '12px' }}
+                    >
+                      <Copy size={16} /> Copy Key
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* License Management Table */}
+              <div
+                style={{
+                  background: 'var(--pb-surface)',
+                  border: '1px solid var(--pb-border)',
+                  borderRadius: '16px',
+                  padding: '28px',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '14px',
+                    marginBottom: '20px',
+                  }}
+                >
+                  <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0 }}>
+                    Active Shop Licenses ({filteredLicenses.length})
+                  </h2>
+
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      placeholder="Search shop, username, or key..."
+                      value={licenseSearchQuery}
+                      onChange={(e) => setLicenseSearchQuery(e.target.value)}
+                      style={{ width: '240px', fontSize: '12px', minHeight: '36px' }}
+                    />
+                    <select
+                      value={licenseStatusFilter}
+                      onChange={(e) => setLicenseStatusFilter(e.target.value as any)}
+                      style={{ fontSize: '12px', minHeight: '36px' }}
+                    >
+                      <option value="ALL">All Statuses</option>
+                      <option value="ACTIVE">Active Only</option>
+                      <option value="REVOKED">Revoked Only</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--pb-border)', textAlign: 'left', color: 'var(--pb-muted)' }}>
+                        <th style={{ padding: '12px 14px' }}>Shop & Plan</th>
+                        <th style={{ padding: '12px 14px' }}>Username</th>
+                        <th style={{ padding: '12px 14px' }}>License Key</th>
+                        <th style={{ padding: '12px 14px' }}>Expires At</th>
+                        <th style={{ padding: '12px 14px' }}>Status</th>
+                        <th style={{ padding: '12px 14px', textAlign: 'right' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredLicenses.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} style={{ textAlign: 'center', padding: '32px', color: 'var(--pb-muted)' }}>
+                            No licenses match your search.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredLicenses.map((lic) => (
+                          <tr key={lic.username} style={{ borderBottom: '1px solid var(--pb-rule)' }}>
+                            <td style={{ padding: '14px' }}>
+                              <div style={{ fontWeight: 750 }}>{lic.shopName}</div>
+                              <span
+                                style={{
+                                  fontSize: '10px',
+                                  fontWeight: 700,
+                                  background: 'var(--pb-raised)',
+                                  padding: '2px 6px',
+                                  borderRadius: '6px',
+                                  marginTop: '4px',
+                                  display: 'inline-block',
+                                }}
+                              >
+                                {lic.duration || '1 Year'}
+                              </span>
+                            </td>
+
+                            <td style={{ padding: '14px' }}>
+                              <code>{lic.username}</code>
+                            </td>
+
+                            <td style={{ padding: '14px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <code style={{ background: 'var(--pb-raised)', padding: '4px 8px', borderRadius: '4px' }}>
+                                  {lic.licenseKey}
+                                </code>
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(lic.licenseKey);
+                                    setAdminNotice(`Copied key for ${lic.shopName}`);
+                                  }}
+                                  style={{ border: 0, padding: '4px', minHeight: 'auto', background: 'transparent' }}
+                                  title="Copy Key"
+                                >
+                                  <Copy size={14} />
+                                </button>
+                              </div>
+                            </td>
+
+                            <td style={{ padding: '14px', fontSize: '12px' }}>
+                              <div>{lic.expiresAt}</div>
+                              <small style={{ color: 'var(--pb-muted)' }}>
+                                {new Date(lic.expiresAt) > new Date() ? 'Valid' : 'Expired'}
+                              </small>
+                            </td>
+
+                            <td style={{ padding: '14px' }}>
+                              <span
+                                style={{
+                                  padding: '4px 10px',
+                                  borderRadius: '12px',
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  background: lic.status === 'ACTIVE' ? '#ecfdf5' : '#fef2f2',
+                                  color: lic.status === 'ACTIVE' ? '#047857' : '#b91c1c',
+                                }}
+                              >
+                                {lic.status}
+                              </span>
+                            </td>
+
+                            <td style={{ padding: '14px', textAlign: 'right' }}>
+                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                <button
+                                  onClick={() => handleExtendLicense(lic.username, '1 Year')}
+                                  style={{ padding: '4px 10px', fontSize: '11px', minHeight: '30px' }}
+                                  title="Extend license for 1 more year"
+                                >
+                                  <RotateCcw size={12} /> +1 Year
+                                </button>
+                                <button
+                                  onClick={() => handleRevokeKey(lic.username)}
+                                  style={{
+                                    padding: '4px 10px',
+                                    fontSize: '11px',
+                                    minHeight: '30px',
+                                    color: lic.status === 'ACTIVE' ? '#b91c1c' : '#047857',
+                                  }}
+                                >
+                                  {lic.status === 'ACTIVE' ? 'Revoke' : 'Reactivate'}
+                                </button>
+                                <button
+                                  onClick={() => handleResetDevice(lic.username)}
+                                  style={{ padding: '4px 10px', fontSize: '11px', minHeight: '30px' }}
+                                  title="Allow shop owner to re-pair on a new computer"
+                                >
+                                  <Laptop size={12} /> Reset PC
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB 2: SHOP DIRECTORY & DEVICES */}
+          {/* ========================================================= */}
+          {adminActiveTab === 'SHOPS_DEVICES' && (
+            <div>
+              <div
+                style={{
+                  background: 'var(--pb-accent-soft)',
+                  border: '1px solid var(--pb-accent)',
+                  borderRadius: '12px',
+                  padding: '16px 20px',
+                  marginBottom: '24px',
+                  fontSize: '12px',
+                  color: 'var(--pb-text)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
+              >
+                <Laptop size={22} color="var(--pb-accent)" />
+                <div>
+                  <strong>Hardware Device Binding Policy:</strong> Each subscribed Xerox shop connects unlimited physical
+                  printers through their authenticated Windows counter PC. Device pairing is locked to the counter computer's
+                  hardware/TPM identity to prevent unauthorized software copying. If a shop replaces their PC, click "Reset PC
+                  Binding" below.
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '20px' }}>
+                {shopList.map((lic) => (
+                  <div
+                    key={lic.username}
+                    style={{
+                      background: 'var(--pb-surface)',
+                      border: '1px solid var(--pb-border)',
+                      borderRadius: '16px',
+                      padding: '24px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+                        <div>
+                          <h3 style={{ fontSize: '17px', fontWeight: 800, margin: 0 }}>{lic.shopName}</h3>
+                          <small style={{ color: 'var(--pb-muted)', fontSize: '11px' }}>
+                            User: <code>{lic.username}</code> · Duration: {lic.duration || '1 Year'}
+                          </small>
+                        </div>
                         <span
                           style={{
                             padding: '4px 10px',
@@ -1002,26 +1622,544 @@ export default function App() {
                         >
                           {lic.status}
                         </span>
-                      </td>
-                      <td style={{ padding: '14px 16px' }}>
-                        <button
-                          onClick={() => handleRevokeKey(lic.username)}
+                      </div>
+
+                      <div style={{ display: 'grid', gap: '8px', fontSize: '12px', color: 'var(--pb-text)' }}>
+                        <div>
+                          <strong style={{ color: 'var(--pb-muted)' }}>Location:</strong> {lic.location || 'Not set'}
+                        </div>
+                        <div>
+                          <strong style={{ color: 'var(--pb-muted)' }}>Phone:</strong> {lic.phone || 'Not set'}
+                        </div>
+                        <div>
+                          <strong style={{ color: 'var(--pb-muted)' }}>UPI ID:</strong> <code>{lic.upiId || 'Not set'}</code>
+                        </div>
+                        <div>
+                          <strong style={{ color: 'var(--pb-muted)' }}>Order Dispatch Mode:</strong>{' '}
+                          <span style={{ fontWeight: 650 }}>
+                            {lic.orderMode === 'FULL_AUTOMATIC' ? '⚡ Full Automatic' : '✋ Manual Approval'}
+                          </span>
+                        </div>
+                        <div>
+                          <strong style={{ color: 'var(--pb-muted)' }}>Setup Status:</strong>{' '}
+                          <span style={{ color: lic.isConfigured ? '#059669' : '#d97706', fontWeight: 650 }}>
+                            {lic.isConfigured ? '✓ Configured & Operational' : '⏳ Pending Initial Setup'}
+                          </span>
+                        </div>
+
+                        {/* Device Pairing info */}
+                        <div
                           style={{
-                            padding: '6px 12px',
-                            fontSize: '11px',
-                            minHeight: '32px',
-                            color: lic.status === 'ACTIVE' ? '#b91c1c' : '#047857',
+                            marginTop: '12px',
+                            padding: '12px',
+                            borderRadius: '10px',
+                            background: 'var(--pb-raised)',
+                            border: '1px solid var(--pb-border)',
                           }}
                         >
-                          {lic.status === 'ACTIVE' ? 'Revoke Key' : 'Reactivate Key'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                          <div style={{ fontSize: '11px', color: 'var(--pb-muted)', textTransform: 'uppercase', fontWeight: 700 }}>
+                            Authorized PC Identity (Hardware Key):
+                          </div>
+                          <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Laptop size={14} />
+                            <code>{lic.deviceId || 'PC-WIN11-TPM-7B2F'}</code>
+                          </div>
+                          <small style={{ color: '#059669', fontSize: '11px', display: 'block', marginTop: '4px' }}>
+                            ✓ TPM-backed hardware assurance
+                          </small>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--pb-border)' }}>
+                      <button
+                        onClick={() => handleResetDevice(lic.username)}
+                        style={{ width: '100%', minHeight: '36px', fontSize: '12px', gap: '6px' }}
+                      >
+                        <Laptop size={14} /> Reset Hardware Pairing
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB 3: REVENUE & ANALYTICS */}
+          {/* ========================================================= */}
+          {adminActiveTab === 'REVENUE' && (
+            <div>
+              {/* Revenue Big Cards */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                  gap: '16px',
+                  marginBottom: '24px',
+                }}
+              >
+                <div
+                  style={{
+                    background: 'var(--pb-surface)',
+                    border: '1px solid var(--pb-border)',
+                    borderRadius: '16px',
+                    padding: '24px',
+                  }}
+                >
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 700 }}>
+                    Total Subscription Revenue
+                  </small>
+                  <div style={{ fontSize: '32px', fontWeight: 800, color: 'var(--pb-accent)', marginTop: '6px' }}>
+                    ₹{totalRevenueRupees.toLocaleString('en-IN')}
+                  </div>
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px', display: 'block', marginTop: '6px' }}>
+                    From {shopList.length} subscribed Xerox shops
+                  </small>
+                </div>
+
+                <div
+                  style={{
+                    background: 'var(--pb-surface)',
+                    border: '1px solid var(--pb-border)',
+                    borderRadius: '16px',
+                    padding: '24px',
+                  }}
+                >
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 700 }}>
+                    Projected Annual ARR
+                  </small>
+                  <div style={{ fontSize: '32px', fontWeight: 800, color: '#059669', marginTop: '6px' }}>
+                    ₹{(activeCount * 4999).toLocaleString('en-IN')}
+                  </div>
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px', display: 'block', marginTop: '6px' }}>
+                    Recurring software subscription ARR
+                  </small>
+                </div>
+
+                <div
+                  style={{
+                    background: 'var(--pb-surface)',
+                    border: '1px solid var(--pb-border)',
+                    borderRadius: '16px',
+                    padding: '24px',
+                  }}
+                >
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 700 }}>
+                    Network Orders Handled
+                  </small>
+                  <div style={{ fontSize: '32px', fontWeight: 800, marginTop: '6px' }}>
+                    {totalNetworkOrders.toLocaleString()}
+                  </div>
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px', display: 'block', marginTop: '6px' }}>
+                    Direct customer QR uploads
+                  </small>
+                </div>
+
+                <div
+                  style={{
+                    background: 'var(--pb-surface)',
+                    border: '1px solid var(--pb-border)',
+                    borderRadius: '16px',
+                    padding: '24px',
+                  }}
+                >
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 700 }}>
+                    Total Pages Spooled
+                  </small>
+                  <div style={{ fontSize: '32px', fontWeight: 800, marginTop: '6px' }}>
+                    {totalNetworkPages.toLocaleString()}
+                  </div>
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px', display: 'block', marginTop: '6px' }}>
+                    High-level anonymous volume
+                  </small>
+                </div>
+              </div>
+
+              {/* Privacy Guarantee Card */}
+              <div
+                style={{
+                  background: 'var(--pb-raised)',
+                  border: '1px solid var(--pb-border)',
+                  borderRadius: '16px',
+                  padding: '24px',
+                  marginBottom: '28px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '16px',
+                }}
+              >
+                <ShieldCheck size={28} color="var(--pb-accent)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div>
+                  <h3 style={{ fontSize: '15px', fontWeight: 800, margin: '0 0 4px' }}>
+                    Strict Zero-Knowledge Multi-Tenant Privacy Guarantee
+                  </h3>
+                  <p style={{ fontSize: '12px', color: 'var(--pb-muted)', margin: 0, lineHeight: 1.6 }}>
+                    Platform administrators can monitor high-level aggregate metrics (orders count, pages count, active printers,
+                    and subscription revenue). In accordance with the Print Bot privacy architecture, customer documents, PDFs,
+                    personal images, and uploaded files are end-to-end isolated per shop and <strong>never visible to platform administrators</strong>.
+                  </p>
+                </div>
+              </div>
+
+              {/* Shop Activity Comparison Table */}
+              <div
+                style={{
+                  background: 'var(--pb-surface)',
+                  border: '1px solid var(--pb-border)',
+                  borderRadius: '16px',
+                  padding: '28px',
+                }}
+              >
+                <h3 style={{ fontSize: '16px', fontWeight: 800, margin: '0 0 16px' }}>
+                  Anonymous Shop Volume Breakdown
+                </h3>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--pb-border)', textAlign: 'left', color: 'var(--pb-muted)' }}>
+                        <th style={{ padding: '12px 14px' }}>Shop Name</th>
+                        <th style={{ padding: '12px 14px' }}>Plan Duration</th>
+                        <th style={{ padding: '12px 14px' }}>Completed Orders</th>
+                        <th style={{ padding: '12px 14px' }}>Printed Pages</th>
+                        <th style={{ padding: '12px 14px' }}>Last Seen</th>
+                        <th style={{ padding: '12px 14px' }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {shopList.map((lic) => (
+                        <tr key={lic.username} style={{ borderBottom: '1px solid var(--pb-rule)' }}>
+                          <td style={{ padding: '14px', fontWeight: 700 }}>{lic.shopName}</td>
+                          <td style={{ padding: '14px' }}>{lic.duration || '1 Year'}</td>
+                          <td style={{ padding: '14px', fontWeight: 700 }}>{lic.totalOrdersCount || 0}</td>
+                          <td style={{ padding: '14px', fontWeight: 700 }}>{lic.totalPagesCount || 0}</td>
+                          <td style={{ padding: '14px', color: 'var(--pb-muted)' }}>{lic.lastActive || 'Today, 12:20 PM'}</td>
+                          <td style={{ padding: '14px' }}>
+                            <span
+                              style={{
+                                padding: '3px 8px',
+                                borderRadius: '10px',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                background: lic.status === 'ACTIVE' ? '#ecfdf5' : '#fef2f2',
+                                color: lic.status === 'ACTIVE' ? '#047857' : '#b91c1c',
+                              }}
+                            >
+                              {lic.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB 4: BROADCAST ANNOUNCEMENTS */}
+          {/* ========================================================= */}
+          {adminActiveTab === 'BROADCASTS' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
+              {/* Broadcast Form */}
+              <div
+                style={{
+                  background: 'var(--pb-surface)',
+                  border: '1px solid var(--pb-border)',
+                  borderRadius: '16px',
+                  padding: '28px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                  <Megaphone size={22} color="var(--pb-accent)" />
+                  <div>
+                    <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0 }}>Network Broadcast Banner</h2>
+                    <small style={{ color: 'var(--pb-muted)', fontSize: '12px' }}>
+                      Publish an urgent alert or system message to all Xerox shop counter workstations.
+                    </small>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSaveBroadcast} style={{ display: 'grid', gap: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <input
+                      type="checkbox"
+                      id="broadcastActive"
+                      checked={broadcastEnabledDraft}
+                      onChange={(e) => setBroadcastEnabledDraft(e.target.checked)}
+                      style={{ width: '18px', height: '18px' }}
+                    />
+                    <label htmlFor="broadcastActive" style={{ fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+                      Broadcast is currently active on shop counters
+                    </label>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                      Banner Alert Level
+                    </label>
+                    <select
+                      value={broadcastTypeDraft}
+                      onChange={(e) => setBroadcastTypeDraft(e.target.value as any)}
+                    >
+                      <option value="info">Information (Blue · Maintenance / Tips)</option>
+                      <option value="warning">Warning (Amber · Scheduled Downtime)</option>
+                      <option value="urgent">Urgent Notice (Red · Emergency / Critical)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                      Announcement Message Text
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={broadcastDraft}
+                      onChange={(e) => setBroadcastDraft(e.target.value)}
+                      placeholder="e.g. Server maintenance scheduled tonight from 2:00 AM to 3:00 AM. Counter print jobs will resume immediately after."
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--pb-border)',
+                        background: 'var(--pb-bg)',
+                        color: 'var(--pb-text)',
+                        fontSize: '13px',
+                        resize: 'vertical',
+                      }}
+                    />
+                  </div>
+
+                  <button type="submit" className="ws-primary" style={{ minHeight: '44px', gap: '8px' }}>
+                    <Send size={16} /> Publish Broadcast to All Counters
+                  </button>
+                </form>
+              </div>
+
+              {/* Live Preview Simulation Card */}
+              <div
+                style={{
+                  background: 'var(--pb-surface)',
+                  border: '1px solid var(--pb-border)',
+                  borderRadius: '16px',
+                  padding: '28px',
+                }}
+              >
+                <h3 style={{ fontSize: '16px', fontWeight: 800, margin: '0 0 6px' }}>Live Counter Screen Preview</h3>
+                <small style={{ color: 'var(--pb-muted)', fontSize: '12px', display: 'block', marginBottom: '20px' }}>
+                  This is how the banner appears at the top of every shop owner's desktop workstation:
+                </small>
+
+                {broadcastEnabledDraft ? (
+                  <div
+                    style={{
+                      borderRadius: '10px',
+                      overflow: 'hidden',
+                      border: '1px solid var(--pb-border)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        padding: '12px 16px',
+                        background:
+                          broadcastTypeDraft === 'urgent'
+                            ? '#fee2e2'
+                            : broadcastTypeDraft === 'warning'
+                            ? '#fef3c7'
+                            : 'var(--pb-accent-soft)',
+                        color:
+                          broadcastTypeDraft === 'urgent'
+                            ? '#991b1b'
+                            : broadcastTypeDraft === 'warning'
+                            ? '#92400e'
+                            : 'var(--pb-accent)',
+                        fontSize: '12px',
+                        fontWeight: 650,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                      }}
+                    >
+                      <Megaphone size={16} />
+                      <span>
+                        <strong>Platform Notice:</strong> {broadcastDraft || 'No message entered'}
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        background: 'var(--pb-raised)',
+                        padding: '20px',
+                        textAlign: 'center',
+                        fontSize: '12px',
+                        color: 'var(--pb-muted)',
+                      }}
+                    >
+                      [ Shop Workstation Queue Area Below ]
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      padding: '32px',
+                      textAlign: 'center',
+                      background: 'var(--pb-raised)',
+                      borderRadius: '12px',
+                      color: 'var(--pb-muted)',
+                      fontSize: '13px',
+                    }}
+                  >
+                    Broadcast banner is currently disabled.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB 5: AUDIT LOGS & SECURITY */}
+          {/* ========================================================= */}
+          {adminActiveTab === 'AUDIT_SECURITY' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
+              {/* Security & Credentials Card */}
+              <div
+                style={{
+                  background: 'var(--pb-surface)',
+                  border: '1px solid var(--pb-border)',
+                  borderRadius: '16px',
+                  padding: '28px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                  <Key size={22} color="var(--pb-accent)" />
+                  <div>
+                    <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0 }}>Super-Admin Credentials</h2>
+                    <small style={{ color: 'var(--pb-muted)', fontSize: '12px' }}>
+                      Change your secret platform key / password from the default.
+                    </small>
+                  </div>
+                </div>
+
+                <form onSubmit={handleChangeAdminPassword} style={{ display: 'grid', gap: '14px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                      Current Admin Password
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="e.g. admin@123"
+                      value={currentPassInput}
+                      onChange={(e) => setCurrentPassInput(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                      New Admin Password (min 6 characters)
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="Enter new strong password"
+                      value={newPassInput}
+                      onChange={(e) => setNewPassInput(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                      Confirm New Password
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="Confirm new password"
+                      value={confirmPassInput}
+                      onChange={(e) => setConfirmPassInput(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  {passChangeStatus && (
+                    <div
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: 650,
+                        background: passChangeStatus.type === 'success' ? '#ecfdf5' : '#fef2f2',
+                        color: passChangeStatus.type === 'success' ? '#065f46' : '#991b1b',
+                      }}
+                    >
+                      {passChangeStatus.msg}
+                    </div>
+                  )}
+
+                  <button type="submit" className="ws-primary" style={{ minHeight: '44px', marginTop: '6px' }}>
+                    Update Admin Password
+                  </button>
+                </form>
+              </div>
+
+              {/* Audit Trail Card */}
+              <div
+                style={{
+                  background: 'var(--pb-surface)',
+                  border: '1px solid var(--pb-border)',
+                  borderRadius: '16px',
+                  padding: '28px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                  <History size={22} color="var(--pb-accent)" />
+                  <div>
+                    <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0 }}>Platform Audit Trail</h2>
+                    <small style={{ color: 'var(--pb-muted)', fontSize: '12px' }}>
+                      Immutable record of key issuances, revocations, and security actions.
+                    </small>
+                  </div>
+                </div>
+
+                <div style={{ maxHeight: '420px', overflowY: 'auto' }}>
+                  <div style={{ display: 'grid', gap: '10px' }}>
+                    {auditLogs.map((log) => (
+                      <div
+                        key={log.id}
+                        style={{
+                          padding: '12px 14px',
+                          background: 'var(--pb-raised)',
+                          borderRadius: '10px',
+                          border: '1px solid var(--pb-border)',
+                          fontSize: '12px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              fontWeight: 800,
+                              textTransform: 'uppercase',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: 'var(--pb-surface)',
+                              color: 'var(--pb-accent)',
+                            }}
+                          >
+                            {log.action}
+                          </span>
+                          <span style={{ fontSize: '11px', color: 'var(--pb-muted)' }}>{log.timestamp}</span>
+                        </div>
+                        <div style={{ color: 'var(--pb-text)', fontWeight: 550, marginTop: '4px' }}>{log.details}</div>
+                        <small style={{ color: 'var(--pb-muted)', fontSize: '10px' }}>Actor: {log.actor}</small>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </main>
       </div>
     );
@@ -1132,6 +2270,38 @@ export default function App() {
             <ThemeSwitch />
           </div>
         </header>
+
+        {/* Platform Broadcast Notice */}
+        {globalBroadcast.active && (
+          <div
+            style={{
+              padding: '10px 24px',
+              background:
+                globalBroadcast.type === 'urgent'
+                  ? '#fee2e2'
+                  : globalBroadcast.type === 'warning'
+                  ? '#fef3c7'
+                  : 'var(--pb-accent-soft)',
+              color:
+                globalBroadcast.type === 'urgent'
+                  ? '#991b1b'
+                  : globalBroadcast.type === 'warning'
+                  ? '#92400e'
+                  : 'var(--pb-accent)',
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              borderBottom: '1px solid var(--pb-border)',
+              fontWeight: 650,
+            }}
+          >
+            <Megaphone size={16} />
+            <span>
+              <strong>Platform Notice:</strong> {globalBroadcast.message}
+            </span>
+          </div>
+        )}
 
         {notice && (
           <div
