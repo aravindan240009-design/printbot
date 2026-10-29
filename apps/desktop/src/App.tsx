@@ -21,6 +21,7 @@ import {
   UserCheck,
   PlusCircle,
   Building,
+  Building2,
   Phone,
   QrCode,
   DollarSign,
@@ -45,6 +46,7 @@ import {
 } from 'lucide-react';
 import { ThemeProvider, ThemeSwitch, MotionSurface, PaperScene, PrinterScene, useGsapStagger } from '@xerox/ui';
 import { discoverPrinters, type NativePrinterInfo } from './native';
+import { supabase } from './supabase';
 
 // --- Models & Contracts ---
 
@@ -69,6 +71,36 @@ export interface ShopLicense {
   totalOrdersCount?: number;
   totalPagesCount?: number;
   lastActive?: string;
+}
+
+export interface PilotApplication {
+  id: string;
+  shopName: string;
+  city: string;
+  contactNumber: string;
+  plan: '1 Month' | '1 Year' | 'Lifetime Commercial' | string;
+  appliedAt: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  generatedUsername?: string;
+  generatedKey?: string;
+  approvedAt?: string;
+  notes?: string;
+}
+
+export function mapSupabaseRowToApp(row: any): PilotApplication {
+  return {
+    id: row.id,
+    shopName: row.shop_name || 'Unnamed Shop',
+    city: row.city || '',
+    contactNumber: row.contact_number || '',
+    plan: row.plan || '1 Year',
+    appliedAt: row.applied_at || new Date().toISOString(),
+    status: (row.status as 'PENDING' | 'APPROVED' | 'REJECTED') || 'PENDING',
+    generatedUsername: row.generated_username || undefined,
+    generatedKey: row.generated_key || undefined,
+    approvedAt: row.approved_at || undefined,
+    notes: row.notes || undefined,
+  };
 }
 
 export interface AdminAuditEntry {
@@ -242,7 +274,7 @@ export default function App() {
   const [loginKey, setLoginKey] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  const handleUnifiedLogin = (e: React.FormEvent) => {
+  const handleUnifiedLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
     const u = loginUsername.trim().toLowerCase();
@@ -254,7 +286,7 @@ export default function App() {
       return;
     }
 
-    // 2. Shop Owner License Check (case-insensitive key comparison)
+    // 2. Shop Owner License Check (local cache)
     const license = licenses[u];
     if (license && license.licenseKey.trim().toUpperCase() === k.toUpperCase()) {
       if (license.status === 'REVOKED') {
@@ -263,6 +295,58 @@ export default function App() {
       }
       setActiveSession({ role: 'SHOP_OWNER', username: u });
       return;
+    }
+
+    // 3. Cloud Database Fallback (In case newly approved shop logs into a new PC)
+    try {
+      const { data: cloudApp, error } = await supabase
+        .from('pilot_applications')
+        .select('*')
+        .eq('generated_username', u)
+        .eq('status', 'APPROVED')
+        .maybeSingle();
+
+      if (!error && cloudApp && cloudApp.generated_key?.trim().toUpperCase() === k.toUpperCase()) {
+        const app = mapSupabaseRowToApp(cloudApp);
+        let duration: '1 Month' | '1 Year' | 'Lifetime Commercial' = '1 Year';
+        if (typeof app.plan === 'string') {
+          if (app.plan.includes('Month') || app.plan === '1 Month') duration = '1 Month';
+          else if (app.plan.includes('Lifetime') || app.plan === 'Lifetime Commercial') duration = 'Lifetime Commercial';
+        }
+        const expiry = new Date();
+        if (duration === '1 Month') expiry.setDate(expiry.getDate() + 30);
+        else if (duration === '1 Year') expiry.setFullYear(expiry.getFullYear() + 1);
+        else expiry.setFullYear(expiry.getFullYear() + 50);
+
+        const newLic: ShopLicense = {
+          username: u,
+          licenseKey: k.toUpperCase(),
+          shopName: app.shopName,
+          location: app.city || 'Counter 01',
+          phone: app.contactNumber.startsWith('+91') ? app.contactNumber : `+91 ${app.contactNumber}`,
+          upiId: `${u}@upi`,
+          rates: {
+            bwPerSideRupees: 1.5,
+            colorPerSideRupees: 10.0,
+            duplexDiscountPercent: 15,
+          },
+          orderMode: 'MANUAL_APPROVAL',
+          status: 'ACTIVE',
+          expiresAt: expiry.toISOString().split('T')[0],
+          isConfigured: false,
+          duration: duration,
+          deviceId: null,
+          totalOrdersCount: 0,
+          totalPagesCount: 0,
+          lastActive: 'Authenticated via Cloud',
+        };
+
+        setLicenses((prev) => ({ ...prev, [u]: newLic }));
+        setActiveSession({ role: 'SHOP_OWNER', username: u });
+        return;
+      }
+    } catch (err) {
+      console.warn('Cloud authentication check error:', err);
     }
 
     setLoginError('Invalid Username or Key. Please check your credentials or contact Admin.');
@@ -308,9 +392,333 @@ export default function App() {
   };
 
   // --- Admin Multi-Tab & Management State ---
-  type AdminTab = 'LICENSES' | 'SHOPS_DEVICES' | 'REVENUE' | 'BROADCASTS' | 'AUDIT_SECURITY';
-  const [adminActiveTab, setAdminActiveTab] = useState<AdminTab>('LICENSES');
+  type AdminTab = 'APPLICATIONS' | 'LICENSES' | 'SHOPS_DEVICES' | 'REVENUE' | 'BROADCASTS' | 'AUDIT_SECURITY';
+  const [adminActiveTab, setAdminActiveTab] = useState<AdminTab>('APPLICATIONS');
   const [adminNotice, setAdminNotice] = useState<string | null>(null);
+
+  // --- Pilot Applications State, Cloud Sync & Event Listeners ---
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'CONNECTING' | 'CONNECTED' | 'OFFLINE'>('CONNECTING');
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const [applications, setApplications] = useState<PilotApplication[]>(() => {
+    try {
+      const saved = localStorage.getItem('printbot_pilot_requests');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [
+      {
+        id: 'APP-PILOT-8492',
+        shopName: 'Sri Raghavendra Xerox & Digital Hub',
+        city: 'Coimbatore, Tamil Nadu',
+        contactNumber: '9843212345',
+        plan: '1 Year',
+        appliedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+        status: 'PENDING',
+      },
+      {
+        id: 'APP-PILOT-5120',
+        shopName: 'Balaji Photocopy & Stationers',
+        city: 'Madurai, Tamil Nadu',
+        contactNumber: '9789012345',
+        plan: '1 Month',
+        appliedAt: new Date(Date.now() - 3600000 * 28).toISOString(),
+        status: 'PENDING',
+      },
+    ];
+  });
+
+  const [appSearchQuery, setAppSearchQuery] = useState('');
+  const [appStatusFilter, setAppStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
+  const [issuedCredsModal, setIssuedCredsModal] = useState<{
+    shopName: string;
+    username: string;
+    key: string;
+    duration: string;
+    expiry: string;
+    phone: string;
+  } | null>(null);
+
+  // Synchronize applications into localStorage cache
+  useEffect(() => {
+    try {
+      localStorage.setItem('printbot_pilot_requests', JSON.stringify(applications));
+    } catch {}
+  }, [applications]);
+
+  // Fetch applications from Supabase Cloud Database & Hydrate Licenses
+  const fetchApplicationsFromCloud = async () => {
+    setIsSyncing(true);
+    try {
+      const { data, error } = await supabase
+        .from('pilot_applications')
+        .select('*')
+        .order('applied_at', { ascending: false });
+
+      if (error) {
+        console.warn('Supabase fetch error, maintaining local cache:', error.message);
+        setCloudSyncStatus('OFFLINE');
+      } else if (data) {
+        const mapped = data.map(mapSupabaseRowToApp);
+        if (mapped.length > 0) {
+          setApplications(mapped);
+          try {
+            localStorage.setItem('printbot_pilot_requests', JSON.stringify(mapped));
+          } catch {}
+
+          // Automatically hydrate licenses for any approved shops from the cloud database
+          setLicenses((prev) => {
+            let changed = false;
+            const next = { ...prev };
+            for (const app of mapped) {
+              if (app.status === 'APPROVED' && app.generatedUsername && app.generatedKey) {
+                if (!next[app.generatedUsername]) {
+                  let duration: '1 Month' | '1 Year' | 'Lifetime Commercial' = '1 Year';
+                  if (typeof app.plan === 'string') {
+                    if (app.plan.includes('Month') || app.plan === '1 Month') duration = '1 Month';
+                    else if (app.plan.includes('Lifetime') || app.plan === 'Lifetime Commercial') duration = 'Lifetime Commercial';
+                  }
+                  const expiry = new Date();
+                  if (duration === '1 Month') expiry.setDate(expiry.getDate() + 30);
+                  else if (duration === '1 Year') expiry.setFullYear(expiry.getFullYear() + 1);
+                  else expiry.setFullYear(expiry.getFullYear() + 50);
+
+                  next[app.generatedUsername] = {
+                    username: app.generatedUsername,
+                    licenseKey: app.generatedKey,
+                    shopName: app.shopName,
+                    location: app.city || 'Counter 01',
+                    phone: app.contactNumber.startsWith('+91') ? app.contactNumber : `+91 ${app.contactNumber}`,
+                    upiId: `${app.generatedUsername}@upi`,
+                    rates: {
+                      bwPerSideRupees: 1.5,
+                      colorPerSideRupees: 10.0,
+                      duplexDiscountPercent: 15,
+                    },
+                    orderMode: 'MANUAL_APPROVAL',
+                    status: 'ACTIVE',
+                    expiresAt: expiry.toISOString().split('T')[0],
+                    isConfigured: false,
+                    duration: duration,
+                    deviceId: null,
+                    totalOrdersCount: 0,
+                    totalPagesCount: 0,
+                    lastActive: app.approvedAt || 'Active',
+                  };
+                  changed = true;
+                }
+              }
+            }
+            return changed ? next : prev;
+          });
+        }
+        setCloudSyncStatus('CONNECTED');
+      }
+    } catch (err) {
+      console.warn('Network offline, using local cache:', err);
+      setCloudSyncStatus('OFFLINE');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Live Cloud Connection & Realtime Subscription
+  useEffect(() => {
+    fetchApplicationsFromCloud();
+
+    // Supabase Realtime channel
+    const channel = supabase
+      .channel('pilot_applications_live')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'pilot_applications' },
+        (payload) => {
+          console.info('Realtime Supabase update received:', payload);
+          fetchApplicationsFromCloud();
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          setCloudSyncStatus('CONNECTED');
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setCloudSyncStatus('OFFLINE');
+        }
+      });
+
+    // Local cross-tab sync
+    const handleSync = () => {
+      try {
+        const saved = localStorage.getItem('printbot_pilot_requests');
+        if (saved) setApplications(JSON.parse(saved));
+      } catch {}
+    };
+    window.addEventListener('storage', handleSync);
+    window.addEventListener('printbot_applications_updated', handleSync);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('printbot_applications_updated', handleSync);
+    };
+  }, []);
+
+  // Modify subscription plan for an application (and sync active license if already approved)
+  const handleModifyAppSubscription = async (appId: string, newPlan: '1 Month' | '1 Year' | 'Lifetime Commercial') => {
+    setApplications((prev) =>
+      prev.map((app) => {
+        if (app.id !== appId) return app;
+        const updated = { ...app, plan: newPlan };
+        if (app.generatedUsername && licenses[app.generatedUsername]) {
+          const u = app.generatedUsername;
+          const expiry = new Date();
+          if (newPlan === '1 Month') expiry.setDate(expiry.getDate() + 30);
+          else if (newPlan === '1 Year') expiry.setFullYear(expiry.getFullYear() + 1);
+          else expiry.setFullYear(expiry.getFullYear() + 50);
+
+          setLicenses((l) => ({
+            ...l,
+            [u]: {
+              ...l[u],
+              duration: newPlan,
+              expiresAt: expiry.toISOString().split('T')[0],
+            },
+          }));
+        }
+        return updated;
+      })
+    );
+
+    // Sync modification with cloud database
+    try {
+      await supabase.from('pilot_applications').update({ plan: newPlan }).eq('id', appId);
+    } catch (err) {
+      console.warn('Failed to update plan in Supabase:', err);
+    }
+
+    logAdminAction('KEY_EXTENDED', `Modified subscription for application ${appId} to ${newPlan}`);
+    setAdminNotice(`Subscription modified to ${newPlan}!`);
+  };
+
+  // Generate authentic login credentials directly from submitted application
+  const handleGenerateCredentialsFromApp = async (app: PilotApplication) => {
+    const baseUsername =
+      app.shopName
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+        .slice(0, 10) || 'shop';
+    const randSuffix = Math.floor(100 + Math.random() * 900);
+    const u = `${baseUsername}${randSuffix}`;
+
+    const hex1 = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const hex2 = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const key = `PB-KEY-${hex1}-${hex2}`;
+
+    let duration: '1 Month' | '1 Year' | 'Lifetime Commercial' = '1 Year';
+    if (typeof app.plan === 'string') {
+      if (app.plan.includes('Month') || app.plan === '1 Month') duration = '1 Month';
+      else if (app.plan.includes('Lifetime') || app.plan === 'Lifetime Commercial') duration = 'Lifetime Commercial';
+    }
+
+    const expiry = new Date();
+    if (duration === '1 Month') expiry.setDate(expiry.getDate() + 30);
+    else if (duration === '1 Year') expiry.setFullYear(expiry.getFullYear() + 1);
+    else expiry.setFullYear(expiry.getFullYear() + 50);
+    const expiryStr = expiry.toISOString().split('T')[0];
+    const nowIso = new Date().toISOString();
+
+    const newLicense: ShopLicense = {
+      username: u,
+      licenseKey: key,
+      shopName: app.shopName,
+      location: app.city || 'Counter 01',
+      phone: app.contactNumber.startsWith('+91') ? app.contactNumber : `+91 ${app.contactNumber}`,
+      upiId: `${u}@upi`,
+      rates: {
+        bwPerSideRupees: 1.5,
+        colorPerSideRupees: 10.0,
+        duplexDiscountPercent: 15,
+      },
+      orderMode: 'MANUAL_APPROVAL',
+      status: 'ACTIVE',
+      expiresAt: expiryStr,
+      isConfigured: false,
+      duration: duration,
+      deviceId: null,
+      totalOrdersCount: 0,
+      totalPagesCount: 0,
+      lastActive: 'Just approved',
+    };
+
+    setLicenses((prev) => ({ ...prev, [u]: newLicense }));
+    setApplications((prev) =>
+      prev.map((a) =>
+        a.id === app.id
+          ? {
+              ...a,
+              status: 'APPROVED',
+              generatedUsername: u,
+              generatedKey: key,
+              plan: duration,
+              approvedAt: nowIso,
+            }
+          : a
+      )
+    );
+
+    // Sync generated credentials with Supabase Cloud
+    try {
+      await supabase
+        .from('pilot_applications')
+        .update({
+          status: 'APPROVED',
+          generated_username: u,
+          generated_key: key,
+          plan: duration,
+          approved_at: nowIso,
+        })
+        .eq('id', app.id);
+    } catch (err) {
+      console.warn('Failed to update generated credentials in Supabase:', err);
+    }
+
+    logAdminAction(
+      'KEY_ISSUED',
+      `Generated login credentials (${key}) for applicant ${app.shopName} (@${u}) with ${duration} subscription`
+    );
+    setIssuedCredsModal({
+      shopName: app.shopName,
+      username: u,
+      key: key,
+      duration: duration,
+      expiry: expiryStr,
+      phone: app.contactNumber,
+    });
+    setAdminNotice(`Generated authentic login credentials for ${app.shopName}! (@${u})`);
+  };
+
+  const handleRejectApp = async (appId: string) => {
+    setApplications((prev) => prev.map((a) => (a.id === appId ? { ...a, status: 'REJECTED' } : a)));
+    try {
+      await supabase.from('pilot_applications').update({ status: 'REJECTED' }).eq('id', appId);
+    } catch (err) {
+      console.warn('Failed to mark rejected in Supabase:', err);
+    }
+    logAdminAction('KEY_REVOKED', `Rejected pilot application ${appId}`);
+    setAdminNotice('Application marked as rejected.');
+  };
+
+  const handleDeleteApp = async (appId: string) => {
+    if (!window.confirm('Delete this pilot application record?')) return;
+    setApplications((prev) => prev.filter((a) => a.id !== appId));
+    try {
+      await supabase.from('pilot_applications').delete().eq('id', appId);
+    } catch (err) {
+      console.warn('Failed to delete application from Supabase:', err);
+    }
+    setAdminNotice('Application record deleted.');
+  };
 
   // Auto-dismiss admin notice after 5 seconds
   useEffect(() => {
@@ -939,6 +1347,23 @@ export default function App() {
     const totalNetworkOrders = shopList.reduce((acc, l) => acc + (l.totalOrdersCount || 0), 0);
     const totalNetworkPages = shopList.reduce((acc, l) => acc + (l.totalPagesCount || 0), 0);
 
+    // Filtered Applications for Tab 0
+    const pendingAppCount = applications.filter((a) => a.status === 'PENDING').length;
+    const approvedAppCount = applications.filter((a) => a.status === 'APPROVED').length;
+    const rejectedAppCount = applications.filter((a) => a.status === 'REJECTED').length;
+
+    const filteredApplications = applications.filter((app) => {
+      if (appStatusFilter !== 'ALL' && app.status !== appStatusFilter) return false;
+      if (!appSearchQuery) return true;
+      const q = appSearchQuery.toLowerCase();
+      return (
+        app.shopName.toLowerCase().includes(q) ||
+        app.city.toLowerCase().includes(q) ||
+        app.contactNumber.includes(q) ||
+        app.id.toLowerCase().includes(q)
+      );
+    });
+
     // Filtered Licenses for Tab 1
     const filteredLicenses = shopList.filter((l) => {
       if (licenseStatusFilter !== 'ALL' && l.status !== licenseStatusFilter) return false;
@@ -1026,6 +1451,12 @@ export default function App() {
           }}
         >
           {[
+            {
+              id: 'APPLICATIONS',
+              label: 'Pilot Applications',
+              icon: UserCheck,
+              badge: pendingAppCount > 0 ? `${pendingAppCount} NEW` : `${applications.length}`,
+            },
             { id: 'LICENSES', label: 'Licenses & Keys', icon: KeyRound, badge: `${shopList.length}` },
             { id: 'SHOPS_DEVICES', label: 'Shop Directory & Devices', icon: Building, badge: null },
             { id: 'REVENUE', label: 'Revenue & Analytics', icon: TrendingUp, badge: null },
@@ -1110,6 +1541,615 @@ export default function App() {
 
         {/* Main Content Area */}
         <main style={{ maxWidth: '1240px', margin: '0 auto', padding: '32px 24px' }}>
+          {/* ========================================================= */}
+          {/* TAB 0: PILOT APPLICATIONS & CREDENTIAL GENERATOR */}
+          {/* ========================================================= */}
+          {adminActiveTab === 'APPLICATIONS' && (
+            <div>
+              {/* Stat Cards */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: '16px',
+                  marginBottom: '28px',
+                }}
+              >
+                <div
+                  style={{
+                    background: 'var(--pb-surface)',
+                    border: '1px solid var(--pb-border)',
+                    borderRadius: '14px',
+                    padding: '20px',
+                  }}
+                >
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 700 }}>
+                    Pending Applications
+                  </small>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: pendingAppCount > 0 ? '#d97706' : 'var(--pb-text)', marginTop: '4px' }}>
+                    {pendingAppCount}
+                  </div>
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px' }}>Awaiting review &amp; provisioning</small>
+                </div>
+
+                <div
+                  style={{
+                    background: 'var(--pb-surface)',
+                    border: '1px solid var(--pb-border)',
+                    borderRadius: '14px',
+                    padding: '20px',
+                  }}
+                >
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 700 }}>
+                    Approved &amp; Active Shops
+                  </small>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#059669', marginTop: '4px' }}>
+                    {approvedAppCount}
+                  </div>
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px' }}>Credentials generated &amp; active</small>
+                </div>
+
+                <div
+                  style={{
+                    background: 'var(--pb-surface)',
+                    border: '1px solid var(--pb-border)',
+                    borderRadius: '14px',
+                    padding: '20px',
+                  }}
+                >
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 700 }}>
+                    Total Pilot Applications
+                  </small>
+                  <div style={{ fontSize: '28px', fontWeight: 800, marginTop: '4px' }}>
+                    {applications.length}
+                  </div>
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px' }}>From website &amp; onboarding requests</small>
+                </div>
+
+                <div
+                  style={{
+                    background: 'var(--pb-surface)',
+                    border: '1px solid var(--pb-border)',
+                    borderRadius: '14px',
+                    padding: '20px',
+                  }}
+                >
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 700 }}>
+                    Subscription Entitlement
+                  </small>
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--pb-accent)', marginTop: '4px' }}>
+                    Unlimited
+                  </div>
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px' }}>Printers per subscribed shop</small>
+                </div>
+              </div>
+
+              {/* Filter and Action Header */}
+              <div
+                style={{
+                  background: 'var(--pb-surface)',
+                  border: '1px solid var(--pb-border)',
+                  borderRadius: '16px',
+                  padding: '20px 24px',
+                  marginBottom: '24px',
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '16px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 320px' }}>
+                  <div style={{ position: 'relative', width: '100%', maxWidth: '420px' }}>
+                    <Search
+                      size={16}
+                      style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--pb-muted)' }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Search by shop name, city, phone or ID..."
+                      value={appSearchQuery}
+                      onChange={(e) => setAppSearchQuery(e.target.value)}
+                      style={{ paddingLeft: '36px', width: '100%' }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((status) => {
+                    const count =
+                      status === 'ALL'
+                        ? applications.length
+                        : status === 'PENDING'
+                        ? pendingAppCount
+                        : status === 'APPROVED'
+                        ? approvedAppCount
+                        : rejectedAppCount;
+                    const isSelected = appStatusFilter === status;
+                    return (
+                      <button
+                        key={status}
+                        type="button"
+                        onClick={() => setAppStatusFilter(status)}
+                        style={{
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          padding: '8px 14px',
+                          borderRadius: '8px',
+                          border: isSelected ? '1px solid var(--pb-accent)' : '1px solid var(--pb-border)',
+                          background: isSelected ? 'var(--pb-accent)' : 'var(--pb-raised)',
+                          color: isSelected ? '#fff' : 'var(--pb-text)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {status === 'ALL'
+                          ? `All (${count})`
+                          : status === 'PENDING'
+                          ? `Pending (${count})`
+                          : status === 'APPROVED'
+                          ? `Approved (${count})`
+                          : `Rejected (${count})`}
+                      </button>
+                    );
+                  })}
+
+                  <div style={{ width: '1px', height: '24px', background: 'var(--pb-border)', margin: '0 4px' }} />
+
+                  {/* Cloud Live Sync Indicator */}
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      padding: '7px 12px',
+                      borderRadius: '8px',
+                      background: cloudSyncStatus === 'CONNECTED' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                      color: cloudSyncStatus === 'CONNECTED' ? '#059669' : '#dc2626',
+                      border: `1px solid ${cloudSyncStatus === 'CONNECTED' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                    }}
+                    title="Live connection status with Supabase PostgreSQL cloud database"
+                  >
+                    <div
+                      style={{
+                        width: '7px',
+                        height: '7px',
+                        borderRadius: '50%',
+                        background: cloudSyncStatus === 'CONNECTED' ? '#10b981' : '#ef4444',
+                      }}
+                    />
+                    {cloudSyncStatus === 'CONNECTED' ? 'Cloud Connected' : 'Local Fallback'}
+                  </div>
+
+                  {/* Sync Button */}
+                  <button
+                    type="button"
+                    onClick={() => fetchApplicationsFromCloud()}
+                    disabled={isSyncing}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '12px',
+                      fontWeight: 750,
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--pb-border)',
+                      background: 'var(--pb-raised)',
+                      color: 'var(--pb-text)',
+                      cursor: isSyncing ? 'wait' : 'pointer',
+                    }}
+                    title="Poll Supabase Cloud for new submissions"
+                  >
+                    <RefreshCw size={13} style={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />
+                    <span>{isSyncing ? 'Syncing...' : 'Sync Cloud'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Applications List */}
+              {filteredApplications.length === 0 ? (
+                <div
+                  style={{
+                    background: 'var(--pb-surface)',
+                    border: '1px solid var(--pb-border)',
+                    borderRadius: '16px',
+                    padding: '60px 24px',
+                    textAlign: 'center',
+                  }}
+                >
+                  <UserCheck size={42} style={{ color: 'var(--pb-muted)', opacity: 0.5, margin: '0 auto 12px' }} />
+                  <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 6px' }}>No Applications Found</h3>
+                  <p style={{ color: 'var(--pb-muted)', fontSize: '13px', margin: 0, maxWidth: '420px', marginInline: 'auto' }}>
+                    {appSearchQuery || appStatusFilter !== 'ALL'
+                      ? 'No applications match your active search filter.'
+                      : 'When print shop owners submit the pilot application form on the website, they will appear here for admin review, subscription modification, and login credential generation.'}
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {filteredApplications.map((app) => {
+                    const cleanPhone = app.contactNumber.replace(/\D/g, '');
+                    const isPending = app.status === 'PENDING';
+                    const isApproved = app.status === 'APPROVED';
+
+                    return (
+                      <div
+                        key={app.id}
+                        style={{
+                          background: 'var(--pb-surface)',
+                          border: isPending ? '2px solid rgba(217, 119, 6, 0.4)' : '1px solid var(--pb-border)',
+                          borderRadius: '16px',
+                          padding: '24px',
+                          boxShadow: isPending ? '0 4px 20px -2px rgba(217, 119, 6, 0.08)' : undefined,
+                        }}
+                      >
+                        {/* Header Row */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: '12px',
+                            borderBottom: '1px solid var(--pb-border)',
+                            paddingBottom: '16px',
+                            marginBottom: '18px',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div
+                              style={{
+                                width: '38px',
+                                height: '38px',
+                                borderRadius: '10px',
+                                background: isPending
+                                  ? 'rgba(217, 119, 6, 0.12)'
+                                  : isApproved
+                                  ? 'rgba(5, 150, 105, 0.12)'
+                                  : 'var(--pb-raised)',
+                                color: isPending ? '#d97706' : isApproved ? '#059669' : 'var(--pb-muted)',
+                                display: 'grid',
+                                placeItems: 'center',
+                              }}
+                            >
+                              <Building size={18} />
+                            </div>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <h3 style={{ fontSize: '17px', fontWeight: 800, margin: 0 }}>{app.shopName}</h3>
+                                <code
+                                  style={{
+                                    fontSize: '11px',
+                                    color: 'var(--pb-muted)',
+                                    background: 'var(--pb-raised)',
+                                    padding: '2px 6px',
+                                    borderRadius: '6px',
+                                  }}
+                                >
+                                  {app.id}
+                                </code>
+                              </div>
+                              <small style={{ color: 'var(--pb-muted)', fontSize: '11.5px', marginTop: '2px', display: 'block' }}>
+                                Applied: {new Date(app.appliedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </small>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            {isPending && (
+                              <span
+                                style={{
+                                  background: '#fef3c7',
+                                  color: '#b45309',
+                                  border: '1px solid #fde68a',
+                                  padding: '5px 12px',
+                                  borderRadius: '20px',
+                                  fontSize: '11.5px',
+                                  fontWeight: 750,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                }}
+                              >
+                                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#d97706' }} />
+                                Pending Admin Review
+                              </span>
+                            )}
+                            {isApproved && (
+                              <span
+                                style={{
+                                  background: '#ecfdf5',
+                                  color: '#047857',
+                                  border: '1px solid #a7f3d0',
+                                  padding: '5px 12px',
+                                  borderRadius: '20px',
+                                  fontSize: '11.5px',
+                                  fontWeight: 750,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                }}
+                              >
+                                <CheckCircle2 size={13} strokeWidth={2.5} />
+                                Approved &amp; Active
+                              </span>
+                            )}
+                            {app.status === 'REJECTED' && (
+                              <span
+                                style={{
+                                  background: '#fef2f2',
+                                  color: '#b91c1c',
+                                  border: '1px solid #fecaca',
+                                  padding: '5px 12px',
+                                  borderRadius: '20px',
+                                  fontSize: '11.5px',
+                                  fontWeight: 750,
+                                }}
+                              >
+                                Rejected
+                              </span>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteApp(app.id)}
+                              title="Delete Application Record"
+                              style={{
+                                background: 'transparent',
+                                border: 0,
+                                color: 'var(--pb-muted)',
+                                padding: '6px',
+                                cursor: 'pointer',
+                                borderRadius: '6px',
+                              }}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Body 3-Column Grid */}
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                            gap: '20px',
+                            alignItems: 'start',
+                          }}
+                        >
+                          {/* Col 1: Shop & Contact */}
+                          <div style={{ background: 'var(--pb-raised)', padding: '16px', borderRadius: '12px' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                              Shop Location &amp; Contact
+                            </div>
+                            <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>
+                              📍 {app.city}
+                            </div>
+                            <div style={{ fontSize: '13px', color: 'var(--pb-text)', marginBottom: '10px' }}>
+                              📱 +91 {app.contactNumber}
+                            </div>
+                            <a
+                              href={`https://wa.me/91${cleanPhone}?text=${encodeURIComponent(
+                                `Hello ${app.shopName}! We received your Print Bot shop pilot request from ${app.city}.`
+                              )}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '6px 10px',
+                                background: '#ecfdf5',
+                                color: '#047857',
+                                border: '1px solid #a7f3d0',
+                                borderRadius: '6px',
+                                fontSize: '11.5px',
+                                fontWeight: 700,
+                                textDecoration: 'none',
+                              }}
+                            >
+                              <Send size={12} /> Chat on WhatsApp
+                            </a>
+                          </div>
+
+                          {/* Col 2: Subscription Modifier (Admin Controls) */}
+                          <div style={{ background: 'var(--pb-raised)', padding: '16px', borderRadius: '12px' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                              Subscription Plan (Admin Managed)
+                            </div>
+                            <label style={{ display: 'block', fontSize: '11.5px', color: 'var(--pb-muted)', marginBottom: '4px' }}>
+                              Configure / Modify Shop Plan:
+                            </label>
+                            <select
+                              value={
+                                app.plan.includes('Month')
+                                  ? '1 Month'
+                                  : app.plan.includes('Lifetime')
+                                  ? 'Lifetime Commercial'
+                                  : '1 Year'
+                              }
+                              onChange={(e) =>
+                                handleModifyAppSubscription(
+                                  app.id,
+                                  e.target.value as '1 Month' | '1 Year' | 'Lifetime Commercial'
+                                )
+                              }
+                              style={{
+                                width: '100%',
+                                padding: '8px 10px',
+                                borderRadius: '8px',
+                                border: '1px solid var(--pb-border)',
+                                background: 'var(--pb-surface)',
+                                color: 'var(--pb-text)',
+                                fontSize: '12.5px',
+                                fontWeight: 750,
+                              }}
+                            >
+                              <option value="1 Year">1 Year Subscription — ₹4,999 (2 Mo Free)</option>
+                              <option value="1 Month">1 Month Subscription — ₹499/mo</option>
+                              <option value="Lifetime Commercial">Lifetime Commercial — ₹14,999</option>
+                            </select>
+                            <small style={{ display: 'block', marginTop: '6px', color: 'var(--pb-muted)', fontSize: '11px', lineHeight: 1.4 }}>
+                              Admin can modify subscription anytime in the exe. Includes unlimited connected printers.
+                            </small>
+                          </div>
+
+                          {/* Col 3: Credentials Generator & Actions */}
+                          <div style={{ background: 'var(--pb-raised)', padding: '16px', borderRadius: '12px' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                              Workstation Access &amp; Credentials
+                            </div>
+
+                            {isPending && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleGenerateCredentialsFromApp(app)}
+                                  className="ws-primary"
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '8px',
+                                    padding: '10px 14px',
+                                    fontSize: '13px',
+                                    fontWeight: 750,
+                                    borderRadius: '8px',
+                                    width: '100%',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  <Sparkles size={16} />
+                                  Generate Login Credentials
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRejectApp(app.id)}
+                                  style={{
+                                    padding: '6px 12px',
+                                    fontSize: '11.5px',
+                                    color: 'var(--pb-muted)',
+                                    background: 'transparent',
+                                    border: '1px solid var(--pb-border)',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Decline Application
+                                </button>
+                              </div>
+                            )}
+
+                            {isApproved && (
+                              <div>
+                                <div
+                                  style={{
+                                    background: 'var(--pb-surface)',
+                                    border: '1px solid var(--pb-border)',
+                                    borderRadius: '8px',
+                                    padding: '10px 12px',
+                                    marginBottom: '10px',
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                    <span style={{ fontSize: '11px', color: 'var(--pb-muted)' }}>Username:</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <code style={{ fontSize: '12px', fontWeight: 800 }}>{app.generatedUsername}</code>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(app.generatedUsername || '');
+                                          setAdminNotice(`Copied username @${app.generatedUsername}`);
+                                        }}
+                                        style={{ background: 'transparent', border: 0, padding: '2px', cursor: 'pointer', color: 'var(--pb-muted)' }}
+                                        title="Copy Username"
+                                      >
+                                        <Copy size={12} />
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '11px', color: 'var(--pb-muted)' }}>License Key:</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <code style={{ fontSize: '12px', fontWeight: 800, color: 'var(--pb-accent)' }}>
+                                        {app.generatedKey}
+                                      </code>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(app.generatedKey || '');
+                                          setAdminNotice(`Copied License Key ${app.generatedKey}`);
+                                        }}
+                                        style={{ background: 'transparent', border: 0, padding: '2px', cursor: 'pointer', color: 'var(--pb-muted)' }}
+                                        title="Copy Key"
+                                      >
+                                        <Copy size={12} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <a
+                                  href={`https://wa.me/91${cleanPhone}?text=${encodeURIComponent(
+                                    `Hello *${app.shopName}*! 🎉\n\nYour Print Bot Workstation access is approved.\n\n*Login Credentials:*\n👤 *Username:* ${app.generatedUsername}\n🔑 *License Key:* ${app.generatedKey}\n📅 *Plan:* ${app.plan} (Unlimited Connected Printers)\n\nLaunch Print Bot Workstation software and enter your Username & Key to get started!`
+                                  )}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    padding: '8px 12px',
+                                    background: '#059669',
+                                    color: '#fff',
+                                    borderRadius: '6px',
+                                    fontSize: '12px',
+                                    fontWeight: 700,
+                                    textDecoration: 'none',
+                                    width: '100%',
+                                    boxSizing: 'border-box',
+                                  }}
+                                >
+                                  <Send size={13} /> Send Credentials on WhatsApp
+                                </a>
+                              </div>
+                            )}
+
+                            {app.status === 'REJECTED' && (
+                              <div>
+                                <small style={{ color: 'var(--pb-muted)', fontSize: '11.5px', display: 'block', marginBottom: '8px' }}>
+                                  Application was declined.
+                                </small>
+                                <button
+                                  type="button"
+                                  onClick={() => handleGenerateCredentialsFromApp(app)}
+                                  style={{
+                                    padding: '6px 10px',
+                                    fontSize: '11.5px',
+                                    background: 'var(--pb-surface)',
+                                    border: '1px solid var(--pb-border)',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Reconsider &amp; Approve
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ========================================================= */}
           {/* TAB 1: LICENSES & KEYS */}
           {/* ========================================================= */}
@@ -2410,6 +3450,147 @@ export default function App() {
             </div>
           )}
         </main>
+
+        {/* Issued Credentials Modal */}
+        {issuedCredsModal && (
+          <Dialog
+            title="Workstation Login Credentials Generated"
+            onClose={() => setIssuedCredsModal(null)}
+          >
+            <div style={{ padding: '4px 0' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  marginBottom: '16px',
+                  background: 'rgba(5, 150, 105, 0.1)',
+                  padding: '12px 16px',
+                  borderRadius: '10px',
+                  color: '#059669',
+                }}
+              >
+                <CheckCircle2 size={24} />
+                <div>
+                  <strong style={{ display: 'block', fontSize: '14px' }}>
+                    Access Provisioned for {issuedCredsModal.shopName}
+                  </strong>
+                  <span style={{ fontSize: '12px' }}>
+                    Authentic credentials issued. The shop owner can now log into the desktop workstation.
+                  </span>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  background: 'var(--pb-raised)',
+                  border: '1px solid var(--pb-border)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  marginBottom: '18px',
+                }}
+              >
+                <div style={{ marginBottom: '14px' }}>
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 700 }}>
+                    Shop Owner Username
+                  </small>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
+                    <code style={{ fontSize: '16px', fontWeight: 800 }}>{issuedCredsModal.username}</code>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(issuedCredsModal.username);
+                        setAdminNotice(`Copied username @${issuedCredsModal.username}`);
+                      }}
+                      style={{ minHeight: '32px', fontSize: '11px', gap: '4px' }}
+                    >
+                      <Copy size={13} /> Copy Username
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '14px' }}>
+                  <small style={{ color: 'var(--pb-muted)', fontSize: '11px', textTransform: 'uppercase', fontWeight: 700 }}>
+                    Authentic Workstation License Key
+                  </small>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
+                    <code style={{ fontSize: '16px', fontWeight: 800, color: 'var(--pb-accent)' }}>
+                      {issuedCredsModal.key}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(issuedCredsModal.key);
+                        setAdminNotice(`Copied License Key ${issuedCredsModal.key}`);
+                      }}
+                      style={{ minHeight: '32px', fontSize: '11px', gap: '4px' }}
+                    >
+                      <Copy size={13} /> Copy Key
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontSize: '12px',
+                    borderTop: '1px solid var(--pb-border)',
+                    paddingTop: '10px',
+                  }}
+                >
+                  <span style={{ color: 'var(--pb-muted)' }}>Subscription Validity:</span>
+                  <strong>{issuedCredsModal.duration} (Valid until {issuedCredsModal.expiry})</strong>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <a
+                  href={`https://wa.me/91${issuedCredsModal.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                    `Hello *${issuedCredsModal.shopName}*! 🎉\n\nYour Print Bot Workstation access is approved.\n\n*Your Login Credentials:*\n👤 *Username:* ${issuedCredsModal.username}\n🔑 *License Key:* ${issuedCredsModal.key}\n📅 *Plan:* ${issuedCredsModal.duration} (Unlimited Connected Printers)\n\nLaunch Print Bot Workstation software and enter your Username & Key to get started!`
+                  )}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    padding: '12px',
+                    background: '#059669',
+                    color: '#fff',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: 750,
+                    textDecoration: 'none',
+                  }}
+                >
+                  <Send size={15} /> Send Credentials via WhatsApp (+91 {issuedCredsModal.phone})
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const fullText = `Print Bot Workstation Access Approved\nShop: ${issuedCredsModal.shopName}\nUsername: ${issuedCredsModal.username}\nLicense Key: ${issuedCredsModal.key}\nPlan: ${issuedCredsModal.duration}\nValid until: ${issuedCredsModal.expiry}`;
+                    navigator.clipboard.writeText(fullText);
+                    setAdminNotice('Copied complete credentials summary to clipboard!');
+                  }}
+                  style={{ width: '100%', minHeight: '38px', fontSize: '12px', justifyContent: 'center' }}
+                >
+                  <Copy size={14} /> Copy Full Invitation Summary
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIssuedCredsModal(null)}
+                  style={{ width: '100%', minHeight: '38px', fontSize: '12px', justifyContent: 'center', border: 0, background: 'transparent' }}
+                >
+                  Done / Close
+                </button>
+              </div>
+            </div>
+          </Dialog>
+        )}
       </div>
     );
   }

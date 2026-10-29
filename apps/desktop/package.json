@@ -12,6 +12,7 @@
     "test:native": "python native_printing_bridge.py"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "@tauri-apps/api": "2.12.4",
     "@xerox/api-client": "workspace:*",
     "@xerox/contracts": "workspace:*",

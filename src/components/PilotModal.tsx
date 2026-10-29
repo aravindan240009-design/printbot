@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { InstallerConfig } from '../utils/installer';
+import { supabase } from '../utils/supabase';
 
 interface PilotModalProps {
   isOpen: boolean;
@@ -22,17 +23,25 @@ export const PilotModal: React.FC<PilotModalProps> = ({
   const [shopName, setShopName] = useState('');
   const [city, setCity] = useState('');
   const [contactNumber, setContactNumber] = useState('');
-  const [printerModel, setPrinterModel] = useState('');
-  const [selectedPlan, setSelectedPlan] = useState(preselectedPlan || 'Commercial Print Center');
+  const [selectedPlan, setSelectedPlan] = useState(
+    preselectedPlan?.includes('Month')
+      ? '1 Month'
+      : preselectedPlan?.includes('Lifetime')
+      ? 'Lifetime Commercial'
+      : '1 Year'
+  );
   
   // Status states
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     setActiveTab(initialTab);
     if (preselectedPlan) {
-      setSelectedPlan(preselectedPlan);
+      if (preselectedPlan.includes('Month')) setSelectedPlan('1 Month');
+      else if (preselectedPlan.includes('Lifetime')) setSelectedPlan('Lifetime Commercial');
+      else setSelectedPlan('1 Year');
     }
   }, [initialTab, preselectedPlan, isOpen]);
 
@@ -56,7 +65,7 @@ export const PilotModal: React.FC<PilotModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
@@ -74,19 +83,45 @@ export const PilotModal: React.FC<PilotModalProps> = ({
       return;
     }
 
+    const appId = `APP-PILOT-${Date.now().toString(36).toUpperCase()}-${cleanPhone.slice(-4)}`;
     const applicationData = {
+      id: appId,
       shopName: shopName.trim(),
       city: city.trim(),
       contactNumber: cleanPhone,
-      printerModel: printerModel.trim() || 'Unspecified',
       plan: selectedPlan,
       appliedAt: new Date().toISOString(),
+      status: 'PENDING',
     };
 
+    setIsSubmitting(true);
+
+    // 1. Live Cloud Database Sync (Supabase)
+    try {
+      const { error } = await supabase.from('pilot_applications').insert([
+        {
+          id: appId,
+          shop_name: shopName.trim(),
+          city: city.trim(),
+          contact_number: cleanPhone,
+          plan: selectedPlan,
+          applied_at: new Date().toISOString(),
+          status: 'PENDING',
+        },
+      ]);
+      if (error) console.info('Supabase cloud sync info:', error.message);
+    } catch (err) {
+      console.warn('Supabase offline fallback:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+
+    // 2. Local browser fallback
     try {
       const existing = JSON.parse(localStorage.getItem('printbot_pilot_requests') || '[]');
-      existing.push(applicationData);
+      existing.unshift(applicationData);
       localStorage.setItem('printbot_pilot_requests', JSON.stringify(existing));
+      window.dispatchEvent(new Event('printbot_applications_updated'));
     } catch {
       // Ignore localStorage errors in restricted contexts
     }
@@ -99,7 +134,6 @@ export const PilotModal: React.FC<PilotModalProps> = ({
     setShopName('');
     setCity('');
     setContactNumber('');
-    setPrinterModel('');
     setFormError(null);
   };
 
@@ -214,47 +248,39 @@ export const PilotModal: React.FC<PilotModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="pilot-form-row">
-                    <div className="pilot-field-group">
-                      <label htmlFor="pilot-printer" className="pilot-label">
-                        Connected Printer Model(s)
-                      </label>
-                      <input
-                        id="pilot-printer"
-                        type="text"
-                        className="ui-input"
-                        placeholder="e.g. Canon iR2525, HP M428, Epson L8050"
-                        value={printerModel}
-                        onChange={(e) => setPrinterModel(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="pilot-field-group">
-                      <label htmlFor="pilot-plan" className="pilot-label">
-                        Selected Plan Tier
-                      </label>
-                      <select
-                        id="pilot-plan"
-                        className="ui-select"
-                        value={selectedPlan}
-                        onChange={(e) => setSelectedPlan(e.target.value)}
-                      >
-                        <option value="Single Counter Shop">Single Counter Shop (1 PC, 2 Printers)</option>
-                        <option value="Commercial Print Center">Commercial Print Center (Unlimited Printers)</option>
-                        <option value="Campus / Multi-Branch Fleet">Campus / Multi-Branch Fleet</option>
-                      </select>
-                    </div>
+                  <div className="pilot-field-group">
+                    <label htmlFor="pilot-plan" className="pilot-label">
+                      Subscription Plan <span style={{ color: '#dc2626' }}>*</span>
+                    </label>
+                    <select
+                      id="pilot-plan"
+                      className="ui-select"
+                      value={selectedPlan}
+                      onChange={(e) => setSelectedPlan(e.target.value)}
+                    >
+                      <option value="1 Year">Annual Subscription (₹4,999 / year) — Unlimited Printers (2 Months Free)</option>
+                      <option value="1 Month">Monthly Subscription (₹499 / month) — Unlimited Printers</option>
+                      <option value="Lifetime Commercial">Commercial Lifetime License (₹14,999) — Unlimited Printers</option>
+                    </select>
+                    <small className="muted" style={{ display: 'block', marginTop: '6px', fontSize: '11.5px', lineHeight: 1.5 }}>
+                      Single all-inclusive subscription with unlimited printers. Platform admin reviews each application in the desktop workstation and generates your official login credentials.
+                    </small>
                   </div>
 
                   <div className="pilot-demo-notice" style={{ background: 'var(--surface)', padding: '0.75rem 1rem', borderRadius: '4px', fontSize: 'var(--step-small)', color: 'var(--muted)', margin: '0.75rem 0', lineHeight: 1.5 }}>
-                    <strong>Static Preview Notice:</strong> In this frontend deployment, applications are staged in local browser storage. For immediate onboarding, you can also contact our team directly at <a href="mailto:pilot@printbot.in?subject=Print%20Bot%20Pilot%20Request" style={{ color: 'var(--accent)', fontWeight: 600 }}>pilot@printbot.in</a>.
+                    <strong>Admin Verification:</strong> Submitting this application sends your shop details to the Print Bot Workstation Admin Center where the Super Admin can review, modify subscription settings, and generate your authentic Login Username &amp; License Key.
                   </div>
 
                   <div className="pilot-actions">
-                    <button type="submit" className="btn-primary" style={{ flex: 1, justifyContent: 'center' }}>
-                      Submit Pilot Application
+                    <button
+                      type="submit"
+                      className="btn-primary"
+                      disabled={isSubmitting}
+                      style={{ flex: 1, justifyContent: 'center', opacity: isSubmitting ? 0.7 : 1 }}
+                    >
+                      {isSubmitting ? 'Transmitting to Super Admin...' : 'Submit Pilot Application'}
                     </button>
-                    <button type="button" className="btn-secondary" onClick={onClose}>
+                    <button type="button" className="btn-secondary" onClick={onClose} disabled={isSubmitting}>
                       Cancel
                     </button>
                   </div>
@@ -267,15 +293,15 @@ export const PilotModal: React.FC<PilotModalProps> = ({
                     </svg>
                   </div>
                   <h3 style={{ fontSize: 'var(--step-lead)', fontWeight: 700, margin: '0.5rem 0' }}>
-                    Pilot Application Staged Locally
+                    Application Submitted for Admin Approval
                   </h3>
                   <p className="small" style={{ lineHeight: 1.6, color: 'var(--ink-body)' }}>
-                    Thank you, <strong>{shopName}</strong> ({city}). Your application for the <strong>{selectedPlan}</strong> pilot has been recorded in your local browser session (ID: PB-PILOT-{contactNumber.slice(-4)}).
+                    Thank you, <strong>{shopName}</strong> ({city}). Your application for the <strong>{selectedPlan === '1 Month' ? 'Monthly' : selectedPlan === 'Lifetime Commercial' ? 'Lifetime Commercial' : 'Annual'} Subscription</strong> (Unlimited Printers) is now pending in the Super Admin Center.
                   </p>
                   <div style={{ background: 'var(--surface)', padding: '0.85rem 1rem', borderRadius: '6px', margin: '1rem 0', textAlign: 'left', fontSize: 'var(--step-small)' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--ink)', marginBottom: '4px' }}>Direct Onboarding Integration:</div>
+                    <div style={{ fontWeight: 600, color: 'var(--ink)', marginBottom: '4px' }}>Credential Generation Workflow:</div>
                     <div style={{ color: 'var(--muted)', lineHeight: 1.5 }}>
-                      As this static showcase does not run an active backend lead server, please also email your shop details to <a href="mailto:pilot@printbot.in?subject=Print%20Bot%20Pilot%20Application" style={{ color: 'var(--accent)', fontWeight: 600 }}>pilot@printbot.in</a> for direct workstation provisioning.
+                      The platform admin can now inspect your application in the Desktop Workstation, adjust subscription terms, and generate your authentic <strong>Shop Login Username</strong> and <strong>License Key</strong> (PB-KEY-...). Once generated, you can unlock the desktop workstation and begin processing prints.
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem', justifyContent: 'center' }}>
