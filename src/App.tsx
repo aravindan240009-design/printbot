@@ -30,26 +30,10 @@ import { AutopilotControl } from './components/AutopilotControl';
 import { TypingClosingSection } from './components/TypingClosingSection';
 import { SplashScreen } from './components/SplashScreen';
 import { SubscriptionModal } from './components/SubscriptionModal';
+import { RealisticPrinterFallback } from './components/RealisticPrinterFallback';
 import { getInstallerConfig } from './utils/installer';
 
 const PrinterScene = lazy(() => import('./components/PrecisionPrinter'));
-
-function Poster() {
-  return (
-    <div className="printer-poster" aria-hidden="true">
-      <div className="poster-body">
-        <div className="poster-slot" />
-      </div>
-      <div className="poster-paper">
-        <b>ANNA XEROX & DIGITAL PRINTS</b>
-        <span>Job #PB-8942 · Thesis 2026 · Duplex A4</span>
-        <div style={{ marginTop: '8px', fontSize: '8px', color: '#67283f', fontWeight: 'bold' }}>
-          VERIFIED BY WINSOOOL.DRV · PAID VIA UPI
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function App() {
   const [menu, setMenu] = useState(false);
@@ -81,16 +65,35 @@ export default function App() {
     };
   }, [motionPaused]);
 
-  const [webgl, setWebgl] = useState(false);
+  const [webgl, setWebgl] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+      if (media.matches) return false;
+      const canvas = document.createElement('canvas');
+      const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+      return Boolean(gl && window.innerWidth > 640);
+    } catch {
+      return false;
+    }
+  });
   const [faq, setFaq] = useState<number | null>(0);
   const installer = getInstallerConfig();
+
+  // Scroll to top on launch or reload
+  useEffect(() => {
+    if ('scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
+    }
+    window.scrollTo(0, 0);
+  }, []);
 
   useEffect(() => {
     const media = matchMedia('(prefers-reduced-motion: reduce)');
     const update = () =>
       setWebgl(
         !media.matches &&
-          innerWidth > 760 &&
+          innerWidth > 640 &&
           !('connection' in navigator && (navigator as Navigator & { connection?: { saveData: boolean } }).connection?.saveData)
       );
     update();
@@ -218,9 +221,8 @@ export default function App() {
             </div>
 
             <div className="scene">
-              <Poster />
-              {webgl && (
-                <Suspense fallback={null}>
+              {webgl ? (
+                <Suspense fallback={<RealisticPrinterFallback printing={printed} paused={motionPaused} />}>
                   <PrinterScene
                     printing={printed}
                     paused={motionPaused}
@@ -228,6 +230,8 @@ export default function App() {
                     onFailure={() => setWebgl(false)}
                   />
                 </Suspense>
+              ) : (
+                <RealisticPrinterFallback printing={printed} paused={motionPaused} />
               )}
             </div>
 

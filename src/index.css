@@ -1770,60 +1770,276 @@ html[data-motion=paused] [data-reveal],html[data-motion=paused] .section-heading
   color: #211c13;
 }
 
-/* 2D Fallback Poster Clean Aesthetic */
-.printer-poster {
+/* ==========================================================================
+   HIGH-FIDELITY PHOTOREALISTIC PRINTER FALLBACK
+   ========================================================================== */
+.realistic-printer-fallback {
   position: absolute;
-  width: 290px;
-  height: 270px;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -48%);
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 1;
 }
-.poster-body {
-  width: 280px;
-  height: 140px;
-  background: #2a2228;
-  border-radius: 12px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.25);
+
+.fallback-pedestal-shadow {
+  position: absolute;
+  width: 440px;
+  height: 180px;
+  bottom: 25px;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0) 70%);
+  filter: blur(14px);
+}
+
+.fallback-pedestal {
+  position: absolute;
+  width: 410px;
+  height: 175px;
+  bottom: 35px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 35%, #2a2c2f 0%, #151618 70%);
+  border: 2.5px solid #c8a872;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6), inset 0 2px 12px rgba(200, 168, 114, 0.3);
+  transform: rotateX(60deg);
+}
+
+.fallback-printer-body {
+  position: relative;
+  width: 370px;
+  margin-top: -15px;
+  filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.45));
+}
+
+.fallback-scanner-lid {
+  width: 345px;
+  height: 34px;
+  background: linear-gradient(180deg, #f2efe9 0%, #ded9ce 100%);
+  border-radius: 8px 8px 3px 3px;
+  border: 1px solid rgba(200, 168, 114, 0.4);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  margin: 0 auto;
+  position: relative;
+}
+
+.fallback-scanner-glass {
+  width: 88%;
+  height: 5px;
+  background: linear-gradient(90deg, #1a2f2f, #336e65 50%, #1a2f2f);
+  margin: 5px auto 0;
+  border-radius: 2px;
+  box-shadow: 0 0 6px rgba(51, 110, 101, 0.4);
+}
+
+.fallback-gold-trim {
+  width: 355px;
+  height: 4px;
+  background: linear-gradient(90deg, #b08d55 0%, #e8d09e 50%, #b08d55 100%);
+  margin: 2px auto;
+  border-radius: 1px;
+  box-shadow: 0 0 8px rgba(232, 208, 158, 0.5);
+}
+
+.fallback-upper-housing {
+  width: 362px;
+  height: 88px;
+  background: linear-gradient(180deg, #edeae3 0%, #dedad1 100%);
+  border-radius: 6px;
+  position: relative;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+}
+
+.fallback-touchscreen {
+  width: 150px;
+  height: 70px;
+  background: #0c1214;
+  border-radius: 5px;
+  border: 1.5px solid #23343d;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.8), 0 0 10px rgba(10, 132, 255, 0.2);
+  padding: 6px 9px;
+  color: #fff;
+}
+
+.fallback-screen-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.fallback-screen-brand {
+  font-size: 7.5px;
+  font-weight: 800;
+  color: #c8a872;
+  letter-spacing: 0.08em;
+  font-family: monospace;
+}
+
+.fallback-screen-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.dot-ready {
+  background: #30d158;
+  box-shadow: 0 0 8px #30d158;
+}
+
+.dot-printing {
+  background: #0a84ff;
+  box-shadow: 0 0 8px #0a84ff;
+}
+
+.fallback-screen-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-top: 3px;
+  font-family: 'Playfair Display', Georgia, serif;
+}
+
+.fallback-screen-bar {
+  width: 100%;
+  height: 3px;
+  background: #1c2830;
+  border-radius: 2px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.fallback-screen-fill {
+  height: 100%;
+  background: #30d158;
+}
+
+.fallback-screen-meta {
+  font-size: 7px;
+  color: #8ca8b8;
+  font-family: monospace;
+  margin-top: 4px;
+}
+
+.fallback-face-logo {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: #725e68;
+  letter-spacing: -0.5px;
+}
+
+.fallback-power-ring {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid #c8a872;
+  box-shadow: 0 0 8px rgba(200, 168, 114, 0.4);
+}
+
+.fallback-lower-chassis {
+  width: 356px;
+  height: 105px;
+  background: linear-gradient(180deg, #222426 0%, #151617 100%);
+  border-radius: 0 0 8px 8px;
+  position: relative;
+  margin: -2px auto 0;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
+  padding-top: 8px;
+}
+
+.fallback-vent-louvers {
+  position: absolute;
+  right: 18px;
+  top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.fallback-vent-louvers span {
+  width: 22px;
+  height: 2px;
+  background: #0f1011;
+  border-radius: 1px;
+}
+
+.fallback-output-slot {
+  width: 250px;
+  height: 7px;
+  background: #090a0b;
+  border-radius: 4px;
+  margin: 0 auto;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9);
+}
+
+.fallback-paper-tray {
+  width: 245px;
+  height: 90px;
+  background: linear-gradient(180deg, #191b1d 0%, #0d0e0f 100%);
+  margin: -3px auto 0;
+  border-radius: 4px 4px 10px 10px;
+  border: 1px solid #33383d;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.6);
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-:root[data-theme='light'] .poster-body {
-  background: #e2d2bd;
+
+.fallback-printed-sheet {
+  width: 215px;
+  background: #ffffff;
+  color: #211219;
+  padding: 10px 12px;
+  border-radius: 3px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  border: 1px solid #e5dacb;
+  transform: rotate(-1deg);
 }
-.poster-slot {
-  width: 240px;
-  height: 12px;
-  background: #11090f;
-  border-radius: 4px;
-}
-.poster-paper {
-  position: relative;
-  margin-top: -8px;
-  width: 210px;
-  background: #faf7f2;
-  color: #2b1f24;
-  padding: 16px;
-  border-radius: 4px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
-  border: 1px solid #e2d6c4;
-}
-.poster-paper b {
-  display: block;
-  font-size: 14px;
+
+.fallback-sheet-header {
+  font-size: 9.5px;
+  font-weight: 800;
   font-family: Georgia, serif;
   color: #67283f;
+  line-height: 1.2;
 }
-.poster-paper span {
+
+.fallback-sheet-header span {
   display: block;
-  font-size: 9px;
+  font-size: 7.5px;
   color: #7b6e65;
-  margin-top: 4px;
+  font-family: monospace;
+}
+
+.fallback-sheet-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 6px 0;
+}
+
+.fallback-sheet-lines span {
+  height: 2px;
+  background: #eae2d6;
+  border-radius: 1px;
+}
+
+.fallback-sheet-lines span:nth-child(1) { width: 90%; }
+.fallback-sheet-lines span:nth-child(2) { width: 75%; }
+.fallback-sheet-lines span:nth-child(3) { width: 60%; }
+
+.fallback-sheet-footer {
+  font-size: 7px;
+  font-weight: 700;
+  color: #792d47;
+  letter-spacing: 0.05em;
+  font-family: monospace;
 }
 
 /* ==========================================================================

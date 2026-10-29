@@ -132,35 +132,45 @@ export default function PrecisionPrinter({
     audioEngine.current = createPrinterAudio();
 
     let renderer: THREE.WebGLRenderer;
+    let environment: THREE.WebGLRenderTarget | null = null;
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 50);
+    camera.position.set(6.4, 4.6, 9.0);
+    camera.lookAt(0, 0.05, 0.2);
+
     try {
       renderer = new THREE.WebGLRenderer({
         alpha: true,
         antialias: true,
         powerPreference: 'high-performance',
       });
-    } catch {
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.18;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+      // Immediate sizing to prevent 0x0 or 300x150 flash on launch/reload
+      const initialRect = el.getBoundingClientRect();
+      const initW = initialRect.width || el.clientWidth || 550;
+      const initH = initialRect.height || el.clientHeight || 480;
+      renderer.setSize(initW, initH, false);
+      camera.aspect = initW / initH;
+      camera.updateProjectionMatrix();
+
+      el.appendChild(renderer.domElement);
+
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      const room = new RoomEnvironment();
+      environment = pmrem.fromScene(room, 0.04);
+      scene.environment = environment.texture;
+      room.dispose();
+      pmrem.dispose();
+    } catch (err) {
+      console.warn('[PrecisionPrinter] WebGL initialization failed, falling back:', err);
       onFailure();
       return;
     }
-
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.18;
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    el.appendChild(renderer.domElement);
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 50);
-    camera.position.set(6.4, 4.6, 9.0);
-    camera.lookAt(0, 0.05, 0.2);
-
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    const room = new RoomEnvironment();
-    const environment = pmrem.fromScene(room, 0.04);
-    scene.environment = environment.texture;
-    room.dispose();
-    pmrem.dispose();
 
     const group = new THREE.Group();
     scene.add(group);
@@ -798,13 +808,23 @@ export default function PrecisionPrinter({
 
     const lost = (event: Event) => {
       event.preventDefault();
-      onFailure();
+      if (!disposed) {
+        console.warn('[PrecisionPrinter] WebGL context lost during active session');
+        onFailure();
+      }
+    };
+
+    const restored = () => {
+      if (!disposed) {
+        request();
+      }
     };
 
     el.addEventListener('pointermove', move);
     el.addEventListener('pointerleave', leave);
     document.addEventListener('visibilitychange', visibility);
     renderer.domElement.addEventListener('webglcontextlost', lost);
+    renderer.domElement.addEventListener('webglcontextrestored', restored);
     request();
 
     return () => {
@@ -817,12 +837,13 @@ export default function PrecisionPrinter({
       el.removeEventListener('pointerleave', leave);
       document.removeEventListener('visibilitychange', visibility);
       renderer.domElement.removeEventListener('webglcontextlost', lost);
+      renderer.domElement.removeEventListener('webglcontextrestored', restored);
       scene.traverse((obj) => {
         if (obj instanceof THREE.Mesh) obj.geometry.dispose();
       });
       materials.forEach((m) => m.dispose());
       textures.forEach((t) => t.dispose());
-      environment.dispose();
+      if (environment) environment.dispose();
       key.shadow.dispose();
       renderer.dispose();
       renderer.domElement.remove();
