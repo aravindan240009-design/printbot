@@ -384,16 +384,16 @@ function Console() {
                           <button
                             className="primary"
                             onClick={() => handleApprove(order.id)}
-                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', minHeight: '32px', height: '32px', padding: '0 12px', fontSize: '13px', borderRadius: '7px' }}
                           >
-                            <CheckCircle2 size={16} />
+                            <CheckCircle2 size={15} />
                             Approve Order
                           </button>
                           <button
                             onClick={() => confirm('reject')}
-                            style={{ flex: 1, borderColor: '#ef4444', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                            style={{ flex: 1, borderColor: '#ef4444', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', minHeight: '32px', height: '32px', padding: '0 12px', fontSize: '13px', borderRadius: '7px' }}
                           >
-                            <X size={16} />
+                            <X size={15} />
                             Reject Order
                           </button>
                         </div>
