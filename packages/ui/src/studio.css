@@ -1028,3 +1028,25 @@ select option:checked {
   color: var(--pb-on-accent) !important;
   font-weight: 700 !important;
 }
+
+
+/* ==========================================================================
+   Universal Sticky Header System across all Dashboards, Portals & Workstation
+   ========================================================================== */
+
+.pb-header,
+header.pb-header,
+.ws-topbar,
+header.ws-topbar,
+.console-body > header {
+  position: sticky !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 100 !important;
+  background: var(--pb-surface) !important;
+  border-bottom: 1px solid var(--pb-border) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+}

@@ -1074,6 +1074,11 @@ export default function App() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            position: 'sticky',
+            top: 0,
+            zIndex: 100,
+            backdropFilter: 'blur(16px)',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -1402,7 +1407,7 @@ export default function App() {
       </aside>
 
       {/* Main Panel */}
-      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, height: '100vh', overflowY: 'auto' }}>
         {/* Topbar */}
         <header className="ws-topbar">
           <div>

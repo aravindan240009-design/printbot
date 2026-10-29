@@ -131,45 +131,47 @@ export default function App() {
         Skip to content
       </a>
 
-      {/* Navigation Bar */}
-      <header className="navigation shell">
-        <a className="brand" href="#" aria-label="Print Bot home">
-          <PrintBotLogo size={40} />
-          printbot<span className="brand-dot">®</span>
-        </a>
-
-        <nav aria-label="Main navigation" className={menu ? 'nav-links open' : 'nav-links'}>
-          <a href="#experience" onClick={() => setMenu(false)}>
-            The experience
+      {/* Sticky Navigation Bar */}
+      <header className="landing-sticky-header">
+        <div className="navigation shell">
+          <a className="brand" href="#" aria-label="Print Bot home">
+            <PrintBotLogo size={40} />
+            printbot<span className="brand-dot">®</span>
           </a>
-          <a href="#control" onClick={() => setMenu(false)}>
-            Built for your shop
-          </a>
-          <a href="#pricing" onClick={() => setMenu(false)}>
-            One simple plan
-          </a>
-        </nav>
 
-        <button className="nav-cta" onClick={() => setDialog(true)}>
-          Let’s talk print <ArrowUpRight size={16} />
-        </button>
+          <nav aria-label="Main navigation" className={menu ? 'nav-links open' : 'nav-links'}>
+            <a href="#experience" onClick={() => setMenu(false)}>
+              The experience
+            </a>
+            <a href="#control" onClick={() => setMenu(false)}>
+              Built for your shop
+            </a>
+            <a href="#pricing" onClick={() => setMenu(false)}>
+              One simple plan
+            </a>
+          </nav>
 
-        <button
-          className="landing-theme-switch"
-          aria-label={siteTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-          onClick={() => setSiteTheme(siteTheme === 'dark' ? 'light' : 'dark')}
-        >
-          {siteTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
+          <button className="nav-cta" onClick={() => setDialog(true)}>
+            Let’s talk print <ArrowUpRight size={16} />
+          </button>
 
-        <button
-          className="menu-toggle"
-          aria-label={menu ? 'Close navigation' : 'Open navigation'}
-          aria-expanded={menu}
-          onClick={() => setMenu(!menu)}
-        >
-          {menu ? <X /> : <Menu />}
-        </button>
+          <button
+            className="landing-theme-switch"
+            aria-label={siteTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            onClick={() => setSiteTheme(siteTheme === 'dark' ? 'light' : 'dark')}
+          >
+            {siteTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+
+          <button
+            className="menu-toggle"
+            aria-label={menu ? 'Close navigation' : 'Open navigation'}
+            aria-expanded={menu}
+            onClick={() => setMenu(!menu)}
+          >
+            {menu ? <X /> : <Menu />}
+          </button>
+        </div>
       </header>
 
       {/* Main Content */}
