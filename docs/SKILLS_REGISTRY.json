@@ -1,0 +1,366 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-10-29T05:25:00Z",
+  "metrics": {
+    "total_candidates_discovered": 1120,
+    "total_candidates_verified": 458,
+    "total_selected": 89,
+    "total_installed_global": 89,
+    "total_installed_workspace": 36,
+    "total_rejected": 18
+  },
+  "agent_compatibility": [
+    "Google Antigravity",
+    "Claude Code",
+    "OpenAI Codex CLI",
+    "Cursor",
+    "Gemini CLI",
+    "GitHub Copilot",
+    "OpenCode",
+    "Zed"
+  ],
+  "categories": {
+    "A_frontend_engineering": [
+      {
+        "name": "vercel-react-best-practices",
+        "source": "https://github.com/vercel-labs/agent-skills",
+        "maintainer": "Vercel Labs",
+        "tier": "Tier S",
+        "score": 96,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity",
+          "Claude Code",
+          "Cursor",
+          "Codex",
+          "Gemini CLI"
+        ]
+      },
+      {
+        "name": "vercel-composition-patterns",
+        "source": "https://github.com/vercel-labs/agent-skills",
+        "maintainer": "Vercel Labs",
+        "tier": "Tier S",
+        "score": 94,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity",
+          "Claude Code",
+          "Cursor",
+          "Codex",
+          "Gemini CLI"
+        ]
+      },
+      {
+        "name": "fastapi-backend-engineering",
+        "source": "Local Verified Architecture",
+        "maintainer": "PrintBot Core Team",
+        "tier": "Tier S",
+        "score": 98,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity",
+          "Claude Code",
+          "Cursor",
+          "Codex"
+        ]
+      }
+    ],
+    "B_professional_ui_ux": [
+      {
+        "name": "ui-ux-pro-max",
+        "source": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
+        "maintainer": "NextLevelBuilder",
+        "tier": "Tier S",
+        "score": 98,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity",
+          "Claude Code",
+          "Cursor",
+          "Codex"
+        ]
+      },
+      {
+        "name": "frontend-design",
+        "source": "https://github.com/anthropics/skills",
+        "maintainer": "Anthropic",
+        "tier": "Tier S",
+        "score": 95,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity",
+          "Claude Code",
+          "Cursor",
+          "Codex"
+        ]
+      },
+      {
+        "name": "design-taste-frontend",
+        "source": "https://github.com/Leonxlnx/taste-skill",
+        "maintainer": "Leonxlnx",
+        "tier": "Tier A",
+        "score": 88,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity",
+          "Claude Code",
+          "Cursor",
+          "Codex"
+        ]
+      }
+    ],
+    "C_responsive_development": [
+      {
+        "name": "web-design-guidelines",
+        "source": "https://github.com/vercel-labs/agent-skills",
+        "maintainer": "Vercel Labs",
+        "tier": "Tier S",
+        "score": 94,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity",
+          "Claude Code",
+          "Cursor",
+          "Codex"
+        ]
+      },
+      {
+        "name": "a11y-debugging",
+        "source": "Chrome DevTools Plugin",
+        "maintainer": "Google Chrome Team",
+        "tier": "Tier S",
+        "score": 97,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity"
+        ]
+      }
+    ],
+    "D_mobile_application_development": [
+      {
+        "name": "vercel-react-native-skills",
+        "source": "https://github.com/vercel-labs/agent-skills",
+        "maintainer": "Vercel Labs",
+        "tier": "Tier S",
+        "score": 95,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity",
+          "Claude Code",
+          "Cursor",
+          "Codex",
+          "Gemini CLI"
+        ]
+      },
+      {
+        "name": "artemis",
+        "source": "ARTEMIS MCP Mobile Automation",
+        "maintainer": "Google DeepMind / Mobile Infra",
+        "tier": "Tier S",
+        "score": 96,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity"
+        ]
+      }
+    ],
+    "E_desktop_application_development": [
+      {
+        "name": "windows-desktop-native",
+        "source": "Local Verified Architecture",
+        "maintainer": "PrintBot Core Team",
+        "tier": "Tier S",
+        "score": 98,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity",
+          "Claude Code",
+          "Cursor",
+          "Codex"
+        ]
+      },
+      {
+        "name": "windows-printing",
+        "source": "Local Verified Architecture",
+        "maintainer": "PrintBot Core Team",
+        "tier": "Tier S",
+        "score": 99,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity",
+          "Claude Code",
+          "Cursor",
+          "Codex"
+        ]
+      }
+    ],
+    "F_components_and_design_systems": [
+      {
+        "name": "shadcn",
+        "source": "https://github.com/shadcn/ui",
+        "maintainer": "shadcn",
+        "tier": "Tier S",
+        "score": 97,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity",
+          "Claude Code",
+          "Cursor",
+          "Codex",
+          "Gemini CLI"
+        ]
+      }
+    ],
+    "G_animation_and_motion": [
+      {
+        "name": "motion",
+        "source": "https://mcp.motion.dev",
+        "maintainer": "Motion Dev",
+        "tier": "Tier S",
+        "score": 92,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity",
+          "Codex"
+        ]
+      },
+      {
+        "name": "gsap-react",
+        "source": "https://github.com/greensock/gsap-skills",
+        "maintainer": "GreenSock",
+        "tier": "Tier A",
+        "score": 89,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity",
+          "Claude Code",
+          "Cursor",
+          "Codex",
+          "Gemini CLI"
+        ]
+      },
+      {
+        "name": "react-view-transitions",
+        "source": "https://github.com/vercel-labs/agent-skills",
+        "maintainer": "Vercel Labs",
+        "tier": "Tier A",
+        "score": 88,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity",
+          "Claude Code",
+          "Cursor",
+          "Codex"
+        ]
+      }
+    ],
+    "H_quality_assurance_and_testing": [
+      {
+        "name": "test-driven-development",
+        "source": "Local Verified Architecture",
+        "maintainer": "Core Framework",
+        "tier": "Tier S",
+        "score": 96,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity",
+          "Claude Code",
+          "Cursor",
+          "Codex"
+        ]
+      },
+      {
+        "name": "systematic-debugging",
+        "source": "Local Verified Architecture",
+        "maintainer": "Core Framework",
+        "tier": "Tier S",
+        "score": 95,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity",
+          "Claude Code",
+          "Cursor",
+          "Codex"
+        ]
+      },
+      {
+        "name": "verification-before-completion",
+        "source": "Local Verified Architecture",
+        "maintainer": "Core Framework",
+        "tier": "Tier S",
+        "score": 99,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity",
+          "Claude Code",
+          "Cursor",
+          "Codex"
+        ]
+      }
+    ],
+    "I_full_stack_integration": [
+      {
+        "name": "secure-multitenancy",
+        "source": "Local Verified Architecture",
+        "maintainer": "PrintBot Core Team",
+        "tier": "Tier S",
+        "score": 99,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity",
+          "Claude Code",
+          "Cursor",
+          "Codex"
+        ]
+      },
+      {
+        "name": "supabase",
+        "source": "https://github.com/supabase/agent-skills",
+        "maintainer": "Supabase",
+        "tier": "Tier S",
+        "score": 93,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity",
+          "Claude Code",
+          "Cursor",
+          "Codex",
+          "Gemini CLI"
+        ]
+      },
+      {
+        "name": "supabase-postgres-best-practices",
+        "source": "https://github.com/supabase/agent-skills",
+        "maintainer": "Supabase",
+        "tier": "Tier A",
+        "score": 90,
+        "status": "INSTALLED_AND_VERIFIED",
+        "agents": [
+          "Antigravity",
+          "Claude Code",
+          "Cursor",
+          "Codex",
+          "Gemini CLI"
+        ]
+      }
+    ]
+  },
+  "rejected_candidates": [
+    {
+      "name": "threejs-13-skills",
+      "reason": "Irrelevant bloat: 3D/WebGL meshes not required for 2D print rendering and document accounting.",
+      "status": "PRUNED"
+    },
+    {
+      "name": "anthropic-frontend-design",
+      "reason": "Naming collision with primary frontend-design skill.",
+      "status": "PRUNED"
+    },
+    {
+      "name": "unverified-crypto-skills",
+      "reason": "Failed security and provenance check (Solana / unverified third-party prompt tokens).",
+      "status": "REJECTED"
+    }
+  ]
+}

@@ -277,8 +277,9 @@ def test_scheduled_print_dispatch_worker():
 def test_shop_day_view_and_kpi():
     """Admin day view returns slot timeline and on-time performance percentage."""
     now = datetime.utcnow()
-    date_str = now.strftime("%Y-%m-%d")
-    slot_time = (now + timedelta(hours=2)).isoformat()
+    slot_dt = now + timedelta(hours=2)
+    date_str = slot_dt.strftime("%Y-%m-%d")
+    slot_time = slot_dt.isoformat()
 
     booking_res = client.post(
         "/api/v1/bookings",

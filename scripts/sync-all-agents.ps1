@@ -46,8 +46,27 @@ foreach ($target in $targetStores) {
     Write-Host "  [OK] $target -> $count skills active" -ForegroundColor Green
 }
 
-# 2. Global MCP Config Synchronization
-Write-Host "`n[2/2] Updating Global MCP Server Configurations..." -ForegroundColor Yellow
+# 2. Global Custom Agents Synchronization
+$agentSource = "$PSScriptRoot\..\.agents\agents"
+$agentTargets = @(
+    "$env:USERPROFILE\.gemini\config\agents",
+    "$env:USERPROFILE\.agents\agents"
+)
+
+if (Test-Path $agentSource) {
+    Write-Host "`n[2/3] Synchronizing Global Custom Agents (planner, implementer, reviewer, security, platform-ops, ux-research)..." -ForegroundColor Yellow
+    foreach ($atarget in $agentTargets) {
+        if (-not (Test-Path $atarget)) {
+            New-Item -ItemType Directory -Path $atarget -Force | Out-Null
+        }
+        Copy-Item -Path "$agentSource\*" -Destination $atarget -Recurse -Force
+        $acount = (Get-ChildItem -Path $atarget).Count
+        Write-Host "  [OK] $atarget -> $acount agents active" -ForegroundColor Green
+    }
+}
+
+# 3. Global MCP Config Synchronization
+Write-Host "`n[3/3] Updating Global MCP Server Configurations..." -ForegroundColor Yellow
 
 $mcpJson = @'
 {
