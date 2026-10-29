@@ -1,6 +1,6 @@
 import React from 'react';
-import CustomerWebApp from '../../apps/customer-web/src/App';
-import '../../apps/customer-web/src/index.css';
+import CustomerWebApp from '../customer-web/App';
+import '../customer-web/index.css';
 
 export interface CustomerShopPortalProps {
   shopId: string;
