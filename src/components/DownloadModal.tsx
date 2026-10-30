@@ -124,14 +124,13 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                 <span>Browser download initiated automatically</span>
               </div>
             </div>
-            <a
-              href={artifact.downloadUrl}
-              download={artifact.filename}
+            <button
+              onClick={() => triggerInstallerDownload(artifact)}
               className="px-4 py-2 text-xs font-semibold text-white bg-brand-blue hover:bg-blue-600 rounded-lg transition-all flex items-center gap-1.5 flex-shrink-0 cursor-pointer shadow-md shadow-brand-blue/20"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Click if download didn't start</span>
-            </a>
+              <span>Download {artifact.format.toUpperCase()} ({artifact.filesize})</span>
+            </button>
           </div>
 
           {/* Installer Format Selector */}
@@ -145,7 +144,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                 return (
                   <button
                     key={art.id}
-                    onClick={() => handleSelectArtifact(art)}
+                    onClick={() => setArtifact(art)}
                     className={`p-3 text-left rounded-xl border transition-all cursor-pointer ${
                       isCurrent
                         ? 'bg-brand-blue/15 border-brand-blue text-white shadow-sm'
@@ -216,6 +215,17 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                   Launch Print Bot and scan your shop pairing QR code.
                 </p>
               </div>
+            </div>
+          </div>
+
+          {/* Browser SmartScreen Guidance */}
+          <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-slate-300 flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-brand-400 flex-shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <div className="font-semibold text-white">Notice: "Isn't commonly downloaded" in Edge/Chrome?</div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Microsoft Defender SmartScreen displays this standard advisory for any new software release. To proceed: hover the file in Downloads &gt; click <strong>... (three dots)</strong> &gt; <strong>Keep</strong> &gt; <strong>Show more</strong> &gt; <strong>Keep anyway</strong>.
+              </p>
             </div>
           </div>
 
