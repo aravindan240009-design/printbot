@@ -4,7 +4,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 type Props = {
-  printing: boolean;
+  printing?: boolean;
   paused: boolean;
   soundEnabled?: boolean;
   onFailure: () => void;
@@ -413,105 +413,144 @@ export default function PrecisionPrinter({
     // ==============================================================
     // 6. HIGH-PRECISION 100% RIGID PRINTED DOCUMENT (NO UNROLLING)
     // ==============================================================
-    const artData = canvasTexture(512, 724, (ctx) => {
-      // Warm Ivory paper stock
-      ctx.fillStyle = '#fbf9f4';
-      ctx.fillRect(0, 0, 512, 724);
+    const artData = canvasTexture(768, 1086, (ctx) => {
+      // 1. Premium Warm Ivory Paper Stock
+      ctx.fillStyle = '#fdfbf7';
+      ctx.fillRect(0, 0, 768, 1086);
 
-      // Delicate hairline security borders
-      ctx.strokeStyle = '#c5a66d';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(18, 18, 476, 688);
+      // Outer & Inner Security Guilloche Border
+      ctx.strokeStyle = '#c8a872';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(20, 20, 728, 1046);
 
-      ctx.strokeStyle = '#e6dcce';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(24, 24, 464, 676);
-
-      // Header block
-      ctx.fillStyle = '#67283f';
-      ctx.font = 'bold 20px Georgia, serif';
-      ctx.fillText('ANNA XEROX & DIGITAL PRINTS', 38, 62);
-
-      ctx.fillStyle = '#8b7a67';
-      ctx.font = '10px sans-serif';
-      ctx.fillText('GOVT. RECOGNIZED COUNTER · GUINDY, CHENNAI · PIN 600025', 38, 80);
-
-      // Hairline divider
-      ctx.strokeStyle = '#c5a66d';
+      ctx.strokeStyle = '#67283f';
       ctx.lineWidth = 1.5;
+      ctx.strokeRect(28, 28, 712, 1030);
+
+      // Top Header Banner Pill
+      ctx.fillStyle = '#67283f';
+      ctx.fillRect(44, 46, 680, 46);
+      ctx.fillStyle = '#edd5ae';
+      ctx.font = 'bold 16px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('PRINT BOT OS · OFFICIAL SUBSCRIBER PROPOSAL', 384, 75);
+
+      // Main High-Impact Hero Headline (The Impressive Sentence)
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#211219';
+      ctx.font = 'bold 50px Georgia, serif';
+      ctx.fillText('Double Your Counter Speed.', 384, 155);
+
+      ctx.fillStyle = '#8b2949';
+      ctx.font = 'bold 48px Georgia, serif';
+      ctx.fillText('Keep 100% Of Your Profit.', 384, 215);
+
+      // Gold Accent Divider
+      ctx.strokeStyle = '#c8a872';
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(38, 94);
-      ctx.lineTo(474, 94);
+      ctx.moveTo(120, 245);
+      ctx.lineTo(648, 245);
       ctx.stroke();
 
-      // Document title
-      ctx.fillStyle = '#221e1a';
-      ctx.font = 'bold 26px Georgia, serif';
-      ctx.fillText('THESIS DISPATCH RECEIPT', 38, 136);
+      // The Impressive Pitch Sentence (Clear, Legible, High-Contrast)
+      ctx.fillStyle = '#2d221c';
+      ctx.font = 'bold 22px sans-serif';
+      ctx.fillText('0% Per-Page Commission. Unlimited Printers.', 384, 288);
 
-      ctx.fillStyle = '#5c5244';
-      ctx.font = '12px sans-serif';
-      ctx.fillText('Job #PB-8942 · Anna University Engineering Thesis 2026', 38, 158);
-      ctx.fillText('Duplex Long-Edge · 80 GSM Royal Ivory · Color Laser', 38, 178);
+      ctx.fillStyle = '#5c493c';
+      ctx.font = '18px sans-serif';
+      ctx.fillText('One flat monthly subscription for your entire Xerox shop.', 384, 320);
+      ctx.fillText('Customers scan QR, upload & pay UPI in 30 seconds.', 384, 348);
+      ctx.fillText('Your printers deliver automatically without counter chaos.', 384, 376);
 
-      // Technical Chart & Geometry
-      ctx.fillStyle = '#f2ede4';
-      ctx.fillRect(38, 200, 436, 175);
-      ctx.strokeStyle = '#dbcbb7';
-      ctx.strokeRect(38, 200, 436, 175);
+      // 3 Highlight Feature Cards
+      const features = [
+        { title: '₹0 Commission', desc: '100% UPI & cash stays yours' },
+        { title: 'Unlimited Fleet', desc: 'Connect 1 to 20 printers freely' },
+        { title: 'winspool.drv', desc: '100% raw driver, zero margin cut' },
+      ];
 
-      ctx.fillStyle = '#67283f';
-      ctx.fillRect(60, 295, 38, 65);
-      ctx.fillRect(118, 255, 38, 105);
-      ctx.fillRect(176, 235, 38, 125);
-      ctx.fillStyle = '#c5a66d';
-      ctx.fillRect(234, 215, 38, 145);
-      ctx.fillRect(292, 245, 38, 115);
-      ctx.fillRect(350, 225, 38, 135);
+      features.forEach((feat, idx) => {
+        const fx = 48 + idx * 230;
+        ctx.fillStyle = '#f5efe4';
+        ctx.fillRect(fx, 410, 212, 95);
+        ctx.strokeStyle = '#d9c7af';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(fx, 410, 212, 95);
 
-      ctx.fillStyle = '#483f35';
-      ctx.font = '10px sans-serif';
-      ctx.fillText('Fig 4.2 · Verified Thermal Transfer Yield (100% Zero Jam)', 48, 220);
+        ctx.fillStyle = '#8b2949';
+        ctx.font = 'bold 22px Georgia, serif';
+        ctx.fillText(feat.title, fx + 106, 448);
 
-      // Official Starburst Stamp Seal (NOT wireframe rings!)
-      const cx = 390;
-      const cy = 490;
+        ctx.fillStyle = '#5e4e41';
+        ctx.font = '12px sans-serif';
+        ctx.fillText(feat.desc, fx + 106, 478);
+      });
+
+      // Highlighted Subscription Pricing Box
+      ctx.fillStyle = '#2b121e';
+      ctx.fillRect(48, 535, 672, 230);
+      ctx.strokeStyle = '#c8a872';
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(48, 535, 672, 230);
+
+      ctx.fillStyle = '#edd5ae';
+      ctx.font = 'bold 16px monospace';
+      ctx.fillText('★ ALL-INCLUSIVE UNLIMITED SHOP PLAN ★', 384, 575);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 54px Georgia, serif';
+      ctx.fillText('₹1,499', 384, 642);
+
+      ctx.fillStyle = '#dfc599';
+      ctx.font = 'bold 20px sans-serif';
+      ctx.fillText('per month  (or ₹14,990 / year)', 384, 678);
+
+      ctx.fillStyle = '#e8d4cb';
+      ctx.font = '15px sans-serif';
+      ctx.fillText('Zero setup fee · 14-day free trial · Instant 5-min Windows setup', 384, 715);
+
+      // CTA Banner Button
+      ctx.fillStyle = '#e2c18b';
+      ctx.fillRect(160, 785, 448, 62);
+      ctx.strokeStyle = '#f5e4bd';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(160, 785, 448, 62);
+
+      ctx.fillStyle = '#211219';
+      ctx.font = 'bold 24px sans-serif';
+      ctx.fillText('SUBSCRIBE TODAY ↗', 384, 824);
+
+      // Official Starburst Certified Stamp
+      const cx = 384;
+      const cy = 925;
       ctx.save();
-      ctx.strokeStyle = '#c5a66d';
-      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = '#c8a872';
+      ctx.lineWidth = 1.8;
       for (let a = 0; a < Math.PI * 2; a += Math.PI / 12) {
         ctx.beginPath();
-        ctx.arc(cx + Math.cos(a) * 4, cy + Math.sin(a) * 4, 38, 0, Math.PI * 2);
+        ctx.arc(cx + Math.cos(a) * 6, cy + Math.sin(a) * 6, 45, 0, Math.PI * 2);
         ctx.stroke();
       }
-      ctx.fillStyle = '#67283f';
-      ctx.font = 'bold 9px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('PRINT BOT', cx, cy - 5);
-      ctx.fillText('VERIFIED', cx, cy + 9);
+      ctx.fillStyle = '#792d47';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText('PRINT BOT OS CERTIFIED', cx, cy - 8);
+      ctx.fillText('ZERO COMMISSION GUARANTEE', cx, cy + 8);
+      ctx.fillText('★ 2026 ★', cx, cy + 22);
       ctx.restore();
 
-      // Accounting Ledger details
-      ctx.fillStyle = '#3a332a';
-      ctx.font = '12px monospace';
-      ctx.textAlign = 'left';
-      ctx.fillText('Logical Pages:  14 Pages', 40, 430);
-      ctx.fillText('Duplex Sheets:  07 Physical Sheets', 40, 452);
-      ctx.fillText('Paper Grade:    80 GSM Chiffon Ivory', 40, 474);
-      ctx.fillText('Rate per Sheet: ₹3.00 (B&W + Color Mix)', 40, 496);
-      ctx.fillText('Total Paid:     ₹21.00 (UPI Verified)', 40, 518);
-
-      // Security Barcode & Footer
+      // Barcode & Footer
       ctx.fillStyle = '#1c1712';
-      for (let x = 40; x < 280; x += 4) {
+      for (let x = 160; x < 608; x += 6) {
         if (Math.sin(x * 123.4) > -0.2) {
-          ctx.fillRect(x, 580, x % 3 === 0 ? 3 : 1.5, 30);
+          ctx.fillRect(x, 990, x % 3 === 0 ? 4 : 2, 38);
         }
       }
+
       ctx.fillStyle = '#7a6d5d';
-      ctx.font = '10px sans-serif';
-      ctx.fillText('* PB-ORD-8942-CHENNAI *', 40, 630);
-      ctx.fillText('PRINT BOT WIN SPOOLER NATIVE v2.4 · ZERO COMMISSION', 40, 650);
+      ctx.font = '11px monospace';
+      ctx.fillText('* PB-SUBSCRIBE-OFFICIAL-2026 *', 384, 1045);
     });
 
     const artTexture = artData.texture;
@@ -748,7 +787,7 @@ export default function PrecisionPrinter({
           screenCtx.fill();
           screenCtx.fillStyle = '#ffffff';
           screenCtx.font = 'bold 28px Georgia, serif';
-          screenCtx.fillText(`Printing: ${Math.round(printProgress * 100)}%`, 28, 108);
+          screenCtx.fillText(`Printing Proposal: ${Math.round(printProgress * 100)}%`, 28, 108);
 
           // Progress bar track & fill
           screenCtx.fillStyle = '#1c2830';
@@ -758,7 +797,7 @@ export default function PrecisionPrinter({
 
           screenCtx.fillStyle = '#8ca8b8';
           screenCtx.font = '18px monospace';
-          screenCtx.fillText('Job #PB-104 · Thesis 2026 · Page 1/1', 28, 208);
+          screenCtx.fillText('₹1,499/mo Plan · Unlimited Printers · 1200 DPI', 28, 208);
         } else {
           screenCtx.fillStyle = '#30d158';
           screenCtx.beginPath();
@@ -766,14 +805,14 @@ export default function PrecisionPrinter({
           screenCtx.fill();
           screenCtx.fillStyle = '#ffffff';
           screenCtx.font = 'bold 28px Georgia, serif';
-          screenCtx.fillText('Ready to impress', 28, 108);
+          screenCtx.fillText('Subscribe to Print Bot', 28, 108);
 
           screenCtx.fillStyle = '#30d158';
           screenCtx.fillRect(28, 142, 456, 8);
 
           screenCtx.fillStyle = '#9cb3a8';
           screenCtx.font = '18px monospace';
-          screenCtx.fillText('A4 · DUPLEX · 300 DPI · winspool.drv OK', 28, 208);
+          screenCtx.fillText('0% Commission · winspool.drv Ready', 28, 208);
         }
         screenTex.needsUpdate = true;
       }

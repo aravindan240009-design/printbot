@@ -12,7 +12,6 @@ import {
   X,
   MoveUpRight,
   Monitor,
-  RotateCcw,
   Pause,
   Play,
   Sun,
@@ -53,7 +52,6 @@ export default function App() {
 
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
   const [dialog, setDialog] = useState(false);
-  const [printed, setPrinted] = useState(false);
   const [motionPaused, setMotionPaused] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
@@ -220,42 +218,27 @@ export default function App() {
 
             <div className="scene">
               {webgl ? (
-                <Suspense fallback={<RealisticPrinterFallback printing={printed} paused={motionPaused} />}>
+                <Suspense fallback={<RealisticPrinterFallback paused={motionPaused} />}>
                   <PrinterScene
-                    printing={printed}
                     paused={motionPaused}
                     soundEnabled={soundEnabled}
                     onFailure={() => setWebgl(false)}
                   />
                 </Suspense>
               ) : (
-                <RealisticPrinterFallback printing={printed} paused={motionPaused} />
+                <RealisticPrinterFallback paused={motionPaused} />
               )}
             </div>
 
             <div className="scene-label">
-              <span>Drag to rotate 360° · Designed around your workflow</span>
+              <span>Drag to rotate 360° · Autonomous live hardware spool</span>
               <span>
-                Ready when you are <span className="signal" />
+                Live printing · winspool.drv <span className="signal" />
               </span>
             </div>
 
-            {/* Clear, balanced controls */}
+            {/* Minimal Hardware Audio & Animation Pause Controls */}
             <div className="hero-art-controls">
-              <button
-                type="button"
-                className="hero-control-btn primary"
-                onClick={() => {
-                  setPrinted(!printed);
-                  setMotionPaused(false);
-                }}
-                aria-pressed={printed}
-              >
-                {printed ? <RotateCcw size={15} /> : <Printer size={15} />}
-                <span>{printed ? 'Print another impression' : 'Make an impression'}</span>
-                <ArrowUpRight size={15} />
-              </button>
-
               <div className="hero-control-group">
                 <button
                   type="button"
@@ -271,8 +254,8 @@ export default function App() {
                   type="button"
                   className="hero-icon-btn"
                   onClick={() => setMotionPaused(!motionPaused)}
-                  title={motionPaused ? 'Resume site animations' : 'Pause site animations'}
-                  aria-label={motionPaused ? 'Resume site animations' : 'Pause site animations'}
+                  title={motionPaused ? 'Resume live printing animation' : 'Pause live printing animation'}
+                  aria-label={motionPaused ? 'Resume live printing animation' : 'Pause live printing animation'}
                   aria-pressed={motionPaused}
                 >
                   {motionPaused ? <Play size={16} /> : <Pause size={16} />}

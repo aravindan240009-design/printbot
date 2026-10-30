@@ -75,8 +75,8 @@ export function RealisticPrinterFallback({ printing = false, paused = false }: R
               transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
             >
               <div className="fallback-sheet-header">
-                <b>ANNA XEROX & DIGITAL PRINTS</b>
-                <span>Job #PB-8942 · Thesis 2026 · Duplex A4</span>
+                <b>DOUBLE YOUR COUNTER SPEED</b>
+                <span>Keep 100% of your print revenue · Zero Commission</span>
               </div>
               <div className="fallback-sheet-lines">
                 <span />
@@ -84,7 +84,7 @@ export function RealisticPrinterFallback({ printing = false, paused = false }: R
                 <span />
               </div>
               <div className="fallback-sheet-footer">
-                VERIFIED BY WINSPOOL.DRV · PAID VIA UPI
+                SUBSCRIBE TODAY · ₹1,499/MO · UNLIMITED PRINTERS
               </div>
             </motion.div>
           </div>
