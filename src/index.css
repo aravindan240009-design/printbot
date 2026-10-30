@@ -3353,3 +3353,114 @@ html[data-motion=paused] [data-reveal],html[data-motion=paused] .section-heading
   background: #792d47;
   color: #ffffff;
 }
+
+/* ==========================================================================
+   PRODUCTION SPECIMEN BENCHMARKS & ARTWORK GALLERY
+   ========================================================================== */
+.specimen-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lime, #e2c18b);
+  background: rgba(226, 193, 139, 0.12);
+  border: 1px solid rgba(226, 193, 139, 0.25);
+  padding: 5px 14px;
+  border-radius: 999px;
+  margin-bottom: 14px;
+}
+
+:root[data-theme="light"] .specimen-badge {
+  color: #792d47;
+  background: rgba(121, 45, 71, 0.08);
+  border-color: rgba(121, 45, 71, 0.2);
+}
+
+.specimen-calibration-target {
+  width: 80px;
+  height: 80px;
+  margin: 18px auto;
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.specimen-features {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 16px auto 12px;
+  padding: 10px 20px;
+  background: rgba(33, 18, 25, 0.75);
+  border: 1px solid rgba(226, 193, 139, 0.2);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+:root[data-theme="light"] .specimen-features {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(121, 45, 71, 0.15);
+  box-shadow: 0 8px 24px rgba(121, 45, 71, 0.06);
+}
+
+.specimen-features .feature-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.specimen-features .feature-item strong {
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+
+:root[data-theme="light"] .specimen-features .feature-item strong {
+  color: #39232d;
+}
+
+.specimen-features .feature-item span {
+  font-size: 9px;
+  color: var(--muted, #ccb9b8);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+:root[data-theme="light"] .specimen-features .feature-item span {
+  color: #705c60;
+}
+
+.specimen-features .feature-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+:root[data-theme="light"] .specimen-features .feature-divider {
+  background: rgba(121, 45, 71, 0.18);
+}
+
+.specimen-footer-note {
+  display: block;
+  font-size: 10px;
+  color: var(--muted, #aa987b);
+  margin-top: 10px;
+  letter-spacing: 0.02em;
+}
+
+:root[data-theme="light"] .specimen-footer-note {
+  color: #705c60;
+}
+
+.artwork-blueprint,
+.artwork-thesis {
+  border-radius: 6px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+}
