@@ -1,19 +1,22 @@
 # Prevent Vercel from detecting and installing Python backend dependencies
-requirements.txt
-requirements-phase0.txt
-services/
-tests/
-fixtures/
-docs/
+/requirements.txt
+/requirements-phase0.txt
+/services/
+/tests/
+/fixtures/
+/docs/
 *.py
-.venv/
+/.venv/
 __pycache__/
 
 # Native desktop and Rust tools (not needed for web deployment)
-Cargo.toml
-Cargo.lock
-target/
-apps/desktop/src-tauri/
-tools/
+/Cargo.toml
+/Cargo.lock
+/target/
+/apps/desktop/src-tauri/
+/tools/
 *.exe
 
+# Never ignore frontend sources
+!src/**
+!apps/**/src/**
