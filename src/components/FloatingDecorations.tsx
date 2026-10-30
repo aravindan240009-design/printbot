@@ -5,55 +5,6 @@
 export function FloatingDecorations() {
   return (
     <div className="floating-decorations-container" aria-hidden="true">
-      {/* 1. Official Print Bot Certified Seal */}
-      <div className="floating-item float-item-1">
-        <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="60" cy="60" r="54" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" opacity="0.4" />
-          <circle cx="60" cy="60" r="48" stroke="currentColor" strokeWidth="1.5" opacity="0.6" />
-          <circle cx="60" cy="60" r="40" stroke="currentColor" strokeWidth="0.75" opacity="0.3" />
-          {/* Starburst rays */}
-          {Array.from({ length: 16 }).map((_, i) => (
-            <line
-              key={i}
-              x1="60"
-              y1="14"
-              x2="60"
-              y2="19"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              transform={`rotate(${i * 22.5} 60 60)`}
-              opacity="0.7"
-            />
-          ))}
-          <text x="60" y="56" textAnchor="middle" fill="currentColor" fontSize="7" fontWeight="700" letterSpacing="1.8" opacity="0.85">
-            PRINT BOT
-          </text>
-          <text x="60" y="68" textAnchor="middle" fill="currentColor" fontSize="6" fontWeight="600" letterSpacing="1.2" opacity="0.7">
-            CERTIFIED
-          </text>
-          <text x="60" y="78" textAnchor="middle" fill="currentColor" fontSize="5" fontWeight="500" letterSpacing="0.8" opacity="0.5">
-            ★ 2026 ★
-          </text>
-        </svg>
-      </div>
-
-      {/* 2. CMYK Translucent Ink Droplets with glossy reflections */}
-      <div className="floating-item float-item-2">
-        <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-          {/* Cyan */}
-          <circle cx="38" cy="40" r="22" fill="#00d2ff" fillOpacity="0.22" stroke="#00d2ff" strokeWidth="1.2" strokeOpacity="0.6" />
-          {/* Magenta */}
-          <circle cx="62" cy="40" r="22" fill="#ff007f" fillOpacity="0.22" stroke="#ff007f" strokeWidth="1.2" strokeOpacity="0.6" />
-          {/* Yellow */}
-          <circle cx="50" cy="60" r="22" fill="#ffe600" fillOpacity="0.22" stroke="#ffe600" strokeWidth="1.2" strokeOpacity="0.6" />
-          {/* Key / Center droplet */}
-          <circle cx="50" cy="47" r="10" fill="currentColor" fillOpacity="0.3" stroke="currentColor" strokeWidth="1" opacity="0.8" />
-          <text x="50" y="50" textAnchor="middle" fill="currentColor" fontSize="6" fontWeight="800" opacity="0.9">
-            CMYK
-          </text>
-        </svg>
-      </div>
-
       {/* 3. 3D Isometric Paper Sheet with folded corner */}
       <div className="floating-item float-item-3">
         <svg width="110" height="130" viewBox="0 0 110 130" fill="none" xmlns="http://www.w3.org/2000/svg">
