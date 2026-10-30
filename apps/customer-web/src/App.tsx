@@ -26,7 +26,7 @@ import {
   Store,
   Check
 } from 'lucide-react';
-import { MotionSurface, StudioHeader, useGsapStagger } from '@xerox/ui';
+import { MotionSurface, PrintBotLogo, ThemeSwitch, useGsapStagger } from '@xerox/ui';
 import { translations, Language } from './locales';
 import { openShopSession, scanFile, ServerQuote, ShopSession } from './api';
 
@@ -312,6 +312,7 @@ function CustomerFlow() {
   const [scanning, setScanning] = useState(false);
   const [mobileRatesOpen, setMobileRatesOpen] = useState(false);
   const [upiSimulated, setUpiSimulated] = useState(false);
+  const [showSandboxNotice, setShowSandboxNotice] = useState(true);
 
   // Live WebRTC Camera Scanner State
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -595,37 +596,124 @@ function CustomerFlow() {
 
   return (
     <div className="customer-app">
-      {/* Studio Top Header with Shop Brand & Controls */}
-      <StudioHeader title={t.title} subtitle={session.shop_name || c.example}>
-        <label className="customer-language">
-          <span className="sr-only">Language</span>
-          <select value={lang} onChange={(e) => setLang(e.target.value as Language)}>
-            <option value="en">English</option>
-            <option value="ta">தமிழ்</option>
-            <option value="hi">हिन्दी</option>
-          </select>
-        </label>
-      </StudioHeader>
-
-      {/* Non-intrusive Simulation / Preview Banner */}
-      {isPreviewSession && (
-        <div className="customer-preview-notice" role="note">
-          <div className="preview-badge-chip">
-            <Sparkles size={14} />
-            <span>{lang === 'ta' ? 'மாதிரி முன்னோட்டம்' : lang === 'hi' ? 'नमूना मोड' : 'Interactive Sandbox'}</span>
-          </div>
-          <div className="preview-text-block">
-            <strong>{session.shop_name} · Instant Counter Demo</strong>
-            <p>
+      {/* 1. DISCREET INTERACTIVE SANDBOX TOP-TICKER (Dismissible, only if preview session) */}
+      {isPreviewSession && showSandboxNotice && (
+        <div className="customer-sandbox-ticker" role="region" aria-label="Interactive Sandbox Notice">
+          <div className="sandbox-ticker-inner">
+            <span className="ticker-chip">
+              <Sparkles size={12} className="sparkle-spin" />
+              <span>{lang === 'ta' ? 'மாதிரி கவுண்டர்' : lang === 'hi' ? 'डेमो मोड' : 'Interactive Sandbox'}</span>
+            </span>
+            <span className="ticker-message">
               {lang === 'ta'
-                ? 'நேரடி விலைக் கணிப்பு மற்றும் மாதிரி அச்சு வரிசை சோதிக்கப்படுகிறது. உங்கள் கோப்புகளைப் பதிவேற்றி சரிபார்க்கவும்.'
+                ? 'நேரடி விலைக் கணிப்பு & Windows பிரிண்ட் வரிசை மாதிரி இயக்கம் · கட்டணம் தேவையில்லை.'
                 : lang === 'hi'
-                ? 'लाइव दर गणना और प्रिंट कतार का पूर्वावलोकन। फाइलें अपलोड करें और अनुभव जांचें।'
-                : 'Instant real-time price calculator & native Windows spooler simulation. Upload files to test the queue.'}
-            </p>
+                ? 'लाइव पेज गणित और Windows spooler सिमुलेशन सक्रिय · कोई वास्तविक भुगतान नहीं।'
+                : 'Real-time duplex sheet math & native Windows spooler simulation · Zero real payment charged'}
+            </span>
+            <span className="ticker-shop-pill">{session.shop_name}</span>
           </div>
+          <button
+            type="button"
+            className="ticker-dismiss-btn"
+            onClick={() => setShowSandboxNotice(false)}
+            title="Dismiss notice"
+            aria-label="Dismiss notice"
+          >
+            <X size={13} />
+          </button>
         </div>
       )}
+
+      {/* 2. BESPOKE ULTRA-PREMIUM CUSTOMER COUNTER HEADER */}
+      <header className="customer-hub-header">
+        <div className="customer-header-inner">
+          {/* Left: Brand Emblem + Official Shop Identity & Real-Time Status */}
+          <div className="customer-brand-cluster">
+            <a href="#main" className="customer-brand-emblem-wrap" title="Print Bot Platform">
+              <div className="customer-brand-emblem">
+                <PrintBotLogo size={36} />
+              </div>
+            </a>
+
+            {/* Desktop Shop Identity & Metadata */}
+            <div className="customer-shop-id-block desktop-only">
+              <div className="shop-name-row">
+                <span className="shop-official-name">{session.shop_name || c.example}</span>
+                <span className="counter-verified-pill" title="Certified Print Bot Counter">
+                  <ShieldCheck size={12} />
+                  <span>Verified Counter</span>
+                </span>
+                <span className="counter-live-beacon" title="Hardware Spooler Online">
+                  <span className="live-beacon-dot" />
+                  <span>Ready to Print</span>
+                </span>
+              </div>
+              <div className="shop-desk-meta">
+                <span className="desk-item"><MapPin size={11} /> Library Wing · Counter #2</span>
+                <span className="desk-sep">•</span>
+                <span className="desk-item"><Clock size={11} /> 8:30 AM – 9:30 PM</span>
+                <span className="desk-sep">•</span>
+                <span className="desk-item queue-tag"><Zap size={11} /> 0-Min Queue</span>
+              </div>
+            </div>
+
+            {/* Mobile Brand Title next to Logo */}
+            <div className="customer-mobile-brand mobile-only">
+              <span className="mobile-brand-title">Print Bot</span>
+            </div>
+          </div>
+
+          {/* Center: Live Counter Rate Strip (Desktop >= 960px) */}
+          <div className="customer-rates-strip desktop-only-inline">
+            <div className="header-rate-chip" title="Black & White Printing Rate">
+              <span className="chip-label">B&W</span>
+              <strong className="chip-val">{c.rateBw}</strong>
+            </div>
+            <div className="header-rate-chip" title="Full Color Laser Printing Rate">
+              <span className="chip-label">Color</span>
+              <strong className="chip-val">{c.rateColor}</strong>
+            </div>
+            <div className="header-rate-chip eco" title="Two-sided Duplex Paper Discount">
+              <span className="chip-label">Duplex</span>
+              <strong className="chip-val">-17%</strong>
+            </div>
+          </div>
+
+          {/* Right: Trilingual Segmented Switcher + Theme Switch + Live Order Summary */}
+          <div className="customer-header-controls">
+            {/* Live Upload Summary Chip (if user has uploaded documents) */}
+            {files.length > 0 && (
+              <div className="header-cart-chip" title="Files in printing queue">
+                <FileText size={13} />
+                <span>{files.length} {files.length === 1 ? 'file' : 'files'}</span>
+                <span className="cart-chip-divider">·</span>
+                <strong className="cart-chip-price">₹{(serverQuote?.total_rupees || 0).toFixed(2)}</strong>
+              </div>
+            )}
+
+            {/* Trilingual Segmented Pill Switcher */}
+            <div className="customer-lang-segmented" role="radiogroup" aria-label="Select Language">
+              {(['en', 'ta', 'hi'] as const).map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  className={`lang-segment-btn ${lang === l ? 'active' : ''}`}
+                  onClick={() => setLang(l)}
+                  role="radio"
+                  aria-checked={lang === l}
+                  title={l === 'en' ? 'English' : l === 'ta' ? 'தமிழ்' : 'हिन्दी'}
+                >
+                  {l === 'en' ? 'EN' : l === 'ta' ? 'தமிழ்' : 'हिंदी'}
+                </button>
+              ))}
+            </div>
+
+            {/* Haute Theme Switcher */}
+            <ThemeSwitch />
+          </div>
+        </div>
+      </header>
 
       {/* MOBILE ONLY (< 860px): Compact Shop Counter Header with Quick Rates Accordion */}
       <div className="customer-mobile-shop-bar mobile-only">
@@ -817,7 +905,14 @@ function CustomerFlow() {
                     </span>
                     <span className="step-label-group">
                       <span className="step-index">Step 0{item.stepNum}</span>
-                      <span className="step-text">{item.label.replace(/^\d\.\s*/, '')}</span>
+                      <span className="step-text desktop-only-inline">{item.label.replace(/^\d\.\s*/, '')}</span>
+                      <span className="step-text mobile-only-inline">
+                        {item.stepNum === 1
+                          ? (lang === 'ta' ? 'பதிவேற்று' : lang === 'hi' ? 'अपलोड' : 'Upload')
+                          : item.stepNum === 2
+                          ? (lang === 'ta' ? 'அமைப்புகள்' : lang === 'hi' ? 'विकल्प' : 'Options')
+                          : (lang === 'ta' ? 'கட்டணம்' : lang === 'hi' ? 'भुगतान' : 'Pay')}
+                      </span>
                     </span>
                     {item.count !== undefined && item.count > 0 && (
                       <span className="step-badge-counter">{item.count}</span>

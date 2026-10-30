@@ -3595,3 +3595,419 @@ h1, h2, h3 { font-family: 'Manrope', -apple-system, sans-serif; letter-spacing: 
 .btn-nav-next:hover, .btn-nav-pay:hover, .customer-primary:hover {
   background: var(--pb-accent-hover) !important;
 }
+
+
+/* ==========================================================================
+   ULTRA-PREMIUM BESPOKE CUSTOMER COUNTER HEADER
+   ========================================================================== */
+
+/* 1. Dismissible Top Micro-Ticker */
+.customer-sandbox-ticker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px var(--pb-gutter);
+  margin: 0 calc(-1 * var(--pb-gutter));
+  background: linear-gradient(90deg, rgba(212, 175, 55, 0.12) 0%, rgba(14, 165, 233, 0.1) 100%);
+  border-bottom: 1px solid var(--pb-border-gold);
+  font-size: 11.5px;
+  position: relative;
+  z-index: 101;
+}
+.sandbox-ticker-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.ticker-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--pb-accent-soft);
+  color: var(--pb-accent);
+  font-weight: 750;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.ticker-message {
+  color: var(--pb-text);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ticker-shop-pill {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: var(--pb-raised);
+  border: 1px solid var(--pb-border);
+  color: var(--pb-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.ticker-dismiss-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 22px !important;
+  height: 22px !important;
+  min-width: 22px !important;
+  min-height: 22px !important;
+  max-width: 22px !important;
+  max-height: 22px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  border: none !important;
+  background: transparent !important;
+  color: var(--pb-muted) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  flex-shrink: 0 !important;
+  box-shadow: none !important;
+}
+.ticker-dismiss-btn:hover {
+  background: rgba(0, 0, 0, 0.08) !important;
+  color: var(--pb-text) !important;
+}
+:root[data-theme="dark"] .ticker-dismiss-btn:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* 2. Customer Hub Sticky Header */
+.customer-hub-header {
+  position: sticky !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 100 !important;
+  margin: 0 calc(-1 * var(--pb-gutter));
+  padding: 0 var(--pb-gutter);
+  background: var(--pb-surface-glass) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid var(--pb-border-gold) !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.05) !important;
+}
+
+.customer-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 68px;
+  padding: 10px 0;
+}
+
+/* Left: Brand Cluster */
+.customer-brand-cluster {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.customer-brand-emblem-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.customer-brand-emblem-wrap:hover {
+  transform: translateY(-1px) scale(1.03);
+}
+.customer-brand-emblem {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--pb-surface);
+  border: 1px solid var(--pb-border-gold);
+  box-shadow: var(--pb-gold-glow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.customer-shop-id-block {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.shop-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.shop-official-name {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--pb-text);
+  letter-spacing: -0.025em;
+  white-space: nowrap;
+}
+.counter-verified-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.counter-live-beacon {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--pb-accent-soft);
+  border: 1px solid var(--pb-border-gold);
+  color: var(--pb-accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+.live-beacon-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: pulse-beacon 2s infinite ease-in-out;
+}
+@keyframes pulse-beacon {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+.shop-desk-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--pb-muted);
+  flex-wrap: wrap;
+}
+.desk-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.desk-sep {
+  opacity: 0.35;
+  font-size: 10px;
+}
+.queue-tag {
+  color: #10b981;
+  font-weight: 650;
+}
+
+/* Center: Rates Strip (Desktop >= 960px) */
+.customer-rates-strip {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-shrink: 0 !important;
+}
+.header-rate-chip,
+.rate-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 5px 12px !important;
+  border-radius: 8px !important;
+  background: var(--pb-raised) !important;
+  border: 1px solid var(--pb-border) !important;
+  font-size: 12px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  transition: transform 0.18s ease, border-color 0.18s ease !important;
+}
+.header-rate-chip:hover,
+.rate-badge:hover {
+  transform: translateY(-1px) !important;
+  border-color: var(--pb-border-gold) !important;
+}
+.header-rate-chip .chip-label,
+.rate-badge .rate-badge-label {
+  color: var(--pb-muted) !important;
+  font-weight: 600 !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.03em !important;
+}
+.header-rate-chip .chip-val,
+.rate-badge .rate-badge-price {
+  color: var(--pb-text) !important;
+  font-weight: 800 !important;
+  font-variant-numeric: tabular-nums !important;
+  margin-left: 2px !important;
+}
+.header-rate-chip.eco,
+.rate-badge.discount {
+  background: var(--pb-accent-soft) !important;
+  border-color: var(--pb-border-gold) !important;
+}
+.header-rate-chip.eco .chip-val,
+.rate-badge.discount .rate-badge-price {
+  color: var(--pb-accent) !important;
+}
+
+/* Right: Controls & Switchers */
+.customer-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* Live Upload Summary Chip */
+.header-cart-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--pb-accent-soft);
+  border: 1px solid var(--pb-border-gold);
+  color: var(--pb-text);
+  font-size: 12px;
+  font-weight: 600;
+  animation: fadeInChip 0.25s ease-out;
+}
+.cart-chip-divider {
+  opacity: 0.4;
+}
+.cart-chip-price {
+  color: var(--pb-accent);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Trilingual Segmented Pill Switcher */
+.customer-lang-segmented {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--pb-raised);
+  border: 1px solid var(--pb-border);
+  gap: 2px;
+}
+.lang-segment-btn {
+  min-height: 32px !important;
+  height: 32px !important;
+  padding: 0 10px !important;
+  border-radius: 7px !important;
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--pb-muted) !important;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.lang-segment-btn:hover {
+  color: var(--pb-text) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+.lang-segment-btn.active {
+  background: var(--pb-surface) !important;
+  color: var(--pb-accent) !important;
+  font-weight: 800 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  border: 1px solid var(--pb-border-gold) !important;
+}
+
+/* Responsiveness */
+@media (max-width: 980px) {
+  .customer-rates-strip {
+    display: none !important;
+  }
+}
+@media (max-width: 860px) {
+  .customer-hub-header {
+    margin: 0 -16px !important;
+    padding: 0 16px !important;
+  }
+  .customer-header-inner {
+    min-height: 58px;
+    padding: 8px 0;
+    gap: 10px;
+  }
+  .shop-desk-meta {
+    display: none !important;
+  }
+  .counter-verified-pill {
+    display: none !important;
+  }
+  .shop-official-name {
+    font-size: 14.5px;
+  }
+  .customer-brand-emblem {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+  }
+  .lang-segment-btn {
+    padding: 0 8px !important;
+    font-size: 11px !important;
+  }
+  .ticker-message {
+    display: none !important;
+  }
+}
+@media (max-width: 440px) {
+  .customer-mobile-brand {
+    display: none !important;
+  }
+}
+
+
+/* Inline Responsive Utilities & Mobile Header Branding */
+.desktop-only-inline {
+  display: inline-block !important;
+}
+.mobile-only-inline {
+  display: none !important;
+}
+
+@media (max-width: 860px) {
+  .desktop-only-inline {
+    display: none !important;
+  }
+  .mobile-only-inline {
+    display: inline-block !important;
+  }
+}
+
+.customer-mobile-brand {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.mobile-brand-title {
+  font-size: 14.5px;
+  font-weight: 800;
+  color: var(--pb-text);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.mobile-brand-sub {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--pb-accent);
+}
