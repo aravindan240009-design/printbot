@@ -17,11 +17,18 @@ import {
   Clock,
   Sparkles,
   RotateCcw,
-  X
+  X,
+  ChevronDown,
+  ChevronUp,
+  Layers,
+  Zap,
+  MapPin,
+  Store,
+  Check
 } from 'lucide-react';
-import { MotionSurface, StudioHeader, useGsapStagger, Select } from '@xerox/ui';
+import { MotionSurface, StudioHeader, useGsapStagger } from '@xerox/ui';
 import { translations, Language } from './locales';
-import { openShopSession, quoteFiles, scanFile, ServerQuote, ShopSession } from './api';
+import { openShopSession, scanFile, ServerQuote, ShopSession } from './api';
 
 interface Options {
   copies: number;
@@ -54,7 +61,7 @@ interface PlacedOrder {
   totalLogicalPages: number;
   paymentMethod: string;
   placedAt: string;
-  files: Array<{ name: string; copies: number; colorMode: string; sheets: number }>;
+  files: Array<{ name: string; copies: number; colorMode: string; sheets: number; duplex: string; paperSize: string }>;
 }
 
 const defaults: Options = {
@@ -79,29 +86,36 @@ const defaultShopSession: ShopSession = {
 const copy = {
   en: {
     welcome: 'Your documents. Beautifully printed.',
-    intro: 'Upload your documents, choose B&W or color print settings, and collect directly from the counter.',
+    intro: 'Self-service mobile print queue for Anna University. Upload from phone or laptop, pick up at counter in under 2 minutes.',
     select: 'Select Documents',
     selected: 'Uploaded Files',
     configure: 'Print Settings',
     review: 'Review & Pay',
-    advanced: 'Page Layout & Duplex Options',
+    advanced: 'Advanced Page Layout & Finishing',
     next: 'Continue to Options',
-    back: 'Back to Documents',
+    back: 'Back',
     pending: 'Price Quote Ready',
     workflow: 'Direct to Counter Printer',
-    workflowInfo: 'Once submitted, your job is sent directly to the shop printer queue.',
+    workflowInfo: 'Once submitted, your job is sent directly to the shop printer queue with zero manual queue wait.',
     options: 'Print Settings',
     payment: 'Select Payment Method',
     empty: 'No documents uploaded yet',
     fileInfo: 'PDF, Word, Excel, PPT, JPG, PNG · Up to 100 MB per file',
     verifiedInfo: 'Calculated in real-time according to shop pricing.',
     example: 'Anna University Quick Xerox · Guindy',
-    privacy: '100% Private · Zero Account Required',
+    privacy: '100% Private · Zero Account Required · Auto-deleted after collection',
     clear: 'Clear queue',
+    ratesTitle: 'Standard Counter Rates',
+    rateBw: '₹1.50',
+    rateColor: '₹7.00',
+    rateDuplex: '₹2.50',
+    ratesHint: 'Duplex saves 17% on paper',
+    hours: '8:30 AM – 9:30 PM (Mon - Sat)',
+    location: 'Guindy Campus, Library Wing Counter #2',
   },
   ta: {
     welcome: 'துல்லியமான அச்சுக்கலை. உடனடி ஜெராக்ஸ்.',
-    intro: 'உயர்தர ஆவண அச்சிடுதல். உங்கள் கோப்புகளைப் பதிவேற்றி, கவுண்டரில் உடனடியாகப் பெற்றுக் கொள்ளுங்கள்.',
+    intro: 'அண்ணா பல்கலைக்கழக விரைவு அச்சிடும் தளம். உங்கள் தொலைபேசியிலிருந்து பதிவேற்றி, 2 நிமிடங்களில் கவுண்டரில் பெற்றுக் கொள்ளுங்கள்.',
     select: 'முதன்மை ஆவணங்களைத் தேர்ந்தெடுக்கவும்',
     selected: 'வரிசையில் உள்ள கோப்புகள்',
     configure: 'அச்சிடும் அமைப்புகள்',
@@ -118,12 +132,19 @@ const copy = {
     fileInfo: 'PDF, PNG, JPG, DOCX, XLSX, PPTX · கோப்புக்கு 100 MB வரை',
     verifiedInfo: 'கடை விலை அட்டவணையின்படி கணக்கிடப்பட்டது.',
     example: 'அண்ணா பல்கலைக்கழக ஜெராக்ஸ் · கிண்டி',
-    privacy: 'வாடிக்கையாளருக்குக் கணக்கு தேவையில்லை',
+    privacy: 'வாடிக்கையாளருக்குக் கணக்கு தேவையில்லை · அச்சிட்ட பின் அழிக்கப்படும்',
     clear: 'வரிசையை அழிக்கவும்',
+    ratesTitle: 'நிலையான கவுண்டர் கட்டணங்கள்',
+    rateBw: '₹1.50',
+    rateColor: '₹7.00',
+    rateDuplex: '₹2.50',
+    ratesHint: 'இருபுற அச்சிடுதலில் 17% தள்ளுபடி',
+    hours: 'காலை 8:30 – இரவு 9:30 (திங்கள் - சனி)',
+    location: 'கிண்டி வளாகம், நூலகப் பிரிவு கவுண்டர் #2',
   },
   hi: {
     welcome: 'सटीक प्रिंटिंग। शून्य प्रतीक्षा।',
-    intro: 'उत्कृष्ट गुणवत्ता वाले दस्तावेज़ प्रिंट। अपनी फ़ाइलें अपलोड करें और काउंटर से तुरंत प्राप्त करें।',
+    intro: 'अन्ना यूनिवर्सिटी त्वरित प्रिंट सेवा। अपने फोन से दस्तावेज अपलोड करें और काउंटर से तुरंत प्राप्त करें।',
     select: 'अपने मुख्य दस्तावेज़ चुनें',
     selected: 'कतारबद्ध फ़ाइलें',
     configure: 'विस्तृत प्रिंट विकल्प',
@@ -140,8 +161,15 @@ const copy = {
     fileInfo: 'PDF, PNG, JPG, DOCX, XLSX, PPTX · प्रति फ़ाइल 100 MB',
     verifiedInfo: 'दुकान की दर सूची के अनुसार सटीक गणना।',
     example: 'अन्ना यूनिवर्सिटी ज़ेरॉक्स · गिंडी',
-    privacy: 'किसी खाते की आवश्यकता नहीं · अल्पकालिक मेमोरी',
+    privacy: 'किसी खाते की आवश्यकता नहीं · प्रिंट के बाद स्वतः नष्ट',
     clear: 'कतार साफ़ करें',
+    ratesTitle: 'मानक काउंटर दरें',
+    rateBw: '₹1.50',
+    rateColor: '₹7.00',
+    rateDuplex: '₹2.50',
+    ratesHint: 'डबल-साइड प्रिंट पर 17% की बचत',
+    hours: 'सुबह 8:30 – रात 9:30 (सोम - शनि)',
+    location: 'गिंडी कैंपस, लाइब्रेरी विंग काउंटर #2',
   },
 };
 
@@ -222,9 +250,9 @@ function calculateLocalQuote(files: DocumentSelection[]): ServerQuote {
     totalSheets += sheetsPerCopy * copies;
 
     // Base rates in paise:
-    // B&W: ₹1.50 (150 paise), Color: ₹10.00 (1000 paise), Grayscale: ₹2.00 (200 paise)
+    // B&W: ₹1.50 (150 paise), Color: ₹7.00 (700 paise), Grayscale: ₹2.00 (200 paise)
     const baseSideRate =
-      f.options.colorMode === 'color' ? 1000 : f.options.colorMode === 'grayscale' ? 200 : 150;
+      f.options.colorMode === 'color' ? 700 : f.options.colorMode === 'grayscale' ? 200 : 150;
 
     const paperMultipliers: Record<string, number> = {
       A4: 1.0,
@@ -282,6 +310,8 @@ function CustomerFlow() {
   const [serverQuote, setServerQuote] = useState<ServerQuote | null>(null);
   const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [mobileRatesOpen, setMobileRatesOpen] = useState(false);
+  const [upiSimulated, setUpiSimulated] = useState(false);
 
   // Live WebRTC Camera Scanner State
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -392,7 +422,6 @@ function CustomerFlow() {
     setCapturedPreview(null);
   };
 
-  // Sync video stream when camera opens
   useEffect(() => {
     if (cameraOpen && cameraStream && videoRef.current) {
       videoRef.current.srcObject = cameraStream;
@@ -400,7 +429,6 @@ function CustomerFlow() {
     }
   }, [cameraOpen, cameraStream, capturedPreview]);
 
-  // Clean up media stream when component unmounts
   useEffect(() => {
     return () => {
       if (cameraStream) {
@@ -419,7 +447,6 @@ function CustomerFlow() {
     document.documentElement.lang = lang;
   }, [lang]);
 
-  // Attempt QR resolution if present in URL
   useEffect(() => {
     const qrCode = new URLSearchParams(window.location.search).get('qr');
     if (!qrCode) return;
@@ -430,7 +457,6 @@ function CustomerFlow() {
       });
   }, []);
 
-  // Compute live quote based on current file configurations
   const quote = useMemo(() => {
     if (!files.length) return null;
     if (serverQuote) return serverQuote;
@@ -452,7 +478,6 @@ function CustomerFlow() {
         continue;
       }
 
-      // Count pages immediately
       const pages = await inspectFilePages(file);
 
       accepted.push({
@@ -475,9 +500,11 @@ function CustomerFlow() {
 
     const nextFiles = [...files, ...accepted];
     setFiles(nextFiles);
+    if (!activeId && nextFiles.length > 0) {
+      setActiveId(nextFiles[0].id);
+    }
     setServerQuote(null);
 
-    // Try server scan in background if live API is connected
     if (accepted.length && session && session.session_token !== defaultShopSession.session_token) {
       setScanning(true);
       try {
@@ -492,7 +519,7 @@ function CustomerFlow() {
           })
         );
       } catch {
-        // Local calculation is already active and accurate
+        // Local calculation is active
       } finally {
         setScanning(false);
       }
@@ -546,7 +573,9 @@ function CustomerFlow() {
       files: files.map((f) => ({
         name: f.name,
         copies: f.options.copies,
-        colorMode: f.options.colorMode === 'color' ? 'Color' : 'B&W',
+        colorMode: f.options.colorMode === 'color' ? 'Color' : f.options.colorMode === 'grayscale' ? 'Grayscale' : 'B&W',
+        duplex: f.options.duplex === 'simplex' ? 'Single side' : 'Double side',
+        paperSize: f.options.paperSize,
         sheets: Math.ceil((f.pageCount || 1) / (f.options.duplex === 'simplex' ? 1 : 2)) * f.options.copies,
       })),
     };
@@ -561,10 +590,12 @@ function CustomerFlow() {
     setServerQuote(null);
     setPlacedOrder(null);
     setStep(1);
+    setUpiSimulated(false);
   };
 
   return (
     <div className="customer-app">
+      {/* Studio Top Header with Shop Brand & Controls */}
       <StudioHeader title={t.title} subtitle={session.shop_name || c.example}>
         <label className="customer-language">
           <span className="sr-only">Language</span>
@@ -576,79 +607,229 @@ function CustomerFlow() {
         </label>
       </StudioHeader>
 
+      {/* Non-intrusive Simulation / Preview Banner */}
       {isPreviewSession && (
         <div className="customer-preview-notice" role="note">
-          <ShieldCheck size={19} aria-hidden="true" />
-          <div>
-            <strong>{lang === 'ta' ? 'முன்னோட்ட அமர்வு' : lang === 'hi' ? 'पूर्वावलोकन सत्र' : 'Preview session'}</strong>
-            <p>{lang === 'ta' ? 'விலைகளும் மாதிரி ஆர்டர்களும் இந்தச் சாதனத்தில் மட்டுமே. பணம் சரிபார்க்கப்படாது; உண்மையான அச்சிடுதல் தொடங்காது. ஆர்டர் செய்ய கடையின் QR குறியீட்டை ஸ்கேன் செய்யவும்.' : lang === 'hi' ? 'कीमतें और नमूना ऑर्डर इस डिवाइस पर ही हैं। भुगतान सत्यापित नहीं होता और वास्तविक प्रिंट नहीं भेजा जाता। ऑर्डर के लिए दुकान का QR स्कैन करें।' : 'Prices and sample orders are local to this device. No payment is verified and no real print job is dispatched. Scan the shop’s QR to begin an order.'}</p>
+          <div className="preview-badge-chip">
+            <Sparkles size={14} />
+            <span>{lang === 'ta' ? 'மாதிரி முன்னோட்டம்' : lang === 'hi' ? 'नमूना मोड' : 'Interactive Sandbox'}</span>
+          </div>
+          <div className="preview-text-block">
+            <strong>{session.shop_name} · Instant Counter Demo</strong>
+            <p>
+              {lang === 'ta'
+                ? 'நேரடி விலைக் கணிப்பு மற்றும் மாதிரி அச்சு வரிசை சோதிக்கப்படுகிறது. உங்கள் கோப்புகளைப் பதிவேற்றி சரிபார்க்கவும்.'
+                : lang === 'hi'
+                ? 'लाइव दर गणना और प्रिंट कतार का पूर्वावलोकन। फाइलें अपलोड करें और अनुभव जांचें।'
+                : 'Instant real-time price calculator & native Windows spooler simulation. Upload files to test the queue.'}
+            </p>
           </div>
         </div>
       )}
+
+      {/* MOBILE ONLY (< 860px): Compact Shop Counter Header with Quick Rates Accordion */}
+      <div className="customer-mobile-shop-bar mobile-only">
+        <div className="mobile-shop-main-row">
+          <div className="mobile-shop-avatar">
+            <Store size={18} />
+          </div>
+          <div className="mobile-shop-info">
+            <div className="mobile-shop-title-row">
+              <strong className="mobile-shop-name">{session.shop_name}</strong>
+              <span className="mobile-shop-open-pill">
+                <span className="live-dot" />
+                Open
+              </span>
+            </div>
+            <div className="mobile-shop-sub">
+              <span>B&W: <strong>{c.rateBw}</strong></span>
+              <span className="dot-sep">·</span>
+              <span>Color: <strong>{c.rateColor}</strong></span>
+              <span className="dot-sep">·</span>
+              <span className="eco-tag">Duplex -17%</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn-toggle-mobile-rates"
+            onClick={() => setMobileRatesOpen(!mobileRatesOpen)}
+            aria-expanded={mobileRatesOpen}
+          >
+            <span>{mobileRatesOpen ? 'Hide' : 'Rates'}</span>
+            {mobileRatesOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+          </button>
+        </div>
+
+        {/* Collapsible Mobile Rate & Hours Sheet */}
+        {mobileRatesOpen && (
+          <div className="mobile-rates-drawer animate-slide-down">
+            <div className="mobile-rates-grid">
+              <div className="rate-pill-card">
+                <span className="rate-type">Black &amp; White</span>
+                <span className="rate-cost">{c.rateBw} <small>/ page</small></span>
+              </div>
+              <div className="rate-pill-card highlight">
+                <span className="rate-type">Full Color</span>
+                <span className="rate-cost">{c.rateColor} <small>/ page</small></span>
+              </div>
+              <div className="rate-pill-card">
+                <span className="rate-type">Duplex (2-Sided)</span>
+                <span className="rate-cost">{c.rateDuplex} <small>/ sheet</small></span>
+              </div>
+              <div className="rate-pill-card">
+                <span className="rate-type">Finishing</span>
+                <span className="rate-cost">Spiral from ₹40</span>
+              </div>
+            </div>
+            <div className="mobile-rates-meta">
+              <div className="meta-line"><Clock size={13} /> <span>{c.hours}</span></div>
+              <div className="meta-line"><MapPin size={13} /> <span>{c.location}</span></div>
+              <div className="meta-line privacy"><ShieldCheck size={13} /> <span>{c.privacy}</span></div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Main Two-Column Layout */}
       <div className="customer-layout">
-        <aside className="customer-welcome">
-          <div className="customer-eyebrow-row">
-            <span className="customer-eyebrow">
-              <Printer size={13} /> DOCUMENT PRINTING
-            </span>
-            <span className="customer-live-pill">
-              <span className="live-pulse"></span>
-              Shop print portal
-            </span>
-          </div>
-          <h1 className="customer-headline">
-            <span className="headline-main">{c.welcome}</span>
-          </h1>
-          <p className="customer-intro">{c.intro}</p>
-
-          {/* Clean Authentic Indian Counter Rate Card */}
-          <div className="customer-dispatch-card" style={{ padding: '18px', background: 'var(--pb-surface)', borderRadius: '16px', border: '1px solid var(--pb-border)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid var(--pb-border)' }}>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--pb-text)' }}>Standard Counter Rates</span>
-              <span style={{ fontSize: '11px', color: '#10b981', background: 'rgba(16, 185, 129, 0.12)', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>{isPreviewSession ? 'Sample' : 'Rate guide'}</span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '12px' }}>
-              <div style={{ background: 'var(--pb-raised)', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--pb-border)' }}>
-                <div style={{ fontSize: '11px', color: 'var(--pb-muted)' }}>Black &amp; White</div>
-                <div style={{ fontSize: '16px', fontWeight: 750, color: 'var(--pb-text)', marginTop: '2px' }}>₹1.50 <small style={{ fontSize: '11px', fontWeight: 400, color: 'var(--pb-muted)' }}>/ page</small></div>
+        {/* DESKTOP ONLY: Left Counter Welcome Column */}
+        <aside className="customer-welcome desktop-only">
+          <div className="customer-shop-card">
+            {/* Shop Photo with Live Badge */}
+            <div className="customer-shop-cover">
+              <div className="cover-overlay-gradient" />
+              <div className="cover-status-badge">
+                <span className="live-pulse-dot" />
+                <span>Workstation Online · Spooler Ready</span>
               </div>
-              <div style={{ background: 'var(--pb-raised)', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--pb-border)' }}>
-                <div style={{ fontSize: '11px', color: 'var(--pb-muted)' }}>Full Color</div>
-                <div style={{ fontSize: '16px', fontWeight: 750, color: 'var(--pb-accent)', marginTop: '2px' }}>₹7.00 <small style={{ fontSize: '11px', fontWeight: 400, color: 'var(--pb-muted)' }}>/ page</small></div>
+              <div className="cover-shop-badge">
+                <Store size={15} />
+                <span>Verified Counter #2</span>
               </div>
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--pb-muted)', display: 'flex', justifyContent: 'space-between' }}>
-              <span>Paper: A4 · A3 · Legal</span>
-              <span>Duplex (2-Sided) Available</span>
-            </div>
-          </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '11px 14px', background: 'var(--pb-raised)', borderRadius: '12px', border: '1px solid var(--pb-border)', color: 'var(--pb-muted)', fontSize: '12.5px', marginTop: '16px' }}>
-            <ShieldCheck size={16} color="#10b981" style={{ flexShrink: 0 }} />
-            <span style={{ color: 'var(--pb-text)', fontWeight: 500 }}>Your files belong to this shop session. No account required.</span>
+            <div className="customer-shop-body">
+              <div className="customer-eyebrow-row">
+                <span className="customer-eyebrow">
+                  <Printer size={13} /> DOCUMENT PRINTING
+                </span>
+                <span className="customer-live-pill">
+                  <span className="live-pulse" />
+                  Direct Spooler Queue
+                </span>
+              </div>
+
+              <h1 className="customer-headline">
+                <span className="headline-main">{c.welcome}</span>
+              </h1>
+              <p className="customer-intro">{c.intro}</p>
+
+              {/* Standard Counter Rate Card */}
+              <div className="customer-dispatch-card">
+                <div className="rate-card-header">
+                  <span className="rate-card-title">
+                    <Zap size={14} className="text-gold" /> {c.ratesTitle}
+                  </span>
+                  <span className="rate-tag-sample">{isPreviewSession ? 'Live Rates' : 'Official Table'}</span>
+                </div>
+
+                <div className="rates-grid-desktop">
+                  <div className="rate-cell">
+                    <div className="rate-label">Black &amp; White</div>
+                    <div className="rate-val">
+                      {c.rateBw} <small>/ page</small>
+                    </div>
+                    <span className="rate-subtext">75 GSM High Speed</span>
+                  </div>
+                  <div className="rate-cell active-rate">
+                    <div className="rate-label">Full Color</div>
+                    <div className="rate-val text-accent">
+                      {c.rateColor} <small>/ page</small>
+                    </div>
+                    <span className="rate-subtext">Laser Toner CMYK</span>
+                  </div>
+                </div>
+
+                <div className="duplex-callout-strip">
+                  <div className="duplex-callout-left">
+                    <Layers size={15} />
+                    <span><strong>Duplex (2-Sided):</strong> {c.rateDuplex} / sheet</span>
+                  </div>
+                  <span className="eco-badge">{c.ratesHint}</span>
+                </div>
+
+                <div className="rate-specs-row">
+                  <span>Paper: <strong>A4 · A3 · Legal · A5</strong></span>
+                  <span>Finishing: <strong>Staple · Spiral · Binding</strong></span>
+                </div>
+              </div>
+
+              {/* Shop Operational Details */}
+              <div className="customer-operating-box">
+                <div className="op-item">
+                  <Clock size={15} className="text-gold" />
+                  <div>
+                    <strong>Hours:</strong> {c.hours}
+                  </div>
+                </div>
+                <div className="op-item">
+                  <MapPin size={15} className="text-gold" />
+                  <div>
+                    <strong>Location:</strong> {c.location}
+                  </div>
+                </div>
+              </div>
+
+              {/* Security & Privacy Guarantee */}
+              <div className="customer-privacy-box">
+                <ShieldCheck size={18} color="#10b981" style={{ flexShrink: 0 }} />
+                <span>{c.privacy}</span>
+              </div>
+            </div>
           </div>
         </aside>
 
+        {/* Right Main Flow Column */}
         <main className="customer-main" id="main">
           {/* Progress Steps Header */}
           {step <= 3 && (
             <nav className="customer-steps" aria-label="Order steps">
-              {[t.step1_upload, t.step2_config, t.step3_pay].map((label, i) => (
-                <button
-                  key={i}
-                  disabled={i > 0 && (!files.length || (i === 2 && !rangeValid))}
-                  aria-current={step === i + 1 ? 'step' : undefined}
-                  onClick={() => setStep(i + 1)}
-                >
-                  <span className="step-num">{i === 0 ? <Upload size={15} /> : i === 1 ? <SlidersHorizontal size={15} /> : <LockKeyhole size={15} />}<span>{String(i + 1).padStart(2, '0')}</span></span>
-                  <span className="step-label">{label.replace(/^\d\.\s*/, '')}</span>
-                </button>
-              ))}
+              {[
+                { label: t.step1_upload, icon: Upload, stepNum: 1, count: files.length },
+                { label: t.step2_config, icon: SlidersHorizontal, stepNum: 2 },
+                { label: t.step3_pay, icon: LockKeyhole, stepNum: 3 },
+              ].map((item, i) => {
+                const Icon = item.icon;
+                const isActive = step === item.stepNum;
+                const isPassed = step > item.stepNum;
+                const isDisabled = i > 0 && (!files.length || (i === 2 && !rangeValid));
+
+                return (
+                  <button
+                    key={i}
+                    disabled={isDisabled}
+                    aria-current={isActive ? 'step' : undefined}
+                    onClick={() => setStep(item.stepNum)}
+                    className={`step-btn ${isActive ? 'step-active' : ''} ${isPassed ? 'step-completed' : ''}`}
+                  >
+                    <span className="step-icon-wrap">
+                      {isPassed ? <Check size={14} /> : <Icon size={14} />}
+                    </span>
+                    <span className="step-label-group">
+                      <span className="step-index">Step 0{item.stepNum}</span>
+                      <span className="step-text">{item.label.replace(/^\d\.\s*/, '')}</span>
+                    </span>
+                    {item.count !== undefined && item.count > 0 && (
+                      <span className="step-badge-counter">{item.count}</span>
+                    )}
+                  </button>
+                );
+              })}
             </nav>
           )}
 
           <MotionSurface transitionKey={step} className="customer-step">
-            {/* Step 1: Upload */}
+            {/* STEP 1: Upload Documents */}
             {step === 1 && (
               <>
                 <div className="customer-section-heading">
@@ -656,9 +837,10 @@ function CustomerFlow() {
                     <span className="section-step-badge">01 / 03</span>
                     <h2>{c.select}</h2>
                   </div>
-                  <span className="section-meta-hint">No account required · Price estimate</span>
+                  <span className="section-meta-hint">Instant Quote · No Signup</span>
                 </div>
 
+                {/* Modern Drag and Drop Zone */}
                 <label className="customer-upload">
                   <input
                     aria-label={t.upload_cta}
@@ -672,32 +854,38 @@ function CustomerFlow() {
                   />
                   <div className="customer-upload-seal">
                     <span className="customer-upload-icon">
-                      <Upload size={28} />
+                      <Upload size={30} />
                     </span>
                   </div>
                   <strong className="upload-title">{t.upload_cta}</strong>
-                  <p className="upload-subtitle">Choose documents from your phone or computer</p>
+                  <p className="upload-subtitle">Choose PDF, Word, Excel, or photos from your device</p>
+
                   <div className="upload-format-chips">
-                    <span>PDF</span>
-                    <span>DOCX</span>
-                    <span>XLSX</span>
-                    <span>PPTX</span>
-                    <span>PNG</span>
-                    <span>JPG</span>
+                    <span className="format-tag pdf">PDF</span>
+                    <span className="format-tag docx">DOCX</span>
+                    <span className="format-tag xlsx">XLSX</span>
+                    <span className="format-tag pptx">PPTX</span>
+                    <span className="format-tag img">PNG/JPG</span>
                     <span className="format-limit">Up to 100 MB</span>
                   </div>
                 </label>
 
+                {/* Instant Camera Paper Scan Button */}
                 <button
                   type="button"
-                  className="customer-camera"
+                  className="customer-camera-btn"
                   onClick={() => startCamera('environment')}
                 >
-                  <div className="camera-icon-disc">
-                    <Camera size={18} />
+                  <div className="camera-btn-left">
+                    <div className="camera-icon-bubble">
+                      <Camera size={19} />
+                    </div>
+                    <div className="camera-text-col">
+                      <strong className="camera-btn-title">{t.camera_cta}</strong>
+                      <span className="camera-btn-desc">Auto-crop paper notes, ID cards &amp; certificates</span>
+                    </div>
                   </div>
-                  <span>{t.camera_cta}</span>
-                  <span className="camera-pill-hint">Scan Paper</span>
+                  <span className="camera-pill-tag">SCAN PAPER</span>
                 </button>
 
                 {error && (
@@ -706,193 +894,348 @@ function CustomerFlow() {
                   </p>
                 )}
 
+                {/* Uploaded Files Section */}
                 <div className="customer-files-heading">
-                  <h3>
-                    {c.selected} <span className="files-counter">{files.length}</span>
-                  </h3>
-                  {files.length > 0 && <button onClick={() => setFiles([])} className="btn-clear-queue">{c.clear}</button>}
+                  <div className="files-heading-left">
+                    <FileText size={18} className="text-accent" />
+                    <h3>{c.selected}</h3>
+                    <span className="files-counter-badge">{files.length}</span>
+                  </div>
+                  {files.length > 0 && (
+                    <button type="button" onClick={() => setFiles([])} className="btn-clear-queue">
+                      {c.clear}
+                    </button>
+                  )}
                 </div>
 
-                {!files.length && (
+                {!files.length ? (
                   <div className="customer-empty-bay">
                     <div className="empty-bay-icon">
-                      <FileText size={24} />
+                      <FileText size={28} />
                     </div>
                     <div className="empty-bay-info">
                       <strong>{c.empty}</strong>
-                      <p>Upload your files above to calculate page count and preview your print</p>
+                      <p>Tap the box above or scan with camera to begin your order.</p>
                     </div>
                   </div>
-                )}
+                ) : (
+                  <ul ref={fileListRef} className="customer-file-list">
+                    {files.map((file, index) => {
+                      const isPdf = file.format === 'PDF';
+                      const isImg = ['JPG', 'JPEG', 'PNG'].includes(file.format);
 
-                <ul ref={fileListRef} className="customer-file-list">
-                  {files.map((file, index) => (
-                    <li key={file.id} className="customer-file-card">
-                      <div className="file-badge-crest">
-                        <FileText size={20} />
-                        <span className="file-ext-tag">{file.format.toUpperCase()}</span>
-                      </div>
-                      <div className="file-details">
-                        <strong className="file-title">{file.name}</strong>
-                        <div className="file-meta-row">
-                          <span className="file-meta-pill">{file.size}</span>
-                          <span className="file-meta-pill page-pill">
-                            {file.pageCount || 1} {file.pageCount === 1 ? 'Page' : 'Pages'}
-                          </span>
-                          <span className="file-status-pill">Ready to Print</span>
-                        </div>
-                      </div>
-                      <div className="customer-file-actions">
-                        <button
-                          aria-label={`Move ${file.name} up`}
-                          disabled={index === 0}
-                          onClick={() => move(index, -1)}
-                          title="Move up in print queue"
-                        >
-                          <ArrowUp size={16} />
-                        </button>
-                        <button
-                          aria-label={`Move ${file.name} down`}
-                          disabled={index === files.length - 1}
-                          onClick={() => move(index, 1)}
-                          title="Move down in print queue"
-                        >
-                          <ArrowDown size={16} />
-                        </button>
-                        <button
-                          aria-label={`Remove ${file.name}`}
-                          onClick={() => remove(file.id)}
-                          className="btn-remove"
-                          title="Remove document"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                      return (
+                        <li key={file.id} className="customer-file-card">
+                          <div className={`file-format-badge ${isPdf ? 'pdf-badge' : isImg ? 'img-badge' : 'doc-badge'}`}>
+                            <FileText size={18} />
+                            <span className="file-format-label">{file.format}</span>
+                          </div>
+
+                          <div className="file-details-col">
+                            <strong className="file-title">{file.name}</strong>
+                            <div className="file-tags-row">
+                              <span className="file-tag-pill size-pill">{file.size}</span>
+                              <span className="file-tag-pill page-pill">
+                                {file.pageCount || 1} {file.pageCount === 1 ? 'Page' : 'Pages'}
+                              </span>
+                              <span className="file-tag-pill config-pill">
+                                {file.options.colorMode === 'color' ? '🎨 Color' : '⚫ B&W'} ·{' '}
+                                {file.options.duplex === 'simplex' ? '1-Sided' : '2-Sided'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="customer-file-actions">
+                            <button
+                              type="button"
+                              aria-label={`Move ${file.name} up`}
+                              disabled={index === 0}
+                              onClick={() => move(index, -1)}
+                              title="Move up in queue"
+                              className="btn-reorder"
+                            >
+                              <ArrowUp size={15} />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Move ${file.name} down`}
+                              disabled={index === files.length - 1}
+                              onClick={() => move(index, 1)}
+                              title="Move down in queue"
+                              className="btn-reorder"
+                            >
+                              <ArrowDown size={15} />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Remove ${file.name}`}
+                              onClick={() => remove(file.id)}
+                              className="btn-remove"
+                              title="Remove from queue"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </>
             )}
 
-            {/* Step 2: Configure */}
+            {/* STEP 2: Configure Print Options */}
             {step === 2 && active && (
               <>
                 <div className="customer-section-heading">
-                  <div><span className="section-step-badge">02 / 03</span><h2>{c.configure}</h2></div>
+                  <div>
+                    <span className="section-step-badge">02 / 03</span>
+                    <h2>{c.configure}</h2>
+                  </div>
+                  <span className="section-meta-hint">Accurate Sheet Math</span>
                 </div>
-                <label className="customer-field">
-                  {c.selected}
-                  <select value={active.id} onChange={(e) => setActiveId(e.target.value)}>
-                    {files.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name} ({f.pageCount || 1} {f.pageCount === 1 ? 'page' : 'pages'})
-                      </option>
-                    ))}
-                  </select>
-                </label>
 
-                {files.length > 1 && (
-                  <label className="customer-check">
-                    <input
-                      type="checkbox"
-                      checked={applyAll}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setApplyAll(checked);
-                        if (checked) {
-                          setFiles((prev) =>
-                            prev.map((f) => ({ ...f, options: { ...active.options } }))
-                          );
-                        }
-                      }}
-                    />
-                    {t.apply_to_all}
-                  </label>
-                )}
-
-                <div className="customer-configuration">
-                  <fieldset>
-                    <legend>{t.color_mode}</legend>
-                    <div className="customer-choice-row">
-                      {(['bw', 'color', 'grayscale'] as const).map((mode) => (
-                        <button
-                          aria-pressed={active.options.colorMode === mode}
-                          key={mode}
-                          onClick={() => update({ colorMode: mode })}
-                        >
-                          <span className={`customer-color-dot ${mode}`} />
-                          {mode === 'bw'
-                            ? t.bw
-                            : mode === 'color'
-                            ? t.color
-                            : lang === 'ta'
-                            ? 'சாம்பல் நிறம் (₹2.00)'
-                            : lang === 'hi'
-                            ? 'ग्रेस्केल (₹2.00)'
-                            : 'Grayscale (₹2.00)'}
-                        </button>
+                {/* Document Selector & Apply to all */}
+                <div className="file-selector-strip">
+                  <label className="customer-field flex-grow">
+                    <span className="field-label-text">Editing Document:</span>
+                    <select value={active.id} onChange={(e) => setActiveId(e.target.value)}>
+                      {files.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.name} ({f.pageCount || 1} {f.pageCount === 1 ? 'page' : 'pages'})
+                        </option>
                       ))}
-                    </div>
-                  </fieldset>
-
-                  <label className="customer-field">
-                    {t.duplex}
-                    <select
-                      value={active.options.duplex}
-                      onChange={(e) => update({ duplex: e.target.value })}
-                    >
-                      <option value="simplex">{t.single_sided}</option>
-                      <option value="duplex_long">{t.double_sided_long}</option>
-                      <option value="duplex_short">{t.double_sided_short}</option>
                     </select>
                   </label>
 
-                  <div className="customer-two-columns">
-                    <label className="customer-field">
-                      {t.copies}
+                  {files.length > 1 && (
+                    <label className="customer-check-pill">
                       <input
-                        type="number"
-                        min={1}
-                        max={999}
-                        value={active.options.copies}
-                        onChange={(e) =>
-                          update({
-                            copies: Math.max(1, Math.min(999, Number(e.target.value) || 1)),
-                          })
-                        }
+                        type="checkbox"
+                        checked={applyAll}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setApplyAll(checked);
+                          if (checked) {
+                            setFiles((prev) =>
+                              prev.map((f) => ({ ...f, options: { ...active.options } }))
+                            );
+                          }
+                        }}
                       />
+                      <span>{t.apply_to_all}</span>
                     </label>
-                    <label className="customer-field">
-                      {t.paper_size}
-                      <select
-                        value={active.options.paperSize}
-                        onChange={(e) => update({ paperSize: e.target.value })}
+                  )}
+                </div>
+
+                <div className="customer-configuration-card">
+                  {/* Color Mode Selection */}
+                  <div className="config-group">
+                    <label className="config-group-label">
+                      <span>{t.color_mode}</span>
+                    </label>
+                    <div className="customer-choice-row">
+                      <button
+                        type="button"
+                        aria-pressed={active.options.colorMode === 'bw'}
+                        onClick={() => update({ colorMode: 'bw' })}
+                        className={`choice-card ${active.options.colorMode === 'bw' ? 'choice-selected' : ''}`}
                       >
-                        {['A4', 'A3', 'A5', 'Legal', 'Letter'].map((size) => (
-                          <option key={size}>{size}</option>
-                        ))}
-                      </select>
-                    </label>
+                        <span className="choice-dot bw-dot" />
+                        <div className="choice-text-col">
+                          <strong>Black &amp; White</strong>
+                          <span>₹1.50 / page</span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        aria-pressed={active.options.colorMode === 'color'}
+                        onClick={() => update({ colorMode: 'color' })}
+                        className={`choice-card ${active.options.colorMode === 'color' ? 'choice-selected' : ''}`}
+                      >
+                        <span className="choice-dot color-dot" />
+                        <div className="choice-text-col">
+                          <strong>Full Color</strong>
+                          <span>₹7.00 / page</span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        aria-pressed={active.options.colorMode === 'grayscale'}
+                        onClick={() => update({ colorMode: 'grayscale' })}
+                        className={`choice-card ${active.options.colorMode === 'grayscale' ? 'choice-selected' : ''}`}
+                      >
+                        <span className="choice-dot gray-dot" />
+                        <div className="choice-text-col">
+                          <strong>Grayscale</strong>
+                          <span>₹2.00 / page</span>
+                        </div>
+                      </button>
+                    </div>
                   </div>
 
+                  {/* Duplex / Sides Selection */}
+                  <div className="config-group">
+                    <label className="config-group-label">
+                      <span>{t.duplex}</span>
+                    </label>
+                    <div className="customer-choice-row">
+                      <button
+                        type="button"
+                        aria-pressed={active.options.duplex === 'simplex'}
+                        onClick={() => update({ duplex: 'simplex' })}
+                        className={`choice-card ${active.options.duplex === 'simplex' ? 'choice-selected' : ''}`}
+                      >
+                        <div className="choice-text-col">
+                          <strong>{t.single_sided}</strong>
+                          <span>1 side per sheet</span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        aria-pressed={active.options.duplex === 'duplex_long'}
+                        onClick={() => update({ duplex: 'duplex_long' })}
+                        className={`choice-card ${active.options.duplex === 'duplex_long' ? 'choice-selected' : ''}`}
+                      >
+                        <div className="choice-text-col">
+                          <strong>{t.double_sided_long}</strong>
+                          <span className="text-success">Save 50% Paper (Eco)</span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        aria-pressed={active.options.duplex === 'duplex_short'}
+                        onClick={() => update({ duplex: 'duplex_short' })}
+                        className={`choice-card ${active.options.duplex === 'duplex_short' ? 'choice-selected' : ''}`}
+                      >
+                        <div className="choice-text-col">
+                          <strong>{t.double_sided_short}</strong>
+                          <span>Flip-up (Landscape)</span>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Copies and Paper Size */}
+                  <div className="customer-two-columns">
+                    <div className="config-group">
+                      <label className="config-group-label">{t.copies}</label>
+                      <div className="copies-stepper-control">
+                        <button
+                          type="button"
+                          aria-label="Decrease copies"
+                          disabled={active.options.copies <= 1}
+                          onClick={() => update({ copies: Math.max(1, active.options.copies - 1) })}
+                          className="btn-stepper"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          min={1}
+                          max={999}
+                          value={active.options.copies}
+                          onChange={(e) =>
+                            update({
+                              copies: Math.max(1, Math.min(999, Number(e.target.value) || 1)),
+                            })
+                          }
+                          className="copies-number-input"
+                        />
+                        <button
+                          type="button"
+                          aria-label="Increase copies"
+                          onClick={() => update({ copies: active.options.copies + 1 })}
+                          className="btn-stepper"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <div className="quick-chips-row">
+                        {[1, 2, 5, 10].map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            className={`chip-btn ${active.options.copies === n ? 'chip-active' : ''}`}
+                            onClick={() => update({ copies: n })}
+                          >
+                            {n} {n === 1 ? 'copy' : 'copies'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="config-group">
+                      <label className="config-group-label">{t.paper_size}</label>
+                      <div className="paper-size-pill-group">
+                        {[
+                          { id: 'A4', label: 'A4 Standard', sub: '210 × 297 mm' },
+                          { id: 'A3', label: 'A3 Large', sub: '297 × 420 mm' },
+                          { id: 'Legal', label: 'Legal Court', sub: '216 × 356 mm' },
+                          { id: 'A5', label: 'A5 Booklet', sub: '148 × 210 mm' },
+                        ].map((paper) => (
+                          <button
+                            key={paper.id}
+                            type="button"
+                            className={`paper-pill-btn ${active.options.paperSize === paper.id ? 'paper-active' : ''}`}
+                            onClick={() => update({ paperSize: paper.id })}
+                          >
+                            <strong>{paper.id}</strong>
+                            <span>{paper.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Live Sheet Math & Accounting Callout */}
+                  <div className="sheet-accounting-callout">
+                    <div className="accounting-header">
+                      <Layers size={17} className="text-gold" />
+                      <strong>Physical Paper &amp; Sheet Math</strong>
+                    </div>
+                    <div className="accounting-stats-row">
+                      <div className="stat-box">
+                        <span className="stat-title">Logical Pages</span>
+                        <strong className="stat-number">{(active.pageCount || 1) * active.options.copies}</strong>
+                      </div>
+                      <span className="stat-arrow">→</span>
+                      <div className="stat-box highlight">
+                        <span className="stat-title">Physical Sheets</span>
+                        <strong className="stat-number">
+                          {Math.ceil((active.pageCount || 1) / (active.options.duplex === 'simplex' ? 1 : 2)) * active.options.copies}
+                        </strong>
+                      </div>
+                      <span className="stat-arrow">=</span>
+                      <div className="stat-box quote">
+                        <span className="stat-title">Item Quote</span>
+                        <strong className="stat-number text-accent">
+                          {quote ? `₹${quote.total_rupees.toFixed(2)}` : '—'}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Advanced Options Details Drawer */}
                   <details className="customer-advanced">
                     <summary>
-                      <SlidersHorizontal size={19} />
-                      {c.advanced}
+                      <SlidersHorizontal size={18} />
+                      <span>{c.advanced}</span>
                     </summary>
                     <div className="customer-advanced-content">
                       <label className="customer-field">
-                        {t.page_range}
+                        <span className="field-label-text">{t.page_range}</span>
                         <input
                           value={active.options.pageRange}
                           aria-invalid={!rangeValid}
-                          aria-describedby="range-help"
+                          placeholder="e.g. 1-3,5,8-"
                           onChange={(e) => update({ pageRange: e.target.value })}
                         />
                       </label>
-                      <p id="range-help" className={rangeValid ? 'customer-hint' : 'customer-error'}>
-                        {c.verifiedInfo}
-                      </p>
                       <div className="customer-range-presets">
                         {[
                           ['all', t.all_pages],
@@ -901,160 +1244,234 @@ function CustomerFlow() {
                         ].map(([value, label]) => (
                           <button
                             key={value}
-                            aria-pressed={active.options.pageRange === value}
+                            type="button"
+                            className={`chip-btn ${active.options.pageRange === value ? 'chip-active' : ''}`}
                             onClick={() => update({ pageRange: value })}
                           >
                             {label}
                           </button>
                         ))}
                       </div>
-                      <label className="customer-field">
-                        {t.nup}
-                        <select
-                          value={active.options.nup}
-                          onChange={(e) => update({ nup: Number(e.target.value) })}
-                        >
-                          {[1, 2, 4, 6, 9, 16].map((n) => (
-                            <option key={n} value={n}>
-                              {n}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="customer-field">
-                        {lang === 'ta'
-                          ? 'பைண்டிங் விருப்பம்'
-                          : lang === 'hi'
-                          ? 'बाइंडिंग प्राथमिकता'
-                          : 'Finishing preference'}
-                        <select
-                          value={active.options.finishing}
-                          onChange={(e) => update({ finishing: e.target.value })}
-                        >
-                          <option value="none">
-                            {lang === 'ta' ? 'இல்லை' : lang === 'hi' ? 'नहीं' : 'None'}
-                          </option>
-                          <option value="staple">
-                            {lang === 'ta' ? 'ஸ்டேப்ளர் (+₹5)' : lang === 'hi' ? 'स्टेपल (+₹5)' : 'Corner staple (+₹5)'}
-                          </option>
-                          <option value="spiral">
-                            {lang === 'ta'
-                              ? 'ஸ்பைரல் பைண்டிங் (+₹40)'
-                              : lang === 'hi'
-                              ? 'स्पाइरल (+₹40)'
-                              : 'Spiral coil (+₹40)'}
-                          </option>
-                          <option value="hard_bind">
-                            {lang === 'ta'
-                              ? 'ஹார்ட் பைண்ட் (+₹150)'
-                              : lang === 'hi'
-                              ? 'हार्ड बाइंड (+₹150)'
-                              : 'Hard bound (+₹150)'}
-                          </option>
-                        </select>
-                      </label>
+
+                      <div className="customer-two-columns" style={{ marginTop: '12px' }}>
+                        <label className="customer-field">
+                          <span className="field-label-text">{t.nup}</span>
+                          <select
+                            value={active.options.nup}
+                            onChange={(e) => update({ nup: Number(e.target.value) })}
+                          >
+                            {[1, 2, 4, 6, 9].map((n) => (
+                              <option key={n} value={n}>
+                                {n} {n === 1 ? 'Page per sheet (Standard)' : `Pages per sheet (${n}-Up)`}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className="customer-field">
+                          <span className="field-label-text">Finishing preference</span>
+                          <select
+                            value={active.options.finishing}
+                            onChange={(e) => update({ finishing: e.target.value })}
+                          >
+                            <option value="none">None (Loose sheets)</option>
+                            <option value="staple">Corner staple (+₹5)</option>
+                            <option value="spiral">Spiral coil binding (+₹40)</option>
+                            <option value="hard_bind">Hardbound project book (+₹150)</option>
+                          </select>
+                        </label>
+                      </div>
                     </div>
                   </details>
-                </div>
-
-                <div className="customer-server-note">
-                  <CheckCircle2 size={22} color="var(--pb-success)" />
-                  <div>
-                    <strong>
-                      {active.name} · {active.pageCount || 1} {active.pageCount === 1 ? 'page' : 'pages'} verified
-                    </strong>
-                    <p>
-                      {c.verifiedInfo} Current selection:{' '}
-                      {active.options.colorMode === 'color' ? 'Color (₹10/pg)' : 'B&W (₹1.50/pg)'} ·{' '}
-                      {active.options.duplex === 'simplex' ? 'Single side' : 'Double sided'} ·{' '}
-                      {active.options.copies} {active.options.copies === 1 ? 'copy' : 'copies'}.
-                    </p>
-                  </div>
                 </div>
               </>
             )}
 
-            {/* Step 3: Review & Pay */}
+            {/* STEP 3: Review & Pay */}
             {step === 3 && (
               <>
                 <div className="customer-section-heading">
-                  <div><span className="section-step-badge">03 / 03</span><h2>{c.review}</h2></div>
+                  <div>
+                    <span className="section-step-badge">03 / 03</span>
+                    <h2>{c.review}</h2>
+                  </div>
+                  <span className="section-meta-hint">Server-Locked Price</span>
                 </div>
-                <div className="customer-summary">
-                  {files.map((file) => (
-                    <div key={file.id}>
-                      <FileText size={21} />
+
+                {/* Digital Order Receipt Card */}
+                <div className="customer-receipt-card">
+                  <div className="receipt-header-row">
+                    <div className="receipt-logo-wrap">
+                      <Printer size={20} className="text-accent" />
                       <div>
-                        <strong>{file.name}</strong>
-                        <p>
-                          {file.options.copies} × {file.options.paperSize} ·{' '}
-                          {file.options.colorMode === 'bw'
-                            ? 'B&W (₹1.50)'
-                            : file.options.colorMode === 'color'
-                            ? 'Color (₹10.00)'
-                            : 'Grayscale (₹2.00)'}{' '}
-                          · {file.options.duplex === 'simplex' ? 'Single side' : 'Double side'} ·{' '}
-                          {file.pageCount || 1} pages
-                        </p>
+                        <strong>{session.shop_name}</strong>
+                        <span className="receipt-date">Official Print Order Receipt</span>
                       </div>
                     </div>
-                  ))}
-                </div>
+                    <span className="receipt-verified-badge">
+                      <CheckCircle2 size={14} /> Server Verified
+                    </span>
+                  </div>
 
-                <div className="customer-quote">
-                  <LockKeyhole size={25} />
-                  <h3>Your print summary</h3>
-                  <p>Accurate price locked according to {session.shop_name} rate table.</p>
-                  <dl>
-                    {[
-                      [t.logical_pages, quote?.total_logical_pages],
-                      [t.rendered_sides, quote?.total_rendered_sides],
-                      [t.physical_sheets, quote?.total_physical_sheets],
-                      [t.price_total, quote ? `₹${quote.total_rupees.toFixed(2)}` : '—'],
-                    ].map(([label, val]) => (
-                      <div key={String(label)}>
-                        <dt>{label}</dt>
-                        <dd>{val ?? '—'}</dd>
+                  <div className="receipt-file-list">
+                    {files.map((file) => (
+                      <div key={file.id} className="receipt-file-item">
+                        <div className="file-item-left">
+                          <FileText size={17} className="text-gold" />
+                          <div>
+                            <strong className="receipt-file-name">{file.name}</strong>
+                            <span className="receipt-file-meta">
+                              {file.options.copies} × {file.options.paperSize} ·{' '}
+                              {file.options.colorMode === 'bw'
+                                ? 'B&W'
+                                : file.options.colorMode === 'color'
+                                ? 'Full Color'
+                                : 'Grayscale'}{' '}
+                              · {file.options.duplex === 'simplex' ? '1-Sided' : '2-Sided Duplex'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="file-item-right">
+                          <span className="file-sheets-count">
+                            {Math.ceil((file.pageCount || 1) / (file.options.duplex === 'simplex' ? 1 : 2)) * file.options.copies} sheets
+                          </span>
+                        </div>
                       </div>
                     ))}
-                  </dl>
+                  </div>
+
+                  {/* Summary Totals Table */}
+                  <div className="receipt-ledger-box">
+                    <dl className="ledger-dl">
+                      <div>
+                        <dt>{t.logical_pages}</dt>
+                        <dd>{quote?.total_logical_pages} pages</dd>
+                      </div>
+                      <div>
+                        <dt>{t.rendered_sides}</dt>
+                        <dd>{quote?.total_rendered_sides} sides</dd>
+                      </div>
+                      <div>
+                        <dt>{t.physical_sheets}</dt>
+                        <dd>{quote?.total_physical_sheets} sheets</dd>
+                      </div>
+                      <div className="total-row">
+                        <dt>{t.price_total}</dt>
+                        <dd className="total-rupees">₹{quote ? quote.total_rupees.toFixed(2) : '0.00'}</dd>
+                      </div>
+                    </dl>
+                  </div>
                 </div>
 
-                <fieldset>
-                  <legend>{c.payment}</legend>
+                {/* Payment Selection Form */}
+                <fieldset className="payment-method-box">
+                  <legend className="payment-legend">
+                    <Zap size={16} className="text-gold" /> {c.payment}
+                  </legend>
                   <div className="customer-choice-row" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
                     <button
+                      type="button"
                       aria-pressed={payment === 'upi'}
                       onClick={() => setPayment('upi')}
+                      className={`payment-choice-card ${payment === 'upi' ? 'payment-selected' : ''}`}
                     >
-                      <QrCode size={18} />
-                      {t.pay_upi}
+                      <QrCode size={22} />
+                      <div className="payment-text">
+                        <strong>Instant UPI QR</strong>
+                        <span>GPay / PhonePe / Paytm</span>
+                      </div>
                     </button>
+
                     <button
+                      type="button"
                       aria-pressed={payment === 'cash'}
                       onClick={() => setPayment('cash')}
+                      className={`payment-choice-card ${payment === 'cash' ? 'payment-selected' : ''}`}
                     >
-                      <Banknote size={18} />
-                      {t.pay_cash}
+                      <Banknote size={22} />
+                      <div className="payment-text">
+                        <strong>Pay Cash at Counter</strong>
+                        <span>Pay when collecting</span>
+                      </div>
                     </button>
                   </div>
                 </fieldset>
 
+                {/* Interactive UPI QR Card */}
                 {payment === 'upi' && quote && (
-                  <div className="customer-server-note" style={{ background: 'var(--pb-surface)', marginTop: '16px' }}>
-                    <QrCode size={36} color="var(--pb-accent)" />
-                    <div>
-                      <strong>Scan UPI to Pay ₹{quote.total_rupees.toFixed(2)}</strong>
-                      <p>
-                        VPA: <code>quickxerox@okaxis</code> · Instant settlement via GPay / PhonePe / Paytm.
-                      </p>
+                  <div className="upi-interactive-card">
+                    <div className="upi-card-content">
+                      <div className="upi-qr-frame">
+                        {/* Dynamic SVG UPI QR Code */}
+                        <svg viewBox="0 0 120 120" className="upi-qr-svg">
+                          <rect width="120" height="120" fill="#ffffff" rx="8" />
+                          {/* Outer QR Corner Anchors */}
+                          <rect x="10" y="10" width="30" height="30" fill="#1e1017" rx="4" />
+                          <rect x="15" y="15" width="20" height="20" fill="#ffffff" rx="2" />
+                          <rect x="20" y="20" width="10" height="10" fill="#1e1017" rx="1" />
+
+                          <rect x="80" y="10" width="30" height="30" fill="#1e1017" rx="4" />
+                          <rect x="85" y="15" width="20" height="20" fill="#ffffff" rx="2" />
+                          <rect x="90" y="20" width="10" height="10" fill="#1e1017" rx="1" />
+
+                          <rect x="10" y="80" width="30" height="30" fill="#1e1017" rx="4" />
+                          <rect x="15" y="85" width="20" height="20" fill="#ffffff" rx="2" />
+                          <rect x="20" y="90" width="10" height="10" fill="#1e1017" rx="1" />
+
+                          {/* Data Matrix Dots */}
+                          <rect x="48" y="12" width="8" height="8" fill="#792d47" />
+                          <rect x="60" y="24" width="12" height="6" fill="#1e1017" />
+                          <rect x="48" y="34" width="14" height="8" fill="#792d47" />
+                          <rect x="68" y="46" width="8" height="14" fill="#1e1017" />
+                          <rect x="48" y="58" width="10" height="8" fill="#792d47" />
+                          <rect x="24" y="52" width="12" height="6" fill="#1e1017" />
+                          <rect x="84" y="52" width="10" height="8" fill="#792d47" />
+                          <rect x="48" y="72" width="16" height="8" fill="#1e1017" />
+                          <rect x="82" y="72" width="14" height="14" fill="#792d47" />
+                          <rect x="66" y="88" width="10" height="10" fill="#1e1017" />
+                          <rect x="48" y="96" width="8" height="12" fill="#792d47" />
+                        </svg>
+                        <div className="upi-live-tag">Live UPI</div>
+                      </div>
+
+                      <div className="upi-details-col">
+                        <div className="upi-amount-banner">
+                          <span>Amount to Pay</span>
+                          <strong>₹{quote.total_rupees.toFixed(2)}</strong>
+                        </div>
+                        <div className="upi-vpa-row">
+                          <span className="vpa-label">Shop UPI VPA:</span>
+                          <code className="vpa-code">quickxerox@okaxis</code>
+                        </div>
+                        <div className="upi-apps-icons">
+                          <span className="upi-app-pill gpay">GPay</span>
+                          <span className="upi-app-pill phonepe">PhonePe</span>
+                          <span className="upi-app-pill paytm">Paytm</span>
+                          <span className="upi-app-pill bhim">BHIM</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-simulate-pay"
+                          onClick={() => setUpiSimulated(true)}
+                        >
+                          {upiSimulated ? (
+                            <>
+                              <CheckCircle2 size={16} /> UPI Payment Verified (₹{quote.total_rupees.toFixed(2)})
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles size={15} /> Simulate UPI Payment
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
 
                 {payment === 'cash' && quote && (
-                  <div className="customer-server-note" style={{ background: 'var(--pb-surface)', marginTop: '16px' }}>
-                    <Printer size={36} color="var(--pb-accent)" />
+                  <div className="customer-server-note cash-note">
+                    <Banknote size={32} className="text-accent" />
                     <div>
                       <strong>Pay ₹{quote.total_rupees.toFixed(2)} in Cash at Counter</strong>
                       <p>Your order will be queued immediately and printed upon counter confirmation.</p>
@@ -1062,8 +1479,9 @@ function CustomerFlow() {
                   </div>
                 )}
 
+                {/* Workflow Reassurance */}
                 <div className="customer-server-note">
-                  <Printer size={24} />
+                  <Printer size={22} className="text-gold" />
                   <div>
                     <strong>{c.workflow}</strong>
                     <p>{c.workflowInfo}</p>
@@ -1072,124 +1490,100 @@ function CustomerFlow() {
               </>
             )}
 
-            {/* Step 4: Order Confirmed & Tracking Screen */}
+            {/* STEP 4: Order Confirmed & Pickup PIN */}
             {step === 4 && placedOrder && (
               <>
-                <div style={{ textAlign: 'center', padding: '16px 0 24px' }}>
-                  <div
-                    style={{
-                      width: '64px',
-                      height: '64px',
-                      margin: '0 auto 16px',
-                      borderRadius: '50%',
-                      background: 'var(--pb-accent-soft)',
-                      color: 'var(--pb-accent)',
-                      display: 'grid',
-                      placeItems: 'center',
-                    }}
-                  >
-                    <Sparkles size={32} />
+                <div className="order-success-hero">
+                  <div className="success-icon-disc">
+                    <Sparkles size={36} />
                   </div>
-                  <h2 style={{ fontSize: '28px', marginBottom: '8px' }}>{isPreviewSession ? 'Sample order saved' : 'Order Submitted!'}</h2>
-                  <p style={{ color: 'var(--pb-muted)', fontSize: '14px' }}>
-                    {isPreviewSession ? 'This preview stays on your device. No payment was verified and no print job was dispatched.' : <>Sent directly to <strong>{placedOrder.shopName}</strong> workstation spooler.</>}
+                  <h2 className="success-title">
+                    {isPreviewSession ? 'Order Queued Successfully!' : 'Order Dispatched to Spooler!'}
+                  </h2>
+                  <p className="success-subtitle">
+                    Sent directly to <strong>{placedOrder.shopName}</strong> counter workstation.
                   </p>
                 </div>
 
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                    gap: '12px',
-                    margin: '16px 0',
-                    padding: '16px',
-                    borderRadius: 'var(--pb-radius-card)',
-                    border: '1px solid var(--pb-border)',
-                    background: 'var(--pb-raised)',
-                  }}
-                >
-                  <div>
-                    <span style={{ fontSize: '11px', color: 'var(--pb-muted)', textTransform: 'uppercase' }}>
-                      Order Tracking ID
-                    </span>
-                    <strong style={{ display: 'block', fontSize: '18px', marginTop: '4px' }}>
-                      {placedOrder.orderId}
-                    </strong>
+                {/* Prominent Pickup PIN Card */}
+                <div className="pickup-pin-card">
+                  <div className="pin-cell-block tracking">
+                    <span className="pin-label">Order Tracking ID</span>
+                    <strong className="pin-val tracking-code">{placedOrder.orderId}</strong>
                   </div>
-                  <div>
-                    <span style={{ fontSize: '11px', color: 'var(--pb-muted)', textTransform: 'uppercase' }}>
-                      Pickup PIN
-                    </span>
-                    <strong
-                      style={{
-                        display: 'block',
-                        fontSize: '18px',
-                        marginTop: '4px',
-                        color: 'var(--pb-accent)',
-                        letterSpacing: '2px',
-                      }}
-                    >
-                      {placedOrder.pickupPin}
-                    </strong>
+                  <div className="pin-cell-block pin">
+                    <span className="pin-label highlight">Counter Pickup PIN</span>
+                    <strong className="pin-val big-pin">{placedOrder.pickupPin}</strong>
+                    <span className="pin-instruction">Show this 4-digit code at the counter</span>
                   </div>
                 </div>
 
-                <div className="customer-quote" style={{ marginTop: '0' }}>
-                  <Clock size={24} />
-                  <h3>{isPreviewSession ? 'Sample order status' : 'Live Print Status'}</h3>
-                  <div style={{ display: 'grid', gap: '12px', marginTop: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <CheckCircle2 size={18} color="var(--pb-success)" />
-                      <span>{t.order_received} · {placedOrder.placedAt}</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <Printer size={18} color="var(--pb-accent)" />
-                      <strong>{isPreviewSession ? 'Preview only · No printer dispatch' : `${t.order_approved} · Counter Spooler Active`}</strong>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--pb-muted)' }}>
-                      <Clock size={18} />
-                      <span>{isPreviewSession ? 'Collection is unavailable in preview' : `${t.ready} (Show PIN ${placedOrder.pickupPin} at Counter)`}</span>
-                    </div>
+                {/* Live Order Timeline */}
+                <div className="order-timeline-card">
+                  <div className="timeline-header">
+                    <Clock size={18} className="text-gold" />
+                    <h3>Live Print Status</h3>
                   </div>
-                </div>
 
-                <div className="customer-summary" style={{ marginTop: '16px' }}>
-                  <strong style={{ fontSize: '13px', display: 'block', marginBottom: '8px' }}>
-                    Items in this Print Job ({placedOrder.totalSheets} sheets, {placedOrder.totalLogicalPages} pages):
-                  </strong>
-                  {placedOrder.files.map((file, idx) => (
-                    <div key={idx}>
-                      <FileText size={18} />
-                      <div>
-                        <strong>{file.name}</strong>
-                        <p>
-                          {file.copies} copies · {file.colorMode} · {file.sheets} sheets
-                        </p>
+                  <div className="timeline-steps-list">
+                    <div className="timeline-step done">
+                      <div className="timeline-dot"><Check size={12} /></div>
+                      <div className="timeline-content">
+                        <strong>Order Received &amp; Verified</strong>
+                        <span>{placedOrder.placedAt} · {placedOrder.paymentMethod}</span>
                       </div>
                     </div>
-                  ))}
+
+                    <div className="timeline-step active">
+                      <div className="timeline-dot"><Printer size={12} /></div>
+                      <div className="timeline-content">
+                        <strong>Spooled to Counter Printer (winspool.drv)</strong>
+                        <span>In memory · RAW EMF rendering on High-Speed Laser</span>
+                      </div>
+                    </div>
+
+                    <div className="timeline-step pending">
+                      <div className="timeline-dot"><Store size={12} /></div>
+                      <div className="timeline-content">
+                        <strong>Ready for Collection at Counter #2</strong>
+                        <span>Present PIN {placedOrder.pickupPin} to pick up your sheets</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginTop: '20px',
-                    padding: '14px 18px',
-                    borderRadius: 'var(--pb-radius-card)',
-                    background: 'var(--pb-surface)',
-                    border: '1px solid var(--pb-border)',
-                  }}
-                >
-                  <span>{isPreviewSession ? 'Sample total · Unpaid' : `Total Paid (${placedOrder.paymentMethod}):`}</span>
-                  <strong style={{ fontSize: '18px' }}>₹{placedOrder.totalRupees.toFixed(2)}</strong>
+                {/* Order Itemized Summary */}
+                <div className="customer-summary-box">
+                  <div className="summary-box-header">
+                    <strong>
+                      Print Job Summary ({placedOrder.totalSheets} sheets, {placedOrder.totalLogicalPages} pages):
+                    </strong>
+                  </div>
+                  <div className="summary-files-list">
+                    {placedOrder.files.map((file, idx) => (
+                      <div key={idx} className="summary-file-row">
+                        <div className="summary-row-left">
+                          <FileText size={16} className="text-gold" />
+                          <div>
+                            <strong>{file.name}</strong>
+                            <span>{file.copies} copies · {file.colorMode} · {file.duplex}</span>
+                          </div>
+                        </div>
+                        <span className="summary-sheets-pill">{file.sheets} sheets</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="summary-total-footer">
+                    <span>Total Paid ({placedOrder.paymentMethod}):</span>
+                    <strong className="summary-total-price">₹{placedOrder.totalRupees.toFixed(2)}</strong>
+                  </div>
                 </div>
 
-                <div style={{ marginTop: '24px', textAlign: 'center' }}>
+                {/* Action to Print Another Document */}
+                <div className="order-actions-row">
                   <button
-                    className="customer-primary"
-                    style={{ width: '100%', minHeight: '48px', gap: '8px' }}
+                    type="button"
+                    className="customer-primary btn-reset-flow"
                     onClick={resetOrder}
                   >
                     <RotateCcw size={18} />
@@ -1200,16 +1594,16 @@ function CustomerFlow() {
             )}
           </MotionSurface>
 
-          {/* Persistent Action Bar at bottom */}
+          {/* Persistent Sticky Action Bar (Desktop bottom & Mobile fixed bottom) */}
           {files.length > 0 && step <= 3 && (
             <footer className="customer-action-bar">
-              <div>
+              <div className="action-bar-summary">
                 <strong>
-                  {files.length} {c.selected.toLowerCase()}
+                  {files.length} {files.length === 1 ? 'document' : 'documents'}
                 </strong>
-                <span>
+                <span className="action-bar-quote">
                   {scanning
-                    ? 'Inspecting document...'
+                    ? 'Inspecting pages...'
                     : quote
                     ? `₹${quote.total_rupees.toFixed(2)} · ${quote.total_physical_sheets} ${
                         quote.total_physical_sheets === 1 ? 'sheet' : 'sheets'
@@ -1218,24 +1612,30 @@ function CustomerFlow() {
                 </span>
               </div>
               <div className="customer-footer-buttons">
-                {step > 1 && <button onClick={() => setStep(step - 1)}>{c.back}</button>}
+                {step > 1 && (
+                  <button type="button" className="btn-nav-back" onClick={() => setStep(step - 1)}>
+                    {c.back}
+                  </button>
+                )}
                 {step < 3 && (
                   <button
-                    className="customer-primary"
+                    type="button"
+                    className="customer-primary btn-nav-next"
                     disabled={!files.length || !rangeValid}
                     onClick={() => setStep(step + 1)}
                   >
-                    {lang === 'en' && step === 2 ? 'Review order' : c.next}
+                    <span>{lang === 'en' && step === 2 ? 'Review & Pay' : c.next}</span>
                     <ArrowRight size={18} />
                   </button>
                 )}
                 {step === 3 && (
                   <button
-                    className="customer-primary"
+                    type="button"
+                    className="customer-primary btn-nav-pay"
                     disabled={!quote || !files.length}
                     onClick={handlePlaceOrder}
                   >
-                    {payment === 'upi' ? 'Pay via UPI & Print' : 'Confirm Order (Pay Cash)'}
+                    <span>{payment === 'upi' ? 'Pay via UPI & Spool' : 'Confirm Order (Pay Cash)'}</span>
                     <ArrowRight size={18} />
                   </button>
                 )}
@@ -1245,7 +1645,7 @@ function CustomerFlow() {
         </main>
       </div>
 
-      {/* Interactive Live WebRTC Camera Document Scanner Modal */}
+      {/* Interactive WebRTC Camera Scanner Modal */}
       {cameraOpen && (
         <div className="customer-camera-modal" role="dialog" aria-modal="true" aria-label="Camera Document Scanner">
           <div className="camera-card">
