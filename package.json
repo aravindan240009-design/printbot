@@ -9,9 +9,6 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "dev:landing": "vite",
-    "build:landing": "vite build",
-    "preview:landing": "vite preview",
     "dev:desktop": "pnpm --filter @xerox/desktop dev",
     "dev:api": "uvicorn services.api.main:app --reload --port 8000",
     "dev:worker": "python -m services.worker.worker",
@@ -21,8 +18,6 @@
     "test:api": "pytest tests/ -v",
     "test:bench": "python tests/benchmark_latency.py",
     "lint": "pnpm -r lint",
-    "lint:landing": "node .agents/skills/design-taste-frontend/scripts/lint.mjs src",
-    "inspect": "node .agents/skills/design-taste-frontend/scripts/inspect.mjs dist/index.html",
     "type-check": "tsc --noEmit",
     "typecheck": "tsc --noEmit"
   },
