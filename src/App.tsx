@@ -28,7 +28,6 @@ import { MarqueeShowcase } from './components/MarqueeShowcase';
 import { ShopRoiCalculator } from './components/ShopRoiCalculator';
 import { AutopilotControl } from './components/AutopilotControl';
 import { TypingClosingSection } from './components/TypingClosingSection';
-import { SplashScreen } from './components/SplashScreen';
 import { SubscriptionModal } from './components/SubscriptionModal';
 import { RealisticPrinterFallback } from './components/RealisticPrinterFallback';
 import { getInstallerConfig } from './utils/installer';
@@ -56,7 +55,6 @@ export default function App() {
   const [printed, setPrinted] = useState(false);
   const [motionPaused, setMotionPaused] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [splashForce, setSplashForce] = useState(false);
 
   useEffect(() => {
     document.documentElement.dataset.motion = motionPaused ? 'paused' : 'playing';
@@ -126,9 +124,6 @@ export default function App() {
 
   return (
     <>
-      {/* Luxury Animated Splash Screen */}
-      <SplashScreen forceShow={splashForce} onComplete={() => setSplashForce(false)} />
-
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
@@ -471,14 +466,6 @@ export default function App() {
           printbot<span className="brand-dot">®</span>
         </a>
         <p>Good print. Better business.</p>
-        <button
-          type="button"
-          className="splash-replay-link"
-          onClick={() => setSplashForce(true)}
-          style={{ background: 'none', border: 'none', color: '#c5a66d', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline' }}
-        >
-          Replay Intro
-        </button>
         <span>© {new Date().getFullYear()} Print Bot</span>
         <a href="#main-content">Back to top ↑</a>
       </footer>
