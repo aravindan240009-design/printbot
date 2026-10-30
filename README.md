@@ -62,9 +62,7 @@ complete.
 
 ```text
 apps/
-  web/             Public marketing/product site (Next.js, port 3000)
   customer-web/    QR customer upload and checkout flow (Vite, port 3000)
-  superadmin-web/  Platform owner administration portal (Vite, port 3002)
   desktop/         Tauri 2 + React + Rust Windows workstation
 
 services/
@@ -172,14 +170,6 @@ http://localhost:3000/?qr=<shop-qr-token>
 The customer app requires the API to be configured and reachable for server
 scan, preview, quote, payment, and tracking behavior. Without that connection,
 the UI can render but cannot create a real order.
-
-### Super-admin portal
-
-```powershell
-pnpm --filter @xerox/superadmin-web dev
-```
-
-Open `http://localhost:3002`.
 
 ### FastAPI service
 

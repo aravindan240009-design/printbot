@@ -12,7 +12,6 @@
     "dev:landing": "vite",
     "build:landing": "vite build",
     "preview:landing": "vite preview",
-    "dev:web": "pnpm --filter @xerox/web dev",
     "dev:desktop": "pnpm --filter @xerox/desktop dev",
     "dev:api": "uvicorn services.api.main:app --reload --port 8000",
     "dev:worker": "python -m services.worker.worker",
