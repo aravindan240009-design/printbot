@@ -64,7 +64,6 @@ complete.
 apps/
   web/             Public marketing/product site (Next.js, port 3000)
   customer-web/    QR customer upload and checkout flow (Vite, port 3000)
-  shop-web/        Shop owner/staff portal (Vite, port 3001)
   superadmin-web/  Platform owner administration portal (Vite, port 3002)
   desktop/         Tauri 2 + React + Rust Windows workstation
 
@@ -173,14 +172,6 @@ http://localhost:3000/?qr=<shop-qr-token>
 The customer app requires the API to be configured and reachable for server
 scan, preview, quote, payment, and tracking behavior. Without that connection,
 the UI can render but cannot create a real order.
-
-### Shop portal
-
-```powershell
-pnpm --filter @xerox/shop-web dev
-```
-
-Open `http://localhost:3001`.
 
 ### Super-admin portal
 
