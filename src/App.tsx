@@ -30,6 +30,7 @@ import { AutopilotControl } from './components/AutopilotControl';
 import { TypingClosingSection } from './components/TypingClosingSection';
 import { SubscriptionModal } from './components/SubscriptionModal';
 import { RealisticPrinterFallback } from './components/RealisticPrinterFallback';
+import { Footer } from './components/Footer';
 import { getInstallerConfig } from './utils/installer';
 
 const PrinterScene = lazy(() => import('./components/PrecisionPrinter'));
@@ -459,16 +460,8 @@ export default function App() {
         <TypingClosingSection onDownload={download} />
       </main>
 
-      {/* Footer */}
-      <footer className="shell footer">
-        <a className="brand" href="#">
-          <PrintBotLogo size={40} />
-          printbot<span className="brand-dot">®</span>
-        </a>
-        <p>Good print. Better business.</p>
-        <span>© {new Date().getFullYear()} Print Bot</span>
-        <a href="#main-content">Back to top ↑</a>
-      </footer>
+      {/* Luxury Enhanced Multi-Column Footer */}
+      <Footer onRequestAccessClick={() => setDialog(true)} />
 
       {/* High-Converting Subscription Dialogue Modal */}
       <SubscriptionModal
