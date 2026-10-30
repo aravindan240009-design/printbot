@@ -312,12 +312,13 @@ function CustomerFlow() {
   const [scanning, setScanning] = useState(false);
   const [mobileRatesOpen, setMobileRatesOpen] = useState(false);
   const [upiSimulated, setUpiSimulated] = useState(false);
-  const [showSandboxNotice, setShowSandboxNotice] = useState(true);
 
   // Live WebRTC Camera Scanner State
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [cameraLoading, setCameraLoading] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [capturedPreview, setCapturedPreview] = useState<string | null>(null);
@@ -330,7 +331,7 @@ function CustomerFlow() {
     }
   }, [cameraStream, cameraOpen, capturedPreview]);
 
-  const startCamera = async (facing: 'environment' | 'user' = cameraFacing) => {
+  const startCamera = async (facing: 'environment' | 'user' = cameraFacing, deviceId?: string) => {
     setCameraError(null);
     setCapturedPreview(null);
     setCameraOpen(true);
@@ -344,12 +345,20 @@ function CustomerFlow() {
         throw new Error('Camera access is not supported in this browser environment. You can upload photo files directly.');
       }
 
+      // Enumerate available video devices
+      if (navigator.mediaDevices.enumerateDevices) {
+        navigator.mediaDevices.enumerateDevices().then((devs) => {
+          const vDevs = devs.filter((d) => d.kind === 'videoinput');
+          setVideoDevices(vDevs);
+        }).catch(() => {});
+      }
+
+      const videoConstraints: MediaTrackConstraints = deviceId
+        ? { deviceId: { exact: deviceId } }
+        : { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1080 } };
+
       const streamPromise = navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: facing },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
+        video: videoConstraints,
         audio: false,
       });
 
@@ -373,6 +382,125 @@ function CustomerFlow() {
       setCameraLoading(false);
       setCameraError(err?.message || 'Unable to access camera. Please check camera permissions or upload an image file.');
     }
+  };
+
+  const switchCameraDevice = async (deviceId: string) => {
+    setSelectedDeviceId(deviceId);
+    await startCamera(cameraFacing, deviceId);
+  };
+
+  const loadSampleDocument = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1200;
+    canvas.height = 800;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Document background
+    ctx.fillStyle = '#faf9f6';
+    ctx.fillRect(0, 0, 1200, 800);
+
+    // Security guilloche pattern & decorative border
+    ctx.strokeStyle = '#b5881c';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(36, 36, 1128, 728);
+    ctx.strokeStyle = '#e2d9c2';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(50, 50, 1100, 700);
+
+    // University Header Emblem
+    ctx.fillStyle = '#67283f';
+    ctx.beginPath();
+    ctx.rect(80, 80, 72, 72);
+    ctx.fill();
+    ctx.fillStyle = '#efd5a7';
+    ctx.font = 'bold 36px sans-serif';
+    ctx.fillText('PB', 96, 130);
+
+    // University Header Title
+    ctx.fillStyle = '#1e293b';
+    ctx.font = 'bold 32px serif';
+    ctx.fillText('ANNA UNIVERSITY · CHENNAI', 175, 115);
+    ctx.fillStyle = '#64748b';
+    ctx.font = '16px sans-serif';
+    ctx.fillText('COLLEGE OF ENGINEERING GUINDY · ESTD 1794', 175, 145);
+
+    // Divider Line
+    ctx.strokeStyle = '#b5881c';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(80, 180);
+    ctx.lineTo(1120, 180);
+    ctx.stroke();
+
+    // Document Title
+    ctx.fillStyle = '#67283f';
+    ctx.font = 'bold 22px sans-serif';
+    ctx.fillText('BONAFIDE CERTIFICATE & STUDENT IDENTITY RECORD · 2026-2027', 80, 225);
+
+    // Photo Box Placeholder
+    ctx.fillStyle = '#f1f5f9';
+    ctx.fillRect(890, 225, 175, 215);
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(890, 225, 175, 215);
+    ctx.fillStyle = '#64748b';
+    ctx.font = 'bold 15px sans-serif';
+    ctx.fillText('STUDENT PHOTO', 915, 335);
+
+    // Student Details Rows
+    const details = [
+      ['Student Name:', 'R. KAVITHA PRIYA'],
+      ['Roll Number:', '2026-BE-MECH-0428'],
+      ['Department:', 'Mechanical & Automation Engineering'],
+      ['Degree Program:', 'B.E. (Full Time - 4 Years)'],
+      ['Academic Year:', '2026 - 2027 (Semester V)'],
+      ['Library Counter:', 'Guindy Library Wing Counter #2'],
+    ];
+
+    let startY = 275;
+    details.forEach(([lbl, val]) => {
+      ctx.fillStyle = '#64748b';
+      ctx.font = 'bold 17px sans-serif';
+      ctx.fillText(lbl, 80, startY);
+
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 19px sans-serif';
+      ctx.fillText(val, 270, startY);
+      startY += 40;
+    });
+
+    // Barcode Simulation
+    ctx.fillStyle = '#0f172a';
+    let barX = 80;
+    for (let i = 0; i < 46; i++) {
+      const w = (i % 3 === 0) ? 5 : (i % 2 === 0) ? 3 : 2;
+      ctx.fillRect(barX, 580, w, 65);
+      barX += w + 3;
+    }
+    ctx.font = '14px monospace';
+    ctx.fillText('*PB-ANNA-2026-XEROX-0428*', 80, 670);
+
+    // Official Seal Stamp
+    ctx.save();
+    ctx.translate(975, 595);
+    ctx.rotate(-0.15);
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.85)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(0, 0, 65, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(16, 185, 129, 0.85)';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('VERIFIED XEROX', 0, -15);
+    ctx.fillText('OFFICIAL COPY', 0, 8);
+    ctx.fillText('OCT 2026', 0, 28);
+    ctx.restore();
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    setCameraError(null);
+    setCapturedPreview(dataUrl);
   };
 
   const closeCamera = () => {
@@ -402,6 +530,7 @@ function CustomerFlow() {
     if (!ctx) return;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    setCameraError(null);
     setCapturedPreview(dataUrl);
   };
 
@@ -596,36 +725,7 @@ function CustomerFlow() {
 
   return (
     <div className="customer-app">
-      {/* 1. DISCREET INTERACTIVE SANDBOX TOP-TICKER (Dismissible, only if preview session) */}
-      {isPreviewSession && showSandboxNotice && (
-        <div className="customer-sandbox-ticker" role="region" aria-label="Interactive Sandbox Notice">
-          <div className="sandbox-ticker-inner">
-            <span className="ticker-chip">
-              <Sparkles size={12} className="sparkle-spin" />
-              <span>{lang === 'ta' ? 'மாதிரி கவுண்டர்' : lang === 'hi' ? 'डेमो मोड' : 'Interactive Sandbox'}</span>
-            </span>
-            <span className="ticker-message">
-              {lang === 'ta'
-                ? 'நேரடி விலைக் கணிப்பு & Windows பிரிண்ட் வரிசை மாதிரி இயக்கம் · கட்டணம் தேவையில்லை.'
-                : lang === 'hi'
-                ? 'लाइव पेज गणित और Windows spooler सिमुलेशन सक्रिय · कोई वास्तविक भुगतान नहीं।'
-                : 'Real-time duplex sheet math & native Windows spooler simulation · Zero real payment charged'}
-            </span>
-            <span className="ticker-shop-pill">{session.shop_name}</span>
-          </div>
-          <button
-            type="button"
-            className="ticker-dismiss-btn"
-            onClick={() => setShowSandboxNotice(false)}
-            title="Dismiss notice"
-            aria-label="Dismiss notice"
-          >
-            <X size={13} />
-          </button>
-        </div>
-      )}
-
-      {/* 2. BESPOKE ULTRA-PREMIUM CUSTOMER COUNTER HEADER */}
+      {/* 1. BESPOKE ULTRA-PREMIUM CUSTOMER COUNTER HEADER */}
       <header className="customer-hub-header">
         <div className="customer-header-inner">
           {/* Left: Brand Emblem + Official Shop Identity & Real-Time Status */}
@@ -1750,6 +1850,21 @@ function CustomerFlow() {
                 <span>Live Document Scanner</span>
               </div>
               <div className="camera-header-actions">
+                {videoDevices.length > 1 && !capturedPreview && (
+                  <select
+                    className="camera-device-select"
+                    value={selectedDeviceId}
+                    onChange={(e) => switchCameraDevice(e.target.value)}
+                    title="Switch camera device"
+                    aria-label="Select camera device"
+                  >
+                    {videoDevices.map((d, idx) => (
+                      <option key={d.deviceId || idx} value={d.deviceId}>
+                        {d.label || `Camera ${idx + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 {!capturedPreview && (
                   <button
                     type="button"
@@ -1758,7 +1873,7 @@ function CustomerFlow() {
                     title="Flip camera (front / back)"
                     aria-label="Flip camera"
                   >
-                    <RotateCcw size={18} />
+                    <RotateCcw size={17} />
                   </button>
                 )}
                 <button
@@ -1768,37 +1883,50 @@ function CustomerFlow() {
                   title="Close camera"
                   aria-label="Close camera"
                 >
-                  <X size={18} />
+                  <X size={17} />
                 </button>
               </div>
             </div>
 
             <div className="camera-viewport">
-              {cameraError ? (
+              {capturedPreview ? (
+                <div className="camera-preview-container">
+                  <img src={capturedPreview} alt="Captured Document" className="camera-preview-img" />
+                  <div className="preview-watermark-chip">
+                    <CheckCircle2 size={13} />
+                    <span>Scanned Document Ready</span>
+                  </div>
+                </div>
+              ) : cameraError ? (
                 <div className="camera-error-view">
                   <div className="camera-error-icon-box">
                     <Camera size={36} />
                   </div>
-                  <strong style={{ fontSize: '15px', color: '#fff' }}>Camera Access Blocked</strong>
+                  <strong style={{ fontSize: '15px', color: '#fff' }}>Camera Sensor Unavailable</strong>
                   <p className="camera-error-text">{cameraError}</p>
-                  <label className="btn-camera-fallback">
-                    <Upload size={16} />
-                    <span>Choose photo from device</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      style={{ display: 'none' }}
-                      onChange={(e) => {
-                        selectFiles(e.target.files);
-                        closeCamera();
-                      }}
-                    />
-                  </label>
-                </div>
-              ) : capturedPreview ? (
-                <div className="camera-preview-container">
-                  <img src={capturedPreview} alt="Captured Document" className="camera-preview-img" />
-                  <div className="preview-watermark-chip">Scanned Document Ready</div>
+                  <div className="camera-fallback-actions">
+                    <label className="btn-camera-fallback">
+                      <Upload size={16} />
+                      <span>Choose Photo from Device</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          selectFiles(e.target.files);
+                          closeCamera();
+                        }}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="btn-camera-sample-fallback"
+                      onClick={loadSampleDocument}
+                    >
+                      <Sparkles size={15} />
+                      <span>Try Sample ID Document</span>
+                    </button>
+                  </div>
                 </div>
               ) : cameraLoading || !cameraStream ? (
                 <div className="camera-loading-view">
@@ -1808,9 +1936,17 @@ function CustomerFlow() {
                     <strong style={{ fontSize: '15px', color: '#fff', marginTop: '12px', display: 'block' }}>
                       Connecting to Camera Sensor...
                     </strong>
-                    <p style={{ fontSize: '12px', color: '#94a3b8', margin: '6px 0 0', maxWidth: '320px', lineHeight: 1.5 }}>
+                    <p style={{ fontSize: '12px', color: '#94a3b8', margin: '6px 0 16px', maxWidth: '320px', lineHeight: 1.5 }}>
                       Please click "Allow" if prompted by your browser for camera permissions.
                     </p>
+                    <button
+                      type="button"
+                      className="btn-camera-sample-fallback"
+                      onClick={loadSampleDocument}
+                    >
+                      <Sparkles size={14} />
+                      <span>Skip &amp; Try Sample Document</span>
+                    </button>
                   </div>
                 </div>
               ) : (
@@ -1827,7 +1963,35 @@ function CustomerFlow() {
                     <span className="reticle-corner tr" />
                     <span className="reticle-corner bl" />
                     <span className="reticle-corner br" />
+                    <div className="scanner-laser-bar" />
                   </div>
+
+                  {/* Quick in-view helpers for desktop/virtual cameras */}
+                  <div className="camera-viewport-helpers">
+                    <button
+                      type="button"
+                      className="viewport-action-pill sample"
+                      onClick={loadSampleDocument}
+                      title="Load sample Anna University student document"
+                    >
+                      <Sparkles size={13} />
+                      <span>Try Sample Document</span>
+                    </button>
+                    <label className="viewport-action-pill upload" title="Select photo directly from disk">
+                      <Upload size={13} />
+                      <span>Upload Photo</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          selectFiles(e.target.files);
+                          closeCamera();
+                        }}
+                      />
+                    </label>
+                  </div>
+
                   <div className="camera-guide-text">
                     Align document or certificate within guidelines
                   </div>

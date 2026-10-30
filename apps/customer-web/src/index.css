@@ -4011,3 +4011,330 @@ h1, h2, h3 { font-family: 'Manrope', -apple-system, sans-serif; letter-spacing: 
   letter-spacing: 0.06em;
   color: var(--pb-accent);
 }
+
+
+/* ==========================================================================
+   BULLETPROOF ISOLATED CAMERA SCANNER MODAL (IMMUNE TO GLOBAL LIGHT THEME)
+   ========================================================================== */
+
+.customer-camera-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 99999 !important;
+  background: rgba(0, 0, 0, 0.88) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 16px !important;
+}
+
+.customer-camera-modal .camera-card {
+  width: min(560px, 100%) !important;
+  max-width: 560px !important;
+  background: #090e18 !important;
+  border: 1.5px solid var(--pb-border-gold) !important;
+  border-radius: 22px !important;
+  overflow: hidden !important;
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.9), 0 0 40px rgba(212, 175, 55, 0.2) !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.customer-camera-modal .camera-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 14px 18px !important;
+  background: #0f172a !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.customer-camera-modal .camera-header-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  font-size: 13px !important;
+  font-weight: 750 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  color: #ffffff !important;
+}
+
+.customer-camera-modal .camera-live-dot {
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50% !important;
+  background: #ef4444 !important;
+  box-shadow: 0 0 10px #ef4444 !important;
+  animation: liveDotPulse 1.4s infinite !important;
+}
+@keyframes liveDotPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.customer-camera-modal .camera-header-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.customer-camera-modal .camera-device-select {
+  height: 32px !important;
+  min-height: 32px !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 8px !important;
+  color: #ffffff !important;
+  font-size: 11.5px !important;
+  padding: 0 8px !important;
+  max-width: 140px !important;
+  cursor: pointer !important;
+}
+.customer-camera-modal .camera-device-select option {
+  background: #0f172a !important;
+  color: #ffffff !important;
+}
+
+/* Explicit Button Resets inside Camera Modal */
+.customer-camera-modal .camera-btn-icon {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  max-width: 34px !important;
+  max-height: 34px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 10px !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  box-shadow: none !important;
+  transition: all 0.2s ease !important;
+}
+.customer-camera-modal .camera-btn-icon:hover {
+  background: rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
+  transform: scale(1.05) !important;
+}
+.customer-camera-modal .camera-btn-icon svg {
+  width: 17px !important;
+  height: 17px !important;
+  stroke: #ffffff !important;
+  color: #ffffff !important;
+  display: block !important;
+}
+
+/* Camera Viewport */
+.customer-camera-modal .camera-viewport {
+  position: relative !important;
+  width: 100% !important;
+  aspect-ratio: 4 / 3 !important;
+  background: #000000 !important;
+  overflow: hidden !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.customer-camera-modal .camera-video,
+.customer-camera-modal .camera-preview-img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+/* Reticle & Scanning Animation */
+.customer-camera-modal .camera-reticle {
+  position: absolute !important;
+  inset: 22px !important;
+  pointer-events: none !important;
+  border: 1px dashed rgba(212, 175, 55, 0.4) !important;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+}
+.customer-camera-modal .reticle-corner {
+  position: absolute !important;
+  width: 22px !important;
+  height: 22px !important;
+  border-color: #d4af37 !important;
+  border-style: solid !important;
+}
+.customer-camera-modal .reticle-corner.tl { top: -2px !important; left: -2px !important; border-width: 3.5px 0 0 3.5px !important; border-top-left-radius: 10px !important; }
+.customer-camera-modal .reticle-corner.tr { top: -2px !important; right: -2px !important; border-width: 3.5px 3.5px 0 0 !important; border-top-right-radius: 10px !important; }
+.customer-camera-modal .reticle-corner.bl { bottom: -2px !important; left: -2px !important; border-width: 0 0 3.5px 3.5px !important; border-bottom-left-radius: 10px !important; }
+.customer-camera-modal .reticle-corner.br { bottom: -2px !important; right: -2px !important; border-width: 0 3.5px 3.5px 0 !important; border-bottom-right-radius: 10px !important; }
+
+/* Animated Scanner Laser Sweep */
+.customer-camera-modal .scanner-laser-bar {
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 2.5px !important;
+  background: linear-gradient(90deg, transparent 0%, #fce881 50%, transparent 100%) !important;
+  box-shadow: 0 0 14px #fce881, 0 0 6px #d4af37 !important;
+  animation: laserSweep 2.2s ease-in-out infinite !important;
+}
+@keyframes laserSweep {
+  0% { top: 2%; opacity: 0.3; }
+  50% { top: 96%; opacity: 1; }
+  100% { top: 2%; opacity: 0.3; }
+}
+
+/* In-Viewport Helper Action Pills */
+.customer-camera-modal .camera-viewport-helpers {
+  position: absolute !important;
+  top: 14px !important;
+  left: 0 !important;
+  right: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  z-index: 10 !important;
+}
+.customer-camera-modal .viewport-action-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 6px 14px !important;
+  min-height: 32px !important;
+  height: 32px !important;
+  border-radius: 999px !important;
+  font-size: 11.5px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4) !important;
+}
+.customer-camera-modal .viewport-action-pill.sample {
+  background: rgba(103, 40, 63, 0.9) !important;
+  border: 1px solid var(--pb-border-gold) !important;
+  color: #ffffff !important;
+}
+.customer-camera-modal .viewport-action-pill.sample:hover {
+  background: #67283f !important;
+  transform: translateY(-1px) scale(1.02) !important;
+}
+.customer-camera-modal .viewport-action-pill.upload {
+  background: rgba(15, 23, 42, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
+}
+.customer-camera-modal .viewport-action-pill.upload:hover {
+  background: rgba(30, 41, 59, 0.95) !important;
+  transform: translateY(-1px) scale(1.02) !important;
+}
+
+.customer-camera-modal .camera-guide-text {
+  position: absolute !important;
+  bottom: 14px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  background: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  padding: 5px 14px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #e2e8f0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+}
+
+/* Shutter Controls */
+.customer-camera-modal .camera-controls {
+  padding: 18px 20px !important;
+  background: #090e18 !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.customer-camera-modal .camera-shutter-container {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+.customer-camera-modal .camera-shutter-btn {
+  width: 68px !important;
+  height: 68px !important;
+  min-width: 68px !important;
+  min-height: 68px !important;
+  max-width: 68px !important;
+  max-height: 68px !important;
+  padding: 4px !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  border: 4px solid var(--pb-accent) !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 0 20px rgba(212, 175, 55, 0.4) !important;
+  transition: transform 0.15s ease, border-color 0.15s ease !important;
+}
+.customer-camera-modal .camera-shutter-btn:hover {
+  transform: scale(1.08) !important;
+  border-color: #fce881 !important;
+  box-shadow: 0 0 28px rgba(212, 175, 55, 0.6) !important;
+}
+.customer-camera-modal .camera-shutter-btn:active {
+  transform: scale(0.92) !important;
+}
+.customer-camera-modal .shutter-inner {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 50% !important;
+  background: #ffffff !important;
+  transition: background 0.2s ease !important;
+}
+.customer-camera-modal .camera-shutter-btn:hover .shutter-inner {
+  background: #fce881 !important;
+}
+.customer-camera-modal .shutter-hint {
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.12em !important;
+  color: #94a3b8 !important;
+  text-transform: uppercase !important;
+}
+
+/* Fallback & Loading Views */
+.customer-camera-modal .camera-fallback-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin-top: 14px !important;
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+}
+.customer-camera-modal .btn-camera-sample-fallback {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 9px 18px !important;
+  border-radius: 10px !important;
+  background: #67283f !important;
+  border: 1px solid var(--pb-border-gold) !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+.customer-camera-modal .btn-camera-sample-fallback:hover {
+  background: #7a314b !important;
+  transform: translateY(-1px) !important;
+}
