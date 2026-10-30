@@ -7,6 +7,17 @@ export default defineConfig({
     jsx: 'automatic',
   },
   base: '/',
+  build: {
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-icons': ['lucide-react'],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     host: true,
@@ -16,5 +27,3 @@ export default defineConfig({
     host: true,
   },
 });
-
-

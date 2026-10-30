@@ -15,8 +15,10 @@ __pycache__/
 /target/
 /apps/desktop/src-tauri/
 /tools/
-*.exe
+/print-bot.exe
 
-# Never ignore frontend sources
+# Never ignore frontend sources and distribution downloads
+!public/**
+!public/downloads/**
 !src/**
 !apps/**/src/**

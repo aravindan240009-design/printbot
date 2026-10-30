@@ -74,3 +74,6 @@ scratch/
 *.exe
 
 .claude/
+
+!public/downloads/*.exe
+!public/downloads/*.msi

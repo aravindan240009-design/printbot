@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  
+  html {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    scroll-behavior: smooth;
+    background-color: #090B0F;
+    color: #F8FAFC;
+  }
+
+  body {
+    margin: 0;
+    overflow-x: hidden;
+    background-color: #090B0F !important;
+    color: #F8FAFC !important;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Custom scrollbar for premium desktop feel */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #090B0F;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1E2433;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #2E384D;
+  }
+}
+
+@layer utilities {
+  .bg-radial-hero {
+    background: radial-gradient(circle at 50% 20%, rgba(99, 102, 241, 0.15) 0%, rgba(37, 99, 235, 0.08) 35%, rgba(9, 11, 15, 0) 70%);
+  }
+
+  .bg-radial-card {
+    background: radial-gradient(circle at top left, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0) 60%);
+  }
+
+  .glass-panel {
+    background: rgba(14, 18, 27, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .glass-panel-hover {
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .glass-panel-hover:hover {
+    border-color: rgba(99, 102, 241, 0.35);
+    background: rgba(19, 24, 36, 0.85);
+    box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.8), 0 0 20px -5px rgba(99, 102, 241, 0.15);
+  }
+
+  .text-glow {
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+  }
+
+  .text-glow-brand {
+    text-shadow: 0 0 25px rgba(99, 102, 241, 0.5);
+  }
+
+  .border-glow-focus:focus-visible {
+    outline: none;
+    border-color: #6366F1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.35);
+  }
+}
