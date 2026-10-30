@@ -47,6 +47,14 @@ export const App: React.FC = () => {
   const [preselectedPlan, setPreselectedPlan] = useState<string | undefined>(undefined);
 
   useEffect(() => {
+    if (shopId) {
+      document.title = `${shopId.toUpperCase()} • Touchless Print Counter`;
+    } else {
+      document.title = 'Print Bot — Desktop Printing and Shop Manager for Windows';
+    }
+  }, [shopId]);
+
+  useEffect(() => {
     // Staggered reveal observer for sections and cards
     const observer = new IntersectionObserver(
       (entries) => {

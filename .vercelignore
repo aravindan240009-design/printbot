@@ -13,6 +13,7 @@ __pycache__/
 Cargo.toml
 Cargo.lock
 target/
-apps/desktop/src-tauri/
+apps/desktop/
 tools/
+*.exe
 

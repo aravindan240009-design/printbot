@@ -124,11 +124,12 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
   // Dynamic Shop Resolution: load profile & subscribe to live rate updates from Desktop Workstation
   useEffect(() => {
     if (!resolvedSlug) return;
+    document.title = `${resolvedSlug.toUpperCase()} • Touchless Print Counter`;
     let unsubRealtime: (() => void) | undefined;
 
     loadShopProfile(resolvedSlug).then((profile) => {
       setSession(profile);
-      document.title = `${profile.shop_name} — Instant Mobile Printing`;
+      document.title = `${profile.shop_name} • Touchless Print Counter`;
     });
 
     unsubRealtime = subscribeToShopRealtime(resolvedSlug, (updated) => {
