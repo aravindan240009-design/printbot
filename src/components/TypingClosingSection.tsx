@@ -19,7 +19,6 @@ export function TypingClosingSection({ onDownload }: TypingClosingProps) {
   const [displayedText, setDisplayedText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [stamped, setStamped] = useState(false);
 
   // Audio Context Ref
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -143,13 +142,11 @@ export function TypingClosingSection({ onDownload }: TypingClosingProps) {
           playTypewriterClick(char === ' ');
         }, typingSpeed);
       } else {
-        // Finished typing full phrase: play carriage chime and stamp effect
-        setStamped(true);
+        // Finished typing full phrase: play carriage chime
         playCarriageChime();
         // Pause to let user read
         timeout = setTimeout(() => {
           setIsDeleting(true);
-          setStamped(false);
         }, 2400);
       }
     } else {
@@ -187,34 +184,6 @@ export function TypingClosingSection({ onDownload }: TypingClosingProps) {
 
   return (
     <section className="typing-closing-section shell" aria-label="Interactive Closing Section">
-      {/* Background Ambience & Animated Guilloché Seal */}
-      <div className={`closing-stamp-seal ${stamped ? 'stamped' : ''}`} aria-hidden="true">
-        <svg width="220" height="220" viewBox="0 0 220 220" fill="none">
-          <circle cx="110" cy="110" r="100" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.25" />
-          <circle cx="110" cy="110" r="85" stroke="currentColor" strokeWidth="1" opacity="0.4" />
-          <circle cx="110" cy="110" r="70" stroke="currentColor" strokeWidth="0.75" strokeDasharray="2 2" opacity="0.2" />
-          {Array.from({ length: 24 }).map((_, i) => (
-            <line
-              key={i}
-              x1="110"
-              y1="28"
-              x2="110"
-              y2="36"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              transform={`rotate(${i * 15} 110 110)`}
-              opacity="0.35"
-            />
-          ))}
-          <text x="110" y="105" textAnchor="middle" fill="currentColor" fontSize="11" fontWeight="800" letterSpacing="2.5" opacity="0.4">
-            PRINT BOT
-          </text>
-          <text x="110" y="122" textAnchor="middle" fill="currentColor" fontSize="8" fontWeight="600" letterSpacing="1.5" opacity="0.35">
-            VERIFIED COUNTER
-          </text>
-        </svg>
-      </div>
-
       {/* Top Header Tag */}
       <div className="closing-eyebrow-row">
         <span className="closing-badge">
