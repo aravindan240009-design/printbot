@@ -133,7 +133,7 @@ export default function App() {
       <header className="landing-sticky-header">
         <div className="navigation shell">
           <a className="brand" href="#" aria-label="Print Bot home">
-            <PrintBotLogo size={40} />
+            <PrintBotLogo size={36} />
             printbot<span className="brand-dot">®</span>
           </a>
 
@@ -149,26 +149,28 @@ export default function App() {
             </a>
           </nav>
 
-          <button className="nav-cta" onClick={() => setDialog(true)}>
-            Let’s talk print <ArrowUpRight size={16} />
-          </button>
+          <div className="nav-actions">
+            <button className="nav-cta" onClick={() => setDialog(true)}>
+              Let’s talk print <ArrowUpRight size={15} />
+            </button>
 
-          <button
-            className="landing-theme-switch"
-            aria-label={siteTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-            onClick={() => setSiteTheme(siteTheme === 'dark' ? 'light' : 'dark')}
-          >
-            {siteTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
+            <button
+              className="landing-theme-switch"
+              aria-label={siteTheme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+              onClick={() => setSiteTheme(siteTheme === 'dark' ? 'light' : 'dark')}
+            >
+              {siteTheme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+            </button>
 
-          <button
-            className="menu-toggle"
-            aria-label={menu ? 'Close navigation' : 'Open navigation'}
-            aria-expanded={menu}
-            onClick={() => setMenu(!menu)}
-          >
-            {menu ? <X /> : <Menu />}
-          </button>
+            <button
+              className="menu-toggle"
+              aria-label={menu ? 'Close navigation' : 'Open navigation'}
+              aria-expanded={menu}
+              onClick={() => setMenu(!menu)}
+            >
+              {menu ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          </div>
         </div>
       </header>
 
