@@ -462,17 +462,33 @@ export default function App() {
     }
   }, [currentShop]);
 
+  const [platformDomain, setPlatformDomain] = useState<string>(() => {
+    return (
+      localStorage.getItem('printbot_platform_domain') ||
+      (import.meta.env.VITE_PLATFORM_DOMAIN as string) ||
+      'printbotak.vercel.app'
+    );
+  });
+  const [customDomainInput, setCustomDomainInput] = useState<string>(() => {
+    return (
+      localStorage.getItem('printbot_platform_domain') ||
+      (import.meta.env.VITE_PLATFORM_DOMAIN as string) ||
+      'printbotak.vercel.app'
+    );
+  });
+
   const [websiteQrDataUrl, setWebsiteQrDataUrl] = useState<string>('');
   useEffect(() => {
     const shopSlug = (currentShop?.shopName || currentShop?.username || 'shop')
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9]/g, '');
-    const customerPortalUrl = `https://printbotak.vercel.app/?shop=${shopSlug}`;
-    QRCode.toDataURL(customerPortalUrl, { width: 280, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
+    const cleanDomain = platformDomain.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    const shopSubdomainUrl = `https://${shopSlug}.${cleanDomain}`;
+    QRCode.toDataURL(shopSubdomainUrl, { width: 280, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
       .then(setWebsiteQrDataUrl)
       .catch((err) => console.warn('QR code generation error:', err));
-  }, [currentShop?.shopName, currentShop?.username]);
+  }, [currentShop?.shopName, currentShop?.username, platformDomain]);
 
   const handleSaveSetup = (e: React.FormEvent) => {
     e.preventDefault();
@@ -4067,11 +4083,9 @@ export default function App() {
               .toLowerCase()
               .trim()
               .replace(/[^a-z0-9]/g, '');
-            const mainDomain = 'https://printbotak.vercel.app';
-            const customerPortalUrl = `https://printbotak.vercel.app/?shop=${shopSlug}`;
-            const cleanPathUrl = `https://printbotak.vercel.app/shop/${shopSlug}`;
-            const shopSubdomainUrl = `https://${shopSlug}.printbotak.vercel.app`;
-            const qrImageUrl = websiteQrDataUrl || `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(customerPortalUrl)}`;
+            const cleanDomain = platformDomain.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+            const shopSubdomainUrl = `https://${shopSlug}.${cleanDomain}`;
+            const qrImageUrl = websiteQrDataUrl || `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(shopSubdomainUrl)}`;
 
             return (
               <div className="ws-view">
@@ -4079,37 +4093,37 @@ export default function App() {
                   <div>
                     <span className="ws-eyebrow">ONLINE ACCESS</span>
                     <h1>Shop Website &amp; QR Code</h1>
-                    <p>Customers can upload and print directly using your dedicated web address or counter stand QR code.</p>
+                    <p>Customers can upload and print directly using your dedicated shop owner subdomain or counter stand QR code.</p>
                   </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', alignItems: 'start' }}>
-                  {/* Left Column: Domain & Access Links */}
+                  {/* Left Column: Dedicated Shop Subdomain */}
                   <div className="ws-panel" style={{ padding: '24px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
                       <Globe size={20} color="var(--pb-accent)" />
                       <div>
-                        <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 750 }}>Customer Access Links</h3>
-                        <small style={{ color: 'var(--pb-muted)' }}>Share your shop link with customers to upload from their phones</small>
+                        <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 750 }}>Shop Owner Subdomain</h3>
+                        <small style={{ color: 'var(--pb-muted)' }}>Dedicated web address for your customers to upload from their phones</small>
                       </div>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                       {/* Shop Subdomain Portal */}
-                      <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--pb-raised)', border: '1px solid var(--pb-accent)' }}>
-                        <div style={{ marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-accent)' }}>YOUR DEDICATED SHOP SUBDOMAIN</span>
-                          <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', fontWeight: 700 }}>LIVE SUBDOMAIN</span>
+                      <div style={{ padding: '16px', borderRadius: '12px', background: 'var(--pb-raised)', border: '1px solid var(--pb-accent)' }}>
+                        <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-accent)', letterSpacing: '0.5px' }}>YOUR DEDICATED SHOP SUBDOMAIN</span>
+                          <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '4px', background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', fontWeight: 700 }}>LIVE SUBDOMAIN</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
-                          <code style={{ fontSize: '13px', fontWeight: 750, color: 'var(--pb-accent)' }}>{shopSubdomainUrl}</code>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                          <code style={{ fontSize: '14px', fontWeight: 750, color: 'var(--pb-accent)', wordBreak: 'break-all' }}>{shopSubdomainUrl}</code>
                           <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                             <button
                               onClick={() => {
                                 navigator.clipboard.writeText(shopSubdomainUrl);
                                 setNotice('Copied shop subdomain link to clipboard.');
                               }}
-                              style={{ border: 0, padding: '4px 10px', fontSize: '11px', gap: '4px' }}
+                              style={{ border: 0, padding: '5px 10px', fontSize: '11px', gap: '4px' }}
                             >
                               <Copy size={12} /> Copy
                             </button>
@@ -4121,7 +4135,7 @@ export default function App() {
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px',
-                                padding: '4px 10px',
+                                padding: '5px 10px',
                                 fontSize: '11px',
                                 borderRadius: '6px',
                                 background: 'var(--pb-accent)',
@@ -4136,103 +4150,42 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Customer Dedicated Portal (Guaranteed Live SSL) */}
-                      <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--pb-raised)', border: '1px solid var(--pb-accent)' }}>
-                        <div style={{ marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-accent)' }}>YOUR DEDICATED CUSTOMER PORTAL</span>
-                          <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', fontWeight: 700 }}>LIVE SSL</span>
+                      {/* Custom / Platform Domain Setting */}
+                      <div style={{ padding: '16px', borderRadius: '12px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
+                        <div style={{ marginBottom: '8px' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--pb-text)' }}>Platform Root / Custom Domain</span>
+                          <p style={{ margin: '4px 0 10px', fontSize: '11px', color: 'var(--pb-muted)', lineHeight: 1.4 }}>
+                            Wildcard subdomains (<code>*.yourdomain.com</code>) require a custom domain on Vercel with a wildcard DNS record. Vercel does not route multi-level subdomains on default <code>vercel.app</code> domains.
+                          </p>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
-                          <code style={{ fontSize: '13px', fontWeight: 750, color: 'var(--pb-accent)' }}>{customerPortalUrl}</code>
-                          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(customerPortalUrl);
-                                setNotice('Copied customer portal link to clipboard.');
-                              }}
-                              style={{ border: 0, padding: '4px 10px', fontSize: '11px', gap: '4px' }}
-                            >
-                              <Copy size={12} /> Copy
-                            </button>
-                            <a
-                              href={customerPortalUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '4px 10px',
-                                fontSize: '11px',
-                                borderRadius: '6px',
-                                background: 'var(--pb-accent)',
-                                color: '#fff',
-                                textDecoration: 'none',
-                                fontWeight: 650
-                              }}
-                            >
-                              <ExternalLink size={12} /> Visit
-                            </a>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Direct Clean Path Route */}
-                      <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
-                        <div style={{ marginBottom: '6px' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-muted)' }}>DIRECT PATH ROUTE</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
-                          <code style={{ fontSize: '13px', fontWeight: 650 }}>{cleanPathUrl}</code>
-                          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(cleanPathUrl);
-                                setNotice('Copied clean path route to clipboard.');
-                              }}
-                              style={{ border: 0, padding: '4px 8px', fontSize: '11px', gap: '4px' }}
-                            >
-                              <Copy size={12} /> Copy
-                            </button>
-                            <a
-                              href={cleanPathUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '4px 8px',
-                                fontSize: '11px',
-                                borderRadius: '6px',
-                                background: 'var(--pb-raised)',
-                                border: '1px solid var(--pb-border)',
-                                color: 'var(--pb-text)',
-                                textDecoration: 'none',
-                                fontWeight: 650
-                              }}
-                            >
-                              <ExternalLink size={12} /> Open
-                            </a>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Main Platform Domain */}
-                      <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
-                        <div style={{ marginBottom: '6px' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-muted)' }}>PLATFORM MAIN DOMAIN</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <code style={{ fontSize: '13px', fontWeight: 650 }}>{mainDomain}/</code>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(`${mainDomain}/`);
-                              setNotice('Copied platform main domain to clipboard.');
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            value={customDomainInput}
+                            onChange={(e) => setCustomDomainInput(e.target.value)}
+                            placeholder="e.g. printbotak.com or yourdomain.com"
+                            style={{
+                              flex: 1,
+                              padding: '8px 12px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--pb-border)',
+                              background: 'var(--pb-bg)',
+                              color: 'var(--pb-text)',
+                              fontSize: '12px'
                             }}
-                            style={{ border: 0, padding: '4px 8px', fontSize: '11px', gap: '4px' }}
+                          />
+                          <button
+                            className="ws-primary"
+                            onClick={() => {
+                              const clean = customDomainInput.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+                              if (!clean) return;
+                              setPlatformDomain(clean);
+                              localStorage.setItem('printbot_platform_domain', clean);
+                              setNotice(`Platform domain updated to ${clean}`);
+                            }}
+                            style={{ padding: '8px 14px', fontSize: '12px', flexShrink: 0 }}
                           >
-                            <Copy size={12} /> Copy
+                            Save Domain
                           </button>
                         </div>
                       </div>
@@ -4270,7 +4223,7 @@ export default function App() {
                                     h1 { margin: 0 0 8px; font-size: 24px; font-weight: 800; }
                                     p { color: #52525b; margin: 0 0 24px; font-size: 14px; }
                                     img { width: 240px; height: 240px; border-radius: 12px; }
-                                    .sub { margin-top: 20px; font-size: 12px; font-weight: 700; color: #18181b; word-break: break-all; }
+                                    .sub { margin-top: 20px; font-size: 13px; font-weight: 750; color: #18181b; word-break: break-all; }
                                   </style>
                                 </head>
                                 <body>
@@ -4278,7 +4231,7 @@ export default function App() {
                                     <h1>${currentShop?.shopName || 'Print Shop'}</h1>
                                     <p>Scan to Upload &amp; Print from Phone</p>
                                     <img src="${qrImageUrl}" alt="QR Code" />
-                                    <div class="sub">${customerPortalUrl}</div>
+                                    <div class="sub">${shopSubdomainUrl}</div>
                                   </div>
                                   <script>window.onload = function() { window.print(); };</script>
                                 </body>
@@ -4294,8 +4247,8 @@ export default function App() {
 
                       <button
                         onClick={() => {
-                          navigator.clipboard.writeText(customerPortalUrl);
-                          setNotice('Copied shop portal URL for customers.');
+                          navigator.clipboard.writeText(shopSubdomainUrl);
+                          setNotice('Copied shop subdomain link to clipboard.');
                         }}
                         style={{ width: '100%', justifyContent: 'center', minHeight: '38px', gap: '6px' }}
                       >
