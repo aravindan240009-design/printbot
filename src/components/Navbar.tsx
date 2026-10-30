@@ -8,8 +8,7 @@ import {
   ExternalLink, 
   Sliders, 
   ShieldCheck, 
-  Sparkles,
-  Smartphone
+  Sparkles
 } from 'lucide-react';
 import { DOWNLOAD_CONFIG, triggerInstallerDownload } from '../config/download';
 
@@ -110,16 +109,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, onOpenDow
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-3">
-            {/* Customer Counter Portal link */}
-            <button
-              onClick={() => handleNavClick('/customer')}
-              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-300 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl transition-all duration-200 cursor-pointer"
-              title="Launch walk-in customer mobile web upload preview"
-            >
-              <Smartphone className="w-3.5 h-3.5 text-brand-400" />
-              <span>Customer Portal</span>
-            </button>
-
             {/* Primary Download CTA */}
             <button
               onClick={handleDownload}
@@ -180,14 +169,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, onOpenDow
           </div>
 
           <div className="pt-2 border-t border-white/[0.08] grid gap-2">
-            <button
-              onClick={() => handleNavClick('/customer')}
-              className="w-full py-2.5 px-4 text-sm font-medium text-slate-300 bg-white/[0.05] hover:bg-white/[0.08] rounded-xl flex items-center justify-center gap-2"
-            >
-              <Smartphone className="w-4 h-4 text-brand-400" />
-              <span>Launch Customer Upload Portal</span>
-            </button>
-
             <button
               onClick={() => {
                 setMobileMenuOpen(false);

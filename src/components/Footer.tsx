@@ -97,11 +97,10 @@ export const Footer: React.FC<FooterProps> = ({ navigate, onOpenDownloadModal })
               </li>
               <li>
                 <button
-                  onClick={() => handleNav('/customer')}
-                  className="hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+                  onClick={() => handleNav('/features')}
+                  className="hover:text-white transition-colors cursor-pointer"
                 >
-                  <span>Customer QR Portal</span>
-                  <span className="text-[10px] px-1.5 py-0.2 bg-brand-500/20 text-brand-300 rounded">Live</span>
+                  Customer QR Engine
                 </button>
               </li>
               <li>
