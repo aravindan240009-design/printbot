@@ -4095,6 +4095,47 @@ export default function App() {
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      {/* Shop Subdomain Portal */}
+                      <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--pb-raised)', border: '1px solid var(--pb-accent)' }}>
+                        <div style={{ marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-accent)' }}>YOUR DEDICATED SHOP SUBDOMAIN</span>
+                          <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', fontWeight: 700 }}>LIVE SUBDOMAIN</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                          <code style={{ fontSize: '13px', fontWeight: 750, color: 'var(--pb-accent)' }}>{shopSubdomainUrl}</code>
+                          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(shopSubdomainUrl);
+                                setNotice('Copied shop subdomain link to clipboard.');
+                              }}
+                              style={{ border: 0, padding: '4px 10px', fontSize: '11px', gap: '4px' }}
+                            >
+                              <Copy size={12} /> Copy
+                            </button>
+                            <a
+                              href={shopSubdomainUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 10px',
+                                fontSize: '11px',
+                                borderRadius: '6px',
+                                background: 'var(--pb-accent)',
+                                color: '#fff',
+                                textDecoration: 'none',
+                                fontWeight: 650
+                              }}
+                            >
+                              <ExternalLink size={12} /> Visit Subdomain
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+
                       {/* Customer Dedicated Portal (Guaranteed Live SSL) */}
                       <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--pb-raised)', border: '1px solid var(--pb-accent)' }}>
                         <div style={{ marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
