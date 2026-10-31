@@ -413,58 +413,57 @@ export default function PrecisionPrinter({
     // ==============================================================
     // 6. HIGH-PRECISION 100% RIGID PRINTED DOCUMENT (NO UNROLLING)
     // ==============================================================
-    const artData = canvasTexture(1536, 2172, (ctx) => {
-      // 2x Retina super-sampling for crystal clear text and line art
+    const artData = canvasTexture(2172, 1536, (ctx) => {
+      // True 2x Retina super-sampling for crystal clear text and line art
       ctx.scale(2, 2);
-      // 1. Premium Warm Ivory Paper Stock
-      ctx.fillStyle = '#fdfbf7';
-      ctx.fillRect(0, 0, 768, 1086);
+
+      // 1. Premium High-Contrast Pure White Paper Stock (1086 x 768 logical space)
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, 1086, 768);
 
       // Outer & Inner Security Guilloche Border
       ctx.strokeStyle = '#c8a872';
       ctx.lineWidth = 4;
-      ctx.strokeRect(20, 20, 728, 1046);
+      ctx.strokeRect(16, 16, 1054, 736);
 
       ctx.strokeStyle = '#67283f';
       ctx.lineWidth = 1.5;
-      ctx.strokeRect(28, 28, 712, 1030);
+      ctx.strokeRect(24, 24, 1038, 720);
 
       // Top Header Banner Pill
       ctx.fillStyle = '#67283f';
-      ctx.fillRect(44, 46, 680, 46);
+      ctx.fillRect(40, 36, 1006, 46);
       ctx.fillStyle = '#edd5ae';
-      ctx.font = 'bold 16px monospace';
+      ctx.font = 'bold 17px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('PRINT BOT OS · OFFICIAL SUBSCRIBER PROPOSAL', 384, 75);
+      ctx.fillText('PRINT BOT OS · OFFICIAL SUBSCRIBER PROPOSAL · UNLIMITED PRINTERS', 543, 66);
 
-      // Main High-Impact Hero Headline (The Impressive Sentence)
+      // Main High-Impact Hero Headline
       ctx.textAlign = 'center';
-      ctx.fillStyle = '#211219';
-      ctx.font = 'bold 50px Georgia, serif';
-      ctx.fillText('Double Your Counter Speed.', 384, 155);
-
-      ctx.fillStyle = '#8b2949';
+      ctx.fillStyle = '#1c1218';
       ctx.font = 'bold 48px Georgia, serif';
-      ctx.fillText('Keep 100% Of Your Profit.', 384, 215);
+      ctx.fillText('Double Your Counter Speed.', 543, 138);
+
+      ctx.fillStyle = '#8b2046';
+      ctx.font = 'bold 46px Georgia, serif';
+      ctx.fillText('Keep 100% Of Your Profit.', 543, 192);
 
       // Gold Accent Divider
       ctx.strokeStyle = '#c8a872';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(120, 245);
-      ctx.lineTo(648, 245);
+      ctx.moveTo(180, 214);
+      ctx.lineTo(906, 214);
       ctx.stroke();
 
-      // The Impressive Pitch Sentence (Clear, Legible, High-Contrast)
-      ctx.fillStyle = '#2d221c';
+      // Pitch Sentence (Clear, Legible, High-Contrast)
+      ctx.fillStyle = '#22191f';
       ctx.font = 'bold 22px sans-serif';
-      ctx.fillText('0% Per-Page Commission. Unlimited Printers.', 384, 288);
+      ctx.fillText('0% Per-Page Commission · Unlimited Connected Printers', 543, 248);
 
-      ctx.fillStyle = '#5c493c';
-      ctx.font = '18px sans-serif';
-      ctx.fillText('One flat monthly subscription for your entire Xerox shop.', 384, 320);
-      ctx.fillText('Customers scan QR, upload & pay UPI in 30 seconds.', 384, 348);
-      ctx.fillText('Your printers deliver automatically without counter chaos.', 384, 376);
+      ctx.fillStyle = '#4a3b43';
+      ctx.font = '16px sans-serif';
+      ctx.fillText('One flat monthly subscription for your entire Xerox shop · Customers scan QR & pay UPI in 30 seconds', 543, 276);
 
       // 3 Highlight Feature Cards
       const features = [
@@ -474,85 +473,85 @@ export default function PrecisionPrinter({
       ];
 
       features.forEach((feat, idx) => {
-        const fx = 48 + idx * 230;
-        ctx.fillStyle = '#f5efe4';
-        ctx.fillRect(fx, 410, 212, 95);
+        const fx = 48 + idx * 342;
+        ctx.fillStyle = '#f8f4ec';
+        ctx.fillRect(fx, 302, 306, 88);
         ctx.strokeStyle = '#d9c7af';
         ctx.lineWidth = 1.5;
-        ctx.strokeRect(fx, 410, 212, 95);
+        ctx.strokeRect(fx, 302, 306, 88);
 
-        ctx.fillStyle = '#8b2949';
+        ctx.fillStyle = '#8b2046';
         ctx.font = 'bold 22px Georgia, serif';
-        ctx.fillText(feat.title, fx + 106, 448);
+        ctx.fillText(feat.title, fx + 153, 338);
 
-        ctx.fillStyle = '#5e4e41';
-        ctx.font = '12px sans-serif';
-        ctx.fillText(feat.desc, fx + 106, 478);
+        ctx.fillStyle = '#4f4035';
+        ctx.font = '14px sans-serif';
+        ctx.fillText(feat.desc, fx + 153, 368);
       });
 
       // Highlighted Subscription Pricing Box
-      ctx.fillStyle = '#2b121e';
-      ctx.fillRect(48, 535, 672, 230);
+      ctx.fillStyle = '#26101d';
+      ctx.fillRect(48, 408, 990, 185);
       ctx.strokeStyle = '#c8a872';
       ctx.lineWidth = 2.5;
-      ctx.strokeRect(48, 535, 672, 230);
+      ctx.strokeRect(48, 408, 990, 185);
 
       ctx.fillStyle = '#edd5ae';
       ctx.font = 'bold 16px monospace';
-      ctx.fillText('★ ALL-INCLUSIVE UNLIMITED SHOP PLAN ★', 384, 575);
+      ctx.fillText('★ ALL-INCLUSIVE UNLIMITED SHOP PLAN ★', 543, 442);
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 54px Georgia, serif';
-      ctx.fillText('₹199', 384, 642);
+      ctx.font = 'bold 64px Georgia, serif';
+      ctx.fillText('₹199', 543, 508);
 
-      ctx.fillStyle = '#dfc599';
-      ctx.font = 'bold 20px sans-serif';
-      ctx.fillText('per month  (or ₹1,999 / year)', 384, 678);
+      ctx.fillStyle = '#fce881';
+      ctx.font = 'bold 21px sans-serif';
+      ctx.fillText('per month  (or ₹1,999 / year)', 543, 542);
 
-      ctx.fillStyle = '#e8d4cb';
+      ctx.fillStyle = '#ecd6ce';
       ctx.font = '15px sans-serif';
-      ctx.fillText('Zero setup fee · 14-day free trial · Instant 5-min Windows setup', 384, 715);
+      ctx.fillText('Zero setup fee · 14-day free trial · Instant 5-min Windows setup', 543, 574);
 
       // CTA Banner Button
       ctx.fillStyle = '#e2c18b';
-      ctx.fillRect(160, 785, 448, 62);
+      ctx.fillRect(243, 610, 600, 56);
       ctx.strokeStyle = '#f5e4bd';
       ctx.lineWidth = 2;
-      ctx.strokeRect(160, 785, 448, 62);
+      ctx.strokeRect(243, 610, 600, 56);
 
       ctx.fillStyle = '#211219';
-      ctx.font = 'bold 24px sans-serif';
-      ctx.fillText('SUBSCRIBE TODAY ↗', 384, 824);
+      ctx.font = 'bold 23px sans-serif';
+      ctx.fillText('SUBSCRIBE TODAY ↗ · ₹199/MO', 543, 646);
 
-      // Official Starburst Certified Stamp
-      const cx = 384;
-      const cy = 925;
+      // Official Starburst Certified Stamp (Right Side)
+      const cx = 950;
+      const cy = 690;
       ctx.save();
       ctx.strokeStyle = '#c8a872';
       ctx.lineWidth = 1.8;
       for (let a = 0; a < Math.PI * 2; a += Math.PI / 12) {
         ctx.beginPath();
-        ctx.arc(cx + Math.cos(a) * 6, cy + Math.sin(a) * 6, 45, 0, Math.PI * 2);
+        ctx.arc(cx + Math.cos(a) * 6, cy + Math.sin(a) * 6, 36, 0, Math.PI * 2);
         ctx.stroke();
       }
       ctx.fillStyle = '#792d47';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.fillText('PRINT BOT OS CERTIFIED', cx, cy - 8);
-      ctx.fillText('ZERO COMMISSION GUARANTEE', cx, cy + 8);
-      ctx.fillText('★ 2026 ★', cx, cy + 22);
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText('PRINT BOT OS', cx, cy - 6);
+      ctx.fillText('VERIFIED 2026', cx, cy + 8);
       ctx.restore();
 
-      // Barcode & Footer
+      // Barcode & Footer (Left/Center)
       ctx.fillStyle = '#1c1712';
-      for (let x = 160; x < 608; x += 6) {
+      for (let x = 60; x < 480; x += 6) {
         if (Math.sin(x * 123.4) > -0.2) {
-          ctx.fillRect(x, 990, x % 3 === 0 ? 4 : 2, 38);
+          ctx.fillRect(x, 680, x % 3 === 0 ? 4 : 2, 34);
         }
       }
 
       ctx.fillStyle = '#7a6d5d';
-      ctx.font = '11px monospace';
-      ctx.fillText('* PB-SUBSCRIBE-OFFICIAL-2026 *', 384, 1045);
+      ctx.font = '12px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText('* PB-SUBSCRIBE-OFFICIAL-₹199 *', 60, 734);
     });
 
     const artTexture = artData.texture;
