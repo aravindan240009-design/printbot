@@ -100,7 +100,7 @@ export function SubscriptionModal({
   };
 
   const whatsappMessage = encodeURIComponent(
-    `Hi Print Bot Support Team!\n\nI just reserved my 14-Day Free Counter Pilot for:\nShop: ${shopName}\nCity: ${city || 'India'}\nPhone: ${whatsapp}\nPrinters: ${printerModel || 'Commercial Xerox / Digital'}\nPlan: ${billing === 'annual' ? 'Annual (₹14,990/yr)' : 'Monthly (₹1,499/mo)'}\nLicense: ${licenseKey}\n\nPlease confirm my pairing key and send my workstation setup guide!`
+    `Hi Print Bot Support Team!\n\nI just reserved my 14-Day Free Counter Pilot for:\nShop: ${shopName}\nCity: ${city || 'India'}\nPhone: ${whatsapp}\nPrinters: ${printerModel || 'Commercial Xerox / Digital'}\nPlan: ${billing === 'annual' ? 'Annual (₹1,999/yr)' : 'Monthly (₹199/mo)'}\nLicense: ${licenseKey}\n\nPlease confirm my pairing key and send my workstation setup guide!`
   );
 
   return (
@@ -213,7 +213,7 @@ export function SubscriptionModal({
                 <div className="sub-amount">
                   <span className="sub-currency">₹</span>
                   <span className="sub-val">
-                    {billing === 'annual' ? '14,990' : '1,499'}
+                    {billing === 'annual' ? '1,999' : '199'}
                   </span>
                   <span className="sub-period">
                     {billing === 'annual' ? '/year' : '/month'}

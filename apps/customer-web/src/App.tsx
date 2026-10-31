@@ -1008,9 +1008,9 @@ function CustomerFlow() {
                       <span className="step-text desktop-only-inline">{item.label.replace(/^\d\.\s*/, '')}</span>
                       <span className="step-text mobile-only-inline">
                         {item.stepNum === 1
-                          ? (lang === 'ta' ? 'பதிவேற்று' : lang === 'hi' ? 'अपलोड' : 'Upload')
+                          ? (lang === 'ta' ? 'ஆவணங்கள்' : lang === 'hi' ? 'दस्तावेज़' : 'Upload')
                           : item.stepNum === 2
-                          ? (lang === 'ta' ? 'அமைப்புகள்' : lang === 'hi' ? 'विकल्प' : 'Options')
+                          ? (lang === 'ta' ? 'அமைப்புகள்' : lang === 'hi' ? 'सेटिंग्स' : 'Options')
                           : (lang === 'ta' ? 'கட்டணம்' : lang === 'hi' ? 'भुगतान' : 'Pay')}
                       </span>
                     </span>
@@ -1945,7 +1945,7 @@ function CustomerFlow() {
                       onClick={loadSampleDocument}
                     >
                       <Sparkles size={14} />
-                      <span>Skip &amp; Try Sample Document</span>
+                      <span>Load Anna Univ ID Specimen</span>
                     </button>
                   </div>
                 </div>
@@ -1972,10 +1972,10 @@ function CustomerFlow() {
                       type="button"
                       className="viewport-action-pill sample"
                       onClick={loadSampleDocument}
-                      title="Load sample Anna University student document"
+                      title="Load official Anna University student ID card specimen"
                     >
                       <Sparkles size={13} />
-                      <span>Try Sample Document</span>
+                      <span>Anna Univ ID Specimen</span>
                     </button>
                     <label className="viewport-action-pill upload" title="Select photo directly from disk">
                       <Upload size={13} />

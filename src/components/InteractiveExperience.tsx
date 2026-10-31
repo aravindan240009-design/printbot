@@ -450,7 +450,7 @@ export function InteractiveExperience() {
 
                 {/* Document Preset Switcher Bar */}
                 <div className="doc-preset-switcher-bar">
-                  <span className="preset-switcher-label">TEST SAMPLE DOCUMENT:</span>
+                  <span className="preset-switcher-label">OFFICIAL COUNTER SPECIMEN:</span>
                   <div className="preset-pill-group">
                     {DOC_PRESETS.map((doc) => (
                       <button

@@ -688,18 +688,18 @@ export function LuxuryEditorial() {
 
           <div className="specimen-features">
             <div className="feature-item">
-              <strong>1200 DPI</strong>
-              <span>Vector Hairlines</span>
+              <strong>₹0 Commission</strong>
+              <span>Zero Per-Page Cut</span>
             </div>
             <div className="feature-divider" />
             <div className="feature-item">
-              <strong>0% Cut</strong>
-              <span>Zero Spool Clip</span>
+              <strong>Unlimited</strong>
+              <span>Printers Per Shop</span>
             </div>
             <div className="feature-divider" />
             <div className="feature-item">
-              <strong>100% Raw</strong>
-              <span>winspool.drv Pass</span>
+              <strong>Instant Spool</strong>
+              <span>winspool.drv Direct</span>
             </div>
           </div>
 

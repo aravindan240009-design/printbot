@@ -42,12 +42,6 @@ export const Footer: React.FC<FooterProps> = ({ onRequestAccessClick }) => {
               The counter operating system for Indian print shops. Built for high-volume Xerox counters, digital print studios, and college engineering hubs.
             </p>
 
-            {/* Live Operational Health Badge */}
-            <div className="footer-status-badge">
-              <span className="footer-status-indicator" />
-              <span className="footer-status-text">winspool.drv v2.4 Native · 0% Page Cut</span>
-            </div>
-
             {/* Indian Regional Languages Available */}
             <div className="footer-language-strip">
               <Globe size={13} className="footer-lang-icon" />
@@ -71,11 +65,6 @@ export const Footer: React.FC<FooterProps> = ({ onRequestAccessClick }) => {
               <li>
                 <a href="#workflow">
                   Customer QR Journey
-                </a>
-              </li>
-              <li>
-                <a href="#control">
-                  Autopilot vs. Manual
                 </a>
               </li>
               <li>

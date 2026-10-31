@@ -25,7 +25,6 @@ import { FloatingDecorations } from './components/FloatingDecorations';
 import { InteractiveExperience } from './components/InteractiveExperience';
 import { MarqueeShowcase } from './components/MarqueeShowcase';
 import { ShopRoiCalculator } from './components/ShopRoiCalculator';
-import { AutopilotControl } from './components/AutopilotControl';
 import { TypingClosingSection } from './components/TypingClosingSection';
 import { SubscriptionModal } from './components/SubscriptionModal';
 import { RealisticPrinterFallback } from './components/RealisticPrinterFallback';
@@ -145,6 +144,17 @@ export default function App() {
             <a href="#pricing" onClick={() => setMenu(false)}>
               One simple plan
             </a>
+            <button
+              type="button"
+              className="nav-mobile-cta-btn"
+              onClick={() => {
+                setMenu(false);
+                setDialog(true);
+              }}
+            >
+              <span>Let’s talk print</span>
+              <ArrowUpRight size={15} />
+            </button>
           </nav>
 
           <div className="nav-actions">
@@ -296,9 +306,6 @@ export default function App() {
         <InteractiveExperience />
         <MarqueeShowcase />
 
-        {/* Order Mode Control Section */}
-        <AutopilotControl />
-
         {/* Small Details Section */}
         <section className="details-section shell section-space" data-reveal>
           <div className="section-heading">
@@ -363,8 +370,8 @@ export default function App() {
             </div>
             <p className="billing-copy" aria-live="polite">
               {billing === 'monthly'
-                ? 'A monthly subscription (₹1,499/mo) to the complete Print Bot experience. Cancel anytime.'
-                : 'The complete Print Bot plan billed annually (₹14,990/yr — 2 Months Free + 2 Acrylic QR Standees).'}
+                ? 'A monthly subscription (₹199/mo) to the complete Print Bot experience. Cancel anytime.'
+                : 'The complete Print Bot plan billed annually (₹1,999/yr — 2 Months Free + 2 Acrylic QR Standees).'}
             </p>
           </div>
           <div className="plan-content">

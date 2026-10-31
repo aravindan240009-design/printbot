@@ -413,7 +413,9 @@ export default function PrecisionPrinter({
     // ==============================================================
     // 6. HIGH-PRECISION 100% RIGID PRINTED DOCUMENT (NO UNROLLING)
     // ==============================================================
-    const artData = canvasTexture(768, 1086, (ctx) => {
+    const artData = canvasTexture(1536, 2172, (ctx) => {
+      // 2x Retina super-sampling for crystal clear text and line art
+      ctx.scale(2, 2);
       // 1. Premium Warm Ivory Paper Stock
       ctx.fillStyle = '#fdfbf7';
       ctx.fillRect(0, 0, 768, 1086);
@@ -501,11 +503,11 @@ export default function PrecisionPrinter({
 
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 54px Georgia, serif';
-      ctx.fillText('₹1,499', 384, 642);
+      ctx.fillText('₹199', 384, 642);
 
       ctx.fillStyle = '#dfc599';
       ctx.font = 'bold 20px sans-serif';
-      ctx.fillText('per month  (or ₹14,990 / year)', 384, 678);
+      ctx.fillText('per month  (or ₹1,999 / year)', 384, 678);
 
       ctx.fillStyle = '#e8d4cb';
       ctx.font = '15px sans-serif';
@@ -556,6 +558,11 @@ export default function PrecisionPrinter({
     const artTexture = artData.texture;
     artTexture.wrapS = THREE.ClampToEdgeWrapping;
     artTexture.wrapT = THREE.ClampToEdgeWrapping;
+    artTexture.generateMipmaps = true;
+    artTexture.minFilter = THREE.LinearMipmapLinearFilter;
+    artTexture.magFilter = THREE.LinearFilter;
+    artTexture.anisotropy = 16;
+    artTexture.needsUpdate = true;
 
     // Slot exit aperture boundary: plane locked to printer slot aperture
     // Only paper that has physically emerged past the slot aperture is visible
@@ -797,7 +804,7 @@ export default function PrecisionPrinter({
 
           screenCtx.fillStyle = '#8ca8b8';
           screenCtx.font = '18px monospace';
-          screenCtx.fillText('₹1,499/mo Plan · Unlimited Printers · 1200 DPI', 28, 208);
+          screenCtx.fillText('₹199/mo Plan · Unlimited Printers · Instant Spool', 28, 208);
         } else {
           screenCtx.fillStyle = '#30d158';
           screenCtx.beginPath();

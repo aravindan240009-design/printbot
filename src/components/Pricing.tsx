@@ -179,10 +179,10 @@ export const Pricing: React.FC<PricingProps> = ({ onRequestPilot }) => {
                     fontFamily: 'JetBrains Mono, monospace',
                   }}
                 >
-                  {billingCycle === 'monthly' ? '₹999' : '₹9,990'}
+                  {billingCycle === 'monthly' ? '₹199' : '₹1,999'}
                 </span>
                 <span style={{ color: 'var(--muted)', fontSize: '15px' }}>
-                  {billingCycle === 'monthly' ? '/ month' : '/ year (₹832/mo)'}
+                  {billingCycle === 'monthly' ? '/ month' : '/ year (₹166/mo)'}
                 </span>
               </div>
 

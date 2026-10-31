@@ -84,7 +84,7 @@ export function RealisticPrinterFallback({ printing = false, paused = false }: R
                 <span />
               </div>
               <div className="fallback-sheet-footer">
-                SUBSCRIBE TODAY · ₹1,499/MO · UNLIMITED PRINTERS
+                SUBSCRIBE TODAY · ₹199/MO · UNLIMITED PRINTERS
               </div>
             </motion.div>
           </div>

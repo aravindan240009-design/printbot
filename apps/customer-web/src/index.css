@@ -2360,11 +2360,12 @@ h1, h2, h3 { font-family: 'Manrope', -apple-system, sans-serif; letter-spacing: 
   opacity: 0.7;
 }
 .step-text {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 750;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  line-height: 1.25;
+  word-break: keep-all;
+  overflow: visible;
 }
 .step-badge-counter {
   margin-left: auto;
@@ -2395,6 +2396,10 @@ h1, h2, h3 { font-family: 'Manrope', -apple-system, sans-serif; letter-spacing: 
   }
   .step-text {
     font-size: 11px !important;
+    white-space: normal !important;
+    line-height: 1.2 !important;
+    word-break: keep-all !important;
+    overflow: visible !important;
   }
   .step-badge-counter {
     display: none;
@@ -4337,4 +4342,11 @@ h1, h2, h3 { font-family: 'Manrope', -apple-system, sans-serif; letter-spacing: 
 .customer-camera-modal .btn-camera-sample-fallback:hover {
   background: #7a314b !important;
   transform: translateY(-1px) !important;
+}
+
+/* Mobile Phone Bottom Spacing for Fixed Sticky Action Bar */
+@media (max-width: 860px) {
+  .customer-app {
+    padding-bottom: 120px !important;
+  }
 }
