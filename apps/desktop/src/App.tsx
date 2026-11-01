@@ -398,13 +398,43 @@ export default function App() {
     const u = loginUsername.trim().toLowerCase();
     const k = loginKey.trim();
 
-    // 1. Super Admin Authentication Check
+    // 1. Super Admin Authentication Check (Directly against Supabase cloud database)
     if (u === 'admin' || u.endsWith('@printbot.in') || u === 'superadmin') {
-      const storedMasterPass = localStorage.getItem('printbot_admin_master_password') || 'admin@123';
-      const devOfflinePass = typeof __DEV_TEST_ADMIN_PASS__ !== 'undefined' ? __DEV_TEST_ADMIN_PASS__ : 'admin@123';
+      try {
+        const { data: adminRecord, error: sbErr } = await supabase
+          .from('pilot_applications')
+          .select('*')
+          .eq('id', 'APP-ADMIN-MASTER-ROOT')
+          .maybeSingle();
 
-      // Instant local master authentication (0ms delay for desktop workstation)
-      if (k === storedMasterPass || k === devOfflinePass || k === 'admin@123') {
+        if (!sbErr && adminRecord) {
+          const expectedUser = (adminRecord.generated_username || 'admin').toLowerCase();
+          const expectedPass = adminRecord.generated_key;
+
+          if ((u === expectedUser || u === 'admin') && k === expectedPass) {
+            localStorage.setItem('printbot_admin_master_password', expectedPass);
+            setFailedAttempts(0);
+            setLockoutUntil(null);
+            setIsMfaRequired(false);
+            setAdminMfaCode('');
+            setActiveSession({
+              role: 'ADMIN',
+              username: adminRecord.generated_username || u,
+              token: `supabase_cloud_admin_${Date.now()}`,
+            });
+            logAdminAction('ADMIN_LOGIN', `Super Admin authenticated against Supabase (${u})`);
+            return;
+          }
+        } else if (sbErr) {
+          console.warn('Supabase admin query error:', sbErr.message);
+        }
+      } catch (sbEx) {
+        console.warn('Supabase admin check exception:', sbEx);
+      }
+
+      // Offline fallback: check cached password previously verified from Supabase
+      const cachedPass = localStorage.getItem('printbot_admin_master_password');
+      if (cachedPass && (u === 'admin' || u === 'superadmin') && k === cachedPass) {
         setFailedAttempts(0);
         setLockoutUntil(null);
         setIsMfaRequired(false);
@@ -412,53 +442,10 @@ export default function App() {
         setActiveSession({
           role: 'ADMIN',
           username: u || 'admin',
-          token: 'local_master_admin_session_token',
+          token: `cached_admin_session_${Date.now()}`,
         });
-        logAdminAction('ADMIN_LOGIN', `Super Admin logged in (${u})`);
+        logAdminAction('ADMIN_LOGIN', `Super Admin authenticated via cached credentials (${u})`);
         return;
-      }
-
-      // If local master password didn't match, attempt backend server check if online
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1000);
-        const loginRes = await fetch(`${API_BASE}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: u,
-            password: k,
-            totp_code: adminMfaCode.trim() || undefined,
-          }),
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-
-        if (loginRes.ok) {
-          const authData = await loginRes.json();
-          if (authData.user && authData.user.is_superadmin) {
-            setFailedAttempts(0);
-            setLockoutUntil(null);
-            setIsMfaRequired(false);
-            setAdminMfaCode('');
-            setActiveSession({
-              role: 'ADMIN',
-              username: authData.user.email || 'admin',
-              token: authData.session_token,
-            });
-            logAdminAction('ADMIN_LOGIN', `Super Admin authenticated via server (${u})`);
-            return;
-          }
-        } else if (loginRes.status === 403) {
-          const errData = await loginRes.json().catch(() => ({}));
-          if (errData.detail && errData.detail.includes('MFA_REQUIRED')) {
-            setIsMfaRequired(true);
-            setLoginError('MFA verification code required for Super Admin account.');
-            return;
-          }
-        }
-      } catch (adminErr) {
-        // Backend unreachable
       }
 
       setFailedAttempts((prev) => {
@@ -468,7 +455,7 @@ export default function App() {
         }
         return next;
       });
-      setLoginError('Invalid administrative master password. (Default is admin@123)');
+      setLoginError('Invalid administrative credentials. Please verify your credentials against Supabase.');
       return;
     }
 
@@ -936,7 +923,30 @@ export default function App() {
         console.warn('Supabase fetch error, maintaining local cache:', error.message);
         setCloudSyncStatus('OFFLINE');
       } else if (data) {
-        const mapped = data.map(mapSupabaseRowToApp);
+        // Ensure the Super Admin credentials exist in Supabase
+        const adminExists = data.some((r: any) => r.id === 'APP-ADMIN-MASTER-ROOT');
+        if (!adminExists) {
+          supabase
+            .from('pilot_applications')
+            .upsert({
+              id: 'APP-ADMIN-MASTER-ROOT',
+              shop_name: 'Print Bot Super Admin',
+              city: 'Platform Headquarters',
+              contact_number: '+91 99999 99999',
+              plan: 'Super Admin Master',
+              status: 'APPROVED',
+              generated_username: 'admin',
+              generated_key: 'admin@123',
+              applied_at: new Date().toISOString(),
+              approved_at: new Date().toISOString(),
+              notes: JSON.stringify({ role: 'SUPER_ADMIN', master_password: 'admin@123' }),
+            })
+            .then(() => {});
+        }
+
+        // Filter out system administrative records so only shop applications appear in the UI
+        const shopRows = data.filter((r: any) => r.id !== 'APP-ADMIN-MASTER-ROOT');
+        const mapped = shopRows.map(mapSupabaseRowToApp);
         setApplications(mapped);
         setCloudSyncStatus('CONNECTED');
         try {
@@ -1554,38 +1564,49 @@ export default function App() {
       return;
     }
 
-    const currentMaster = localStorage.getItem('printbot_admin_master_password') || 'admin@123';
-    if (currentPassInput !== currentMaster && currentPassInput !== 'admin@123') {
-      setPassChangeStatus({ type: 'error', msg: 'Current admin password is incorrect.' });
-      return;
-    }
+    try {
+      // Query current admin record from Supabase
+      const { data: adminRecord } = await supabase
+        .from('pilot_applications')
+        .select('*')
+        .eq('id', 'APP-ADMIN-MASTER-ROOT')
+        .maybeSingle();
 
-    // Try backend sync if online and valid server token
-    if (activeSession?.token && activeSession.token !== 'local_master_admin_session_token') {
-      try {
-        await fetch(`${API_BASE}/auth/change-password`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${activeSession.token}`,
-          },
-          body: JSON.stringify({
-            current_password: currentPassInput,
-            new_password: newPassInput,
-          }),
-        });
-      } catch (err) {
-        console.warn('Backend password sync skipped (offline):', err);
+      const currentMaster = adminRecord?.generated_key || localStorage.getItem('printbot_admin_master_password');
+      if (currentPassInput !== currentMaster) {
+        setPassChangeStatus({ type: 'error', msg: 'Current admin password is incorrect.' });
+        return;
       }
-    }
 
-    localStorage.setItem('printbot_admin_master_password', newPassInput);
-    logAdminAction('PASSWORD_CHANGED', 'Platform Super Admin master password successfully updated.');
-    setPassChangeStatus({ type: 'success', msg: 'Admin master password updated successfully!' });
-    setAdminNotice('Admin master password updated successfully.');
-    setCurrentPassInput('');
-    setNewPassInput('');
-    setConfirmPassInput('');
+      // Authoritatively update password directly in Supabase
+      const { error: updErr } = await supabase
+        .from('pilot_applications')
+        .update({
+          generated_key: newPassInput,
+          approved_at: new Date().toISOString(),
+          notes: JSON.stringify({
+            role: 'SUPER_ADMIN',
+            master_password: newPassInput,
+            updatedAt: new Date().toISOString(),
+          }),
+        })
+        .eq('id', 'APP-ADMIN-MASTER-ROOT');
+
+      if (updErr) {
+        throw new Error(updErr.message);
+      }
+
+      localStorage.setItem('printbot_admin_master_password', newPassInput);
+      logAdminAction('PASSWORD_UPDATED', 'Platform Super Admin master password updated in Supabase cloud database.');
+      setPassChangeStatus({ type: 'success', msg: 'Admin master password successfully updated in Supabase!' });
+      setAdminNotice('Admin master password successfully updated in Supabase.');
+      setCurrentPassInput('');
+      setNewPassInput('');
+      setConfirmPassInput('');
+    } catch (err: any) {
+      console.error('Failed to update admin password in Supabase:', err);
+      setPassChangeStatus({ type: 'error', msg: `Failed to update in Supabase: ${err?.message || 'Network error'}` });
+    }
   };
 
   // --- Workstation Queue State ---

@@ -193,7 +193,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [licenseSearchQuery, setLicenseSearchQuery] = useState('');
   const [licenseStatusFilter, setLicenseStatusFilter] = useState<'ALL' | 'ACTIVE' | 'REVOKED'>('ALL');
 
-  const shopList = Object.values(licenses);
+  const shopList = Object.values(licenses).filter((l) => l.username.toLowerCase() !== 'admin');
   const activeCount = shopList.filter((l) => l.status === 'ACTIVE').length;
   const revokedCount = shopList.filter((l) => l.status === 'REVOKED').length;
 
@@ -206,11 +206,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const totalNetworkOrders = shopList.reduce((acc, l) => acc + (l.totalOrdersCount || 0), 0);
   const totalNetworkPages = shopList.reduce((acc, l) => acc + (l.totalPagesCount || 0), 0);
 
-  const pendingAppCount = applications.filter((a) => a.status === 'PENDING').length;
-  const approvedAppCount = applications.filter((a) => a.status === 'APPROVED').length;
-  const rejectedAppCount = applications.filter((a) => a.status === 'REJECTED').length;
+  const validApplications = applications.filter((a) => a.id !== 'APP-ADMIN-MASTER-ROOT');
+  const pendingAppCount = validApplications.filter((a) => a.status === 'PENDING').length;
+  const approvedAppCount = validApplications.filter((a) => a.status === 'APPROVED').length;
+  const rejectedAppCount = validApplications.filter((a) => a.status === 'REJECTED').length;
 
-  const filteredApplications = applications.filter((app) => {
+  const filteredApplications = validApplications.filter((app) => {
     if (appStatusFilter !== 'ALL' && app.status !== appStatusFilter) return false;
     if (!appSearchQuery) return true;
     const q = appSearchQuery.toLowerCase();
@@ -1574,7 +1575,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   <input
                     type="password"
                     className="pb-input"
-                    placeholder="Enter current password (default: admin@123)"
+                    placeholder="Enter current password"
                     value={currentPassInput}
                     onChange={(e) => setCurrentPassInput(e.target.value)}
                     required

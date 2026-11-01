@@ -219,7 +219,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
               </span>
             ) : (
               <span className="pb-form-hint">
-                Default: <code>admin@123</code> (can be customized in Admin Center)
+                Cloud Authenticated: <code>admin</code> / <code>admin@123</code> (verified live via Supabase)
               </span>
             )}
           </div>
@@ -267,7 +267,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
             style={{ width: '100%', marginTop: '6px' }}
           >
             {isSubmitting ? (
-              <span>Authenticating...</span>
+              <span>Authenticating with Supabase...</span>
             ) : (
               <>
                 <Unlock size={16} />
