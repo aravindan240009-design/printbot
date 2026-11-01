@@ -50,6 +50,15 @@ import { ThemeProvider, ThemeSwitch, MotionSurface, PaperScene, PrinterScene, us
 import { discoverPrinters, bindWorkstation, getWorkstationDeviceIdentity, type NativePrinterInfo } from './native';
 import { supabase } from './supabase';
 import QRCode from 'qrcode';
+import { DesktopShell, type Tab } from './components/DesktopShell';
+import { LockScreen } from './components/LockScreen';
+import { SetupWizard } from './components/SetupWizard';
+import { QueueView } from './components/QueueView';
+import { PrintersView } from './components/PrintersView';
+import { ServicesView } from './components/ServicesView';
+import { WebsiteView } from './components/WebsiteView';
+import { SettingsView } from './components/SettingsView';
+import { JobRejectModal, ServiceEditModal } from './components/Modals';
 
 const API_BASE = ((import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '');
 
@@ -204,7 +213,6 @@ try {
 const INITIAL_LICENSES: Record<string, ShopLicense> = {};
 
 type AppScreen = 'LOCK_SCREEN' | 'SETUP_WIZARD' | 'WORKSTATION' | 'ADMIN_PORTAL';
-type Tab = 'queue' | 'printers' | 'services' | 'website' | 'settings';
 
 function Dialog({
   title,
@@ -1593,6 +1601,19 @@ export default function App() {
   const [rejectionReason, setRejectionReason] = useState('Poor image resolution or blurred scan');
   const [notice, setNotice] = useState('');
   const [nativePrinters, setNativePrinters] = useState<NativePrinterInfo[] | null>(null);
+  const [isRefreshingPrinters, setIsRefreshingPrinters] = useState(false);
+  const [theme, setTheme] = useState<string>(() => {
+    try {
+      return localStorage.getItem('printbot_theme') || 'dark';
+    } catch {
+      return 'dark';
+    }
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('printbot_theme', theme);
+  }, [theme]);
 
   const [printers] = useState<ConnectedPrinter[]>([]);
 
@@ -1666,187 +1687,20 @@ export default function App() {
   // ==========================================
   if (screen === 'LOCK_SCREEN') {
     return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'grid',
-          placeItems: 'center',
-          background: 'var(--pb-bg)',
-          color: 'var(--pb-text)',
-          padding: '24px',
-        }}
-      >
-        <div
-          style={{
-            width: 'min(460px, 100%)',
-            background: 'var(--pb-surface)',
-            border: '1px solid var(--pb-border)',
-            borderRadius: '20px',
-            padding: '36px 32px',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.06)',
-          }}
-        >
-          {/* Logo & Header */}
-          <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-            <div
-              style={{
-                width: '56px',
-                height: '56px',
-                borderRadius: '16px',
-                background: 'var(--pb-accent)',
-                color: 'var(--pb-on-accent)',
-                display: 'grid',
-                placeItems: 'center',
-                margin: '0 auto 16px',
-              }}
-            >
-              <Lock size={28} />
-            </div>
-            <h1 style={{ fontSize: '26px', fontWeight: 800, margin: 0, letterSpacing: '-0.5px' }}>
-              Print Bot
-            </h1>
-            <p style={{ color: 'var(--pb-muted)', fontSize: '13px', marginTop: '6px' }}>
-              Counter Operating System · License Activation
-            </p>
-          </div>
-
-          {loginError && (
-            <div
-              style={{
-                padding: '12px 14px',
-                borderRadius: '8px',
-                background: '#fef2f2',
-                color: '#991b1b',
-                border: '1px solid #fecaca',
-                fontSize: '12px',
-                marginBottom: '20px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <AlertTriangle size={16} />
-              <span>{loginError}</span>
-            </div>
-          )}
-
-          {/* Single Unified Login Form */}
-          <form onSubmit={handleUnifiedLogin} style={{ display: 'grid', gap: '16px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                Username
-              </label>
-              <input
-                type="text"
-                placeholder="Enter username (e.g. shopowner or admin)"
-                value={loginUsername}
-                onChange={(e) => setLoginUsername(e.target.value)}
-                autoFocus
-                required
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                Key / Password
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Enter key (e.g. PB-KEY-2026-XEROX) or Admin Password"
-                  value={loginKey}
-                  onChange={(e) => handleKeyChange(e.target.value)}
-                  disabled={Boolean(lockoutUntil && new Date() < lockoutUntil)}
-                  style={{ paddingRight: '40px', width: '100%' }}
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  style={{
-                    position: 'absolute',
-                    right: '8px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'transparent',
-                    border: 'none',
-                    padding: '6px',
-                    cursor: 'pointer',
-                    color: 'var(--pb-muted)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
-
-            {isMfaRequired && (
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px', color: 'var(--pb-warning, #f59e0b)' }}>
-                  Authenticator TOTP Code (6 Digits)
-                </label>
-                <input
-                  type="text"
-                  maxLength={6}
-                  placeholder="e.g. 123456"
-                  value={adminMfaCode}
-                  onChange={(e) => setAdminMfaCode(e.target.value.replace(/\D/g, ''))}
-                  autoFocus
-                  required
-                />
-              </div>
-            )}
-
-            <div
-              style={{
-                background: 'var(--pb-raised)',
-                border: '1px solid var(--pb-border)',
-                borderRadius: '10px',
-                padding: '12px',
-                fontSize: '11px',
-                color: 'var(--pb-muted)',
-                lineHeight: '1.6',
-                textAlign: 'center',
-              }}
-            >
-              <strong>Workstation & Portal Login</strong>
-              <div style={{ marginTop: '4px', fontSize: '10px' }}>
-                Shop operators sign in with their issued License Key. Platform administrators sign in with verified server credentials.
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="ws-primary"
-              disabled={Boolean(lockoutUntil && new Date() < lockoutUntil)}
-              style={{
-                width: '100%',
-                minHeight: '46px',
-                marginTop: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                fontSize: '14px',
-                opacity: lockoutUntil && new Date() < lockoutUntil ? 0.6 : 1,
-                cursor: lockoutUntil && new Date() < lockoutUntil ? 'not-allowed' : 'pointer',
-              }}
-            >
-              <Unlock size={18} />
-              Unlock Print Bot Software
-            </button>
-          </form>
-          {lockoutUntil && new Date() < lockoutUntil && (
-            <p style={{ color: '#ef4444', marginTop: '12px', fontSize: '12px', textAlign: 'center', fontWeight: 650 }}>
-              Too many failed attempts. Login locked for {Math.max(1, Math.ceil((lockoutUntil.getTime() - Date.now()) / 1000))}s.
-            </p>
-          )}
-        </div>
-      </div>
+      <LockScreen
+        loginUsername={loginUsername}
+        setLoginUsername={setLoginUsername}
+        loginKey={loginKey}
+        handleKeyChange={handleKeyChange}
+        showPassword={showPassword}
+        setShowPassword={setShowPassword}
+        isMfaRequired={isMfaRequired}
+        adminMfaCode={adminMfaCode}
+        setAdminMfaCode={setAdminMfaCode}
+        loginError={loginError}
+        lockoutUntil={lockoutUntil}
+        onUnifiedLogin={handleUnifiedLogin}
+      />
     );
   }
 
@@ -1855,119 +1709,19 @@ export default function App() {
   // ==========================================
   if (screen === 'SETUP_WIZARD') {
     return (
-      <div
-        style={{
-          minHeight: '100vh',
-          background: 'var(--pb-bg)',
-          color: 'var(--pb-text)',
-          padding: '40px 24px',
-          display: 'grid',
-          placeItems: 'center',
-        }}
-      >
-        <div
-          style={{
-            width: 'min(680px, 100%)',
-            background: 'var(--pb-surface)',
-            border: '1px solid var(--pb-border)',
-            borderRadius: '20px',
-            padding: '36px',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.06)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '24px' }}>
-            <div
-              style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '12px',
-                background: 'var(--pb-accent-soft)',
-                color: 'var(--pb-accent)',
-                display: 'grid',
-                placeItems: 'center',
-              }}
-            >
-              <Sparkles size={24} />
-            </div>
-            <div>
-              <h1 style={{ fontSize: '24px', fontWeight: 800, margin: 0 }}>Shop Setup Wizard</h1>
-              <p style={{ color: 'var(--pb-muted)', fontSize: '13px', margin: '4px 0 0' }}>
-                Key verified! Fill in your Xerox shop details to begin receiving customer orders.
-              </p>
-            </div>
-          </div>
-
-          <form onSubmit={handleSaveSetup} style={{ display: 'grid', gap: '20px' }}>
-            {/* Identity (Auto-filled by License Key) */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                  Xerox Shop Name *
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Metro Xerox & Digital Prints"
-                  value={setupShopName}
-                  onChange={(e) => setSetupShopName(e.target.value)}
-                  required
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                  Branch / Location *
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Counter 01, Main Road"
-                  value={setupLocation}
-                  onChange={(e) => setSetupLocation(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                Contact Phone *
-              </label>
-              <input
-                type="text"
-                placeholder="+91 98401 23456"
-                value={setupPhone}
-                onChange={(e) => setSetupPhone(e.target.value)}
-                required
-              />
-            </div>
-
-            {/* Auto-filled by License Key Note */}
-            <div
-              style={{
-                background: 'var(--pb-raised)',
-                border: '1px solid var(--pb-border)',
-                borderRadius: '12px',
-                padding: '16px',
-                fontSize: '12.5px',
-                lineHeight: 1.5,
-                color: 'var(--pb-muted)',
-              }}
-            >
-              <strong style={{ color: 'var(--pb-text)', display: 'block', marginBottom: '4px' }}>
-                ✓ Configured from License Key:
-              </strong>
-              Per-page rates (<strong>₹{setupBwRate} B&amp;W</strong>, <strong>₹{setupColorRate} Color</strong>) and Order Dispatch Mode (<strong>{setupOrderMode === 'FULL_AUTOMATIC' ? 'Full Automatic' : 'Manual Approval'}</strong>) have been automatically initialized from your License Key. You can adjust rates and dispatch preferences at any time under the <strong>Settings</strong> page.
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
-              <button type="button" onClick={handleLogout}>
-                Cancel / Log Out
-              </button>
-              <button type="submit" className="ws-primary" style={{ minWidth: '180px' }}>
-                Open Workstation Queue →
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
+      <SetupWizard
+        setupShopName={setupShopName}
+        setSetupShopName={setSetupShopName}
+        setupLocation={setupLocation}
+        setSetupLocation={setSetupLocation}
+        setupPhone={setupPhone}
+        setSetupPhone={setSetupPhone}
+        setupBwRate={setupBwRate}
+        setupColorRate={setupColorRate}
+        setupOrderMode={setupOrderMode}
+        onSaveSetup={handleSaveSetup}
+        onLogout={handleLogout}
+      />
     );
   }
 
@@ -4265,1097 +4019,269 @@ export default function App() {
     );
   });
 
+  const handleSaveShopSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeSession) return;
+    const u = activeSession.username;
+
+    setLicenses((prev) => {
+      const updated = {
+        ...prev[u],
+        orderMode: setupOrderMode,
+      };
+      return {
+        ...prev,
+        [u]: updated,
+        ...(currentShop?.username ? { [currentShop.username.toLowerCase()]: updated } : {}),
+        ...(currentShop?.shopName ? { [currentShop.shopName.toLowerCase()]: updated } : {}),
+      };
+    });
+
+    try {
+      const shopName = currentShop?.shopName || setupShopName || u;
+      const username = currentShop?.username || u;
+      const notesPayload = JSON.stringify({
+        services: shopServices,
+        orderMode: setupOrderMode,
+        updatedAt: new Date().toISOString(),
+      });
+
+      let updated = false;
+      if (currentShop?.appId) {
+        const { data, error } = await supabase
+          .from('pilot_applications')
+          .update({ notes: notesPayload })
+          .eq('id', currentShop.appId)
+          .select();
+        if (!error && data && data.length > 0) updated = true;
+      }
+
+      if (!updated) {
+        const orFilter = `generated_username.ilike.${username},shop_name.ilike.${shopName},generated_username.ilike.${u},shop_name.ilike.${u}`;
+        await supabase
+          .from('pilot_applications')
+          .update({ notes: notesPayload })
+          .or(orFilter);
+      }
+    } catch (err) {
+      console.warn('Failed to sync settings to cloud:', err);
+    }
+
+    setNotice('Shop settings updated successfully.');
+  };
+
+  const handleSaveServiceSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!serviceFormTitle.trim() || !serviceFormPrice.trim()) return;
+
+    const featuresArray = serviceFormFeatures
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const newService: ShopServiceItem = {
+      id: editingServiceId || `srv_${Date.now()}`,
+      title: serviceFormTitle.trim(),
+      category: serviceFormCategory,
+      priceDisplay: serviceFormPrice.trim(),
+      turnaround: serviceFormTurnaround.trim() || 'Instant Counter Print',
+      badge: serviceFormBadge.trim() || undefined,
+      description: serviceFormDesc.trim(),
+      features: featuresArray.length > 0 ? featuresArray : ['High-quality print', 'Instant counter pickup'],
+      hasDiscount: serviceFormHasDiscount,
+      discountNote: serviceFormHasDiscount ? serviceFormDiscountNote.trim() : undefined,
+    };
+
+    let updatedList: ShopServiceItem[];
+    if (editingServiceId) {
+      updatedList = shopServices.map((s) => (s.id === editingServiceId ? newService : s));
+    } else {
+      updatedList = [...shopServices, newService];
+    }
+
+    handlePublishServices(updatedList);
+    setIsServiceModalOpen(false);
+  };
+
+  const handleConfirmReject = (jobId: string, reason: string) => {
+    setJobs((prev) =>
+      prev.map((j) =>
+        j.id === jobId
+          ? { ...j, status: 'REJECTED', rejection_reason: reason }
+          : j
+      )
+    );
+    setNotice(`Job #${jobId} rejected.`);
+    setRejectionModalJobId(null);
+  };
+
   return (
-    <div className="workstation">
-      {/* Sidebar */}
-      <aside className="ws-sidebar">
-        <a href="#brand" className="ws-brand" onClick={(e) => e.preventDefault()}>
-          <span>
-            <Printer size={24} />
-          </span>
-          <div>
-            Print Bot
-            <small>COUNTER WORKSPACE</small>
-          </div>
-        </a>
-
-        {currentShop && (
-          <div className="ws-shop">
-            <span className="ws-eyebrow">ACTIVE LICENSED SHOP</span>
-            <strong>{currentShop.shopName}</strong>
-            <small>{currentShop.location}</small>
-          </div>
-        )}
-
-        <nav aria-label="Workstation primary">
-          <button
-            aria-current={activeTab === 'queue' ? 'page' : undefined}
-            onClick={() => setActiveTab('queue')}
-          >
-            <Layers size={18} />
-            Dispatch queue
-            <b>{jobs.length}</b>
-          </button>
-          <button
-            aria-current={activeTab === 'printers' ? 'page' : undefined}
-            onClick={() => setActiveTab('printers')}
-          >
-            <Printer size={18} />
-            Printers
-          </button>
-          <button
-            aria-current={activeTab === 'services' ? 'page' : undefined}
-            onClick={() => setActiveTab('services')}
-          >
-            <Sparkles size={18} />
-            Services
-            <b style={{ marginLeft: 'auto', fontSize: '11px', background: 'var(--pb-raised)', padding: '2px 7px', borderRadius: '4px' }}>
-              {shopServices.length}
-            </b>
-          </button>
-          <button
-            aria-current={activeTab === 'website' ? 'page' : undefined}
-            onClick={() => setActiveTab('website')}
-          >
-            <Globe size={18} />
-            Website
-          </button>
-          <button
-            aria-current={activeTab === 'settings' ? 'page' : undefined}
-            onClick={() => setActiveTab('settings')}
-          >
-            <Settings size={18} />
-            Settings
-          </button>
-        </nav>
-
-        <div className="ws-sidebar-bottom">
-          <ShieldCheck size={20} />
-          <strong>One plan. Every printer.</strong>
-          <p>Unlimited printers per subscribed shop.</p>
-          <button
-            onClick={handleLogout}
-            style={{ width: '100%', minHeight: '38px', fontSize: '12px', gap: '6px' }}
-          >
-            <Lock size={14} /> Lock / Log Out
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Panel */}
-      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        {/* Topbar */}
-        <header className="ws-topbar">
-          <div>
-            <span className="ws-eyebrow">WORKSTATION</span>
-            <strong>Counter-PC-01 ({currentShop?.username})</strong>
-          </div>
-
-          <div className="ws-top-actions">
-            <button
-              aria-label={isAudioEnabled ? 'Disable audio alerts' : 'Enable audio alerts'}
-              onClick={() => setIsAudioEnabled(!isAudioEnabled)}
-            >
-              {isAudioEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
-            </button>
-            <ThemeSwitch />
-          </div>
-        </header>
-
-        {/* Platform Broadcast Notice */}
-        {globalBroadcast.active && (
-          <div
-            style={{
-              padding: '10px 24px',
-              background:
-                globalBroadcast.type === 'urgent'
-                  ? '#fee2e2'
-                  : globalBroadcast.type === 'warning'
-                  ? '#fef3c7'
-                  : 'var(--pb-accent-soft)',
-              color:
-                globalBroadcast.type === 'urgent'
-                  ? '#991b1b'
-                  : globalBroadcast.type === 'warning'
-                  ? '#92400e'
-                  : 'var(--pb-accent)',
-              fontSize: '12px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              borderBottom: '1px solid var(--pb-border)',
-              fontWeight: 650,
-            }}
-          >
-            <Megaphone size={16} />
-            <span>
-              <strong>Platform Notice:</strong> {globalBroadcast.message}
-            </span>
-          </div>
-        )}
-
-        {notice && (
-          <div
-            style={{
-              padding: '10px 24px',
-              background: 'var(--pb-accent-soft)',
-              color: 'var(--pb-accent)',
-              fontSize: '12px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              borderBottom: '1px solid var(--pb-border)',
-            }}
-          >
-            <span>{notice}</span>
-            <button onClick={() => setNotice('')} style={{ border: 0, padding: '4px', minHeight: '28px' }}>
-              <X size={14} />
-            </button>
-          </div>
-        )}
-
-        <main className="ws-main">
-          {/* TAB: QUEUE */}
-          {activeTab === 'queue' && (
-            <div className="ws-view">
-              <div className="ws-page-heading">
-                <div>
-                  <span className="ws-eyebrow">PRINT STUDIO / OPERATIONS</span>
-                  <h1>A clear view of your queue.</h1>
-                  <p>Review incoming customer orders. Keep every job moving with care.</p>
-                </div>
-
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button
-                    className="ws-primary"
-                    disabled={pendingCount === 0}
-                    onClick={() => {
-                      setJobs((prev) =>
-                        prev.map((j) => (j.status === 'PENDING_APPROVAL' ? { ...j, status: 'QUEUED' } : j))
-                      );
-                      setNotice(`Approved all ${pendingCount} pending jobs.`);
-                    }}
-                  >
-                    Approve all ({pendingCount})
-                  </button>
-                </div>
-              </div>
-
-              {/* Stats */}
-              <div className="ws-stats">
-                <div className="ws-stat">
-                  <span>Awaiting review</span>
-                  <strong>{pendingCount.toString().padStart(2, '0')}</strong>
-                  <small>Your next decisions</small>
-                </div>
-                <div className="ws-stat">
-                  <span>In the queue</span>
-                  <strong>{queuedCount.toString().padStart(2, '0')}</strong>
-                  <small>Ready to dispatch</small>
-                </div>
-                <div className="ws-stat">
-                  <span>Completed today</span>
-                  <strong>{completedCount.toString().padStart(2, '0')}</strong>
-                  <small>Total customer prints</small>
-                </div>
-                <div className="ws-stat">
-                  <span>Needs attention</span>
-                  <strong>{attentionCount.toString().padStart(2, '0')}</strong>
-                  <small>Supervised reconciliation</small>
-                </div>
-              </div>
-
-              {/* Queue Table */}
-              <div className="ws-panel">
-                <div className="ws-queue-toolbar">
-                  <div>
-                    <h3>Job activity</h3>
-                    <p>{filteredJobs.length} of {jobs.length} jobs</p>
-                  </div>
-
-                  <div className="ws-search">
-                    <Search size={16} />
-                    <input
-                      type="text"
-                      placeholder="Search filename, customer, or ID"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                  </div>
-
-                  <select
-                    className="ws-filter"
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                  >
-                    <option value="ALL">All jobs</option>
-                    <option value="PENDING_APPROVAL">Awaiting review</option>
-                    <option value="QUEUED">Ready to dispatch</option>
-                    <option value="COMPLETED">Completed</option>
-                    <option value="REJECTED">Rejected</option>
-                  </select>
-                </div>
-
-                {filteredJobs.length === 0 ? (
-                  <div className="ws-empty">
-                    <FileText size={32} />
-                    <p>No jobs found matching your criteria.</p>
-                  </div>
-                ) : (
-                  filteredJobs.map((job) => (
-                    <div key={job.id} className="ws-job">
-                      <div className="ws-file-icon">
-                        <FileText size={22} />
-                      </div>
-                      <div className="ws-job-main">
-                        <div className="ws-job-title">
-                          <h3>{job.file_name}</h3>
-                          <span className="ws-chip">{job.status}</span>
-                        </div>
-                        <p style={{ margin: '4px 0', color: 'var(--pb-muted)', fontSize: '12px' }}>
-                          {job.id} · {job.customer_email} · {job.created_at}
-                        </p>
-                        <div className="ws-job-specs">
-                          <span>
-                            {job.options.paper_size} / {job.options.color_mode.toUpperCase()}
-                          </span>
-                          <span>{job.options.copies} copies</span>
-                          <span>{job.physical_sheets} sheets</span>
-                          <span>{job.options.duplex_mode}</span>
-                        </div>
-
-                        {job.status === 'PENDING_APPROVAL' && (
-                          <div className="ws-job-actions">
-                            <button
-                              className="ws-primary"
-                              onClick={() => handleApproveJob(job.id)}
-                            >
-                              Approve & Print
-                            </button>
-                            <button
-                              onClick={() => {
-                                setRejectionModalJobId(job.id);
-                              }}
-                            >
-                              Reject Job
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="ws-price">
-                        <strong>₹{job.calculated_price_rupees.toFixed(2)}</strong>
-                        <small>Paid via UPI</small>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* TAB: PRINTERS */}
-          {activeTab === 'printers' && (
-            <div className="ws-view">
-              <div className="ws-page-heading">
-                <div>
-                  <span className="ws-eyebrow">HARDWARE CONNECTIONS</span>
-                  <h1>Your printer fleet.</h1>
-                  <p>Native Windows spooler handles jobs without direct PDF driver assumptions.</p>
-                </div>
-              </div>
-
-              <div className="ws-printer-grid">
-                {(nativePrinters && nativePrinters.length > 0) ? (
-                  nativePrinters.map((prn) => (
-                    <div key={prn.name} className="ws-panel ws-printer">
-                      <div className="ws-printer-symbol">
-                        <Printer size={48} />
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                        <h2 style={{ margin: 0, fontSize: '18px' }}>{prn.name}</h2>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          fontSize: '12px',
-                          fontWeight: 750,
-                          padding: '4px 10px',
-                          borderRadius: '999px',
-                          background: prn.is_online ? 'rgba(16, 185, 129, 0.12)' : 'rgba(148, 163, 184, 0.12)',
-                          color: prn.is_online ? 'var(--pb-success)' : 'var(--pb-muted)',
-                        }}>
-                          <span style={{
-                            width: '7px',
-                            height: '7px',
-                            borderRadius: '50%',
-                            background: prn.is_online ? 'var(--pb-success)' : 'var(--pb-muted)',
-                          }} />
-                          {prn.is_online ? 'Online / Ready' : 'Spooler Attached'}
-                        </span>
-                      </div>
-                      <p style={{ marginTop: '8px', minHeight: 'auto', color: 'var(--pb-muted)', fontSize: '12px' }}>
-                        {prn.status ? `Windows Spooler (${prn.status})` : 'Windows Print Spooler Driver'}
-                      </p>
-                    </div>
-                  ))
-                ) : printers.length > 0 ? (
-                  printers.map((prn) => (
-                    <div key={prn.id} className="ws-panel ws-printer">
-                      <div className="ws-printer-symbol">
-                        <Printer size={48} />
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                        <h2 style={{ margin: 0, fontSize: '18px' }}>{prn.name}</h2>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          fontSize: '12px',
-                          fontWeight: 750,
-                          padding: '4px 10px',
-                          borderRadius: '999px',
-                          background: 'rgba(16, 185, 129, 0.12)',
-                          color: 'var(--pb-success)',
-                        }}>
-                          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--pb-success)' }} />
-                          Online
-                        </span>
-                      </div>
-                      <p style={{ marginTop: '8px', minHeight: 'auto', color: 'var(--pb-muted)', fontSize: '12px' }}>
-                        {prn.driver_name || 'Windows Print Spooler Driver'}
-                      </p>
-                    </div>
-                  ))
-                ) : (
-                  <div className="ws-panel ws-empty" style={{ gridColumn: '1 / -1', padding: '48px 24px', textAlign: 'center' }}>
-                    <Printer size={48} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
-                    <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px' }}>No Printers Connected</h2>
-                    <p style={{ color: 'var(--pb-muted)', fontSize: '13px', margin: 0 }}>
-                      Connect your USB or network printer and install drivers. Print Bot automatically discovers all Windows spooler printers with zero setup.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* TAB: SERVICES (SHOP CUSTOM SERVICES & PRICING) */}
-          {activeTab === 'services' && (
-            <div className="ws-view">
-              <div className="ws-page-heading">
-                <div>
-                  <span className="ws-eyebrow">COUNTER CATALOG &amp; PRICING</span>
-                  <h1>Your counter services.</h1>
-                  <p>Create, edit, and price the exact services offered at your shop counter. Customers will see these exact services on your web portal.</p>
-                </div>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <button
-                    className="ws-primary"
-                    onClick={() => {
-                      setEditingServiceId(null);
-                      setServiceFormTitle('');
-                      setServiceFormCategory('docs');
-                      setServiceFormPrice('');
-                      setServiceFormTurnaround('Instant Counter Print');
-                      setServiceFormBadge('');
-                      setServiceFormDesc('');
-                      setServiceFormFeatures('');
-                      setServiceFormHasDiscount(false);
-                      setServiceFormDiscountNote('');
-                      setIsServiceModalOpen(true);
-                    }}
-                    style={{ gap: '6px' }}
-                  >
-                    <PlusCircle size={16} /> Add New Service
-                  </button>
-                  <button
-                    onClick={() => handlePublishServices(shopServices)}
-                    disabled={isPublishingServices}
-                    style={{ gap: '6px', background: 'var(--pb-raised)', border: '1px solid var(--pb-accent)' }}
-                  >
-                    <CheckCircle2 size={16} color="var(--pb-accent)" />
-                    {isPublishingServices ? 'Publishing...' : 'Publish to Customer Web'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Category Filter Pills & Search */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  {['all', 'docs', 'photo', 'binding', 'other'].map((catId) => {
-                    const count = catId === 'all'
-                      ? shopServices.length
-                      : shopServices.filter((s) => s.category === catId).length;
-                    const labels: Record<string, string> = {
-                      all: 'All Services',
-                      docs: 'Document Xerox',
-                      photo: 'Photo & ID',
-                      binding: 'Binding & Finishing',
-                      other: 'Specialty',
-                    };
-                    return (
-                      <button
-                        key={catId}
-                        type="button"
-                        onClick={() => setServicesCategoryFilter(catId)}
-                        style={{
-                          minHeight: '34px',
-                          padding: '6px 14px',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          borderRadius: '999px',
-                          background: servicesCategoryFilter === catId ? 'var(--pb-accent)' : 'var(--pb-surface)',
-                          color: servicesCategoryFilter === catId ? 'var(--pb-on-accent)' : 'var(--pb-muted)',
-                          borderColor: servicesCategoryFilter === catId ? 'var(--pb-accent)' : 'var(--pb-border)',
-                        }}
-                      >
-                        {labels[catId] || catId} ({count})
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div style={{ fontSize: '12px', color: 'var(--pb-muted)' }}>
-                  Total: <strong>{shopServices.length}</strong> services configured
-                </div>
-              </div>
-
-              {/* Services Grid */}
-              <div className="ws-printer-grid">
-                {shopServices
-                  .filter((s) => servicesCategoryFilter === 'all' || s.category === servicesCategoryFilter)
-                  .map((service) => (
-                    <div key={service.id} className="ws-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', position: 'relative' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                        <span style={{
-                          fontSize: '10px',
-                          fontWeight: 800,
-                          letterSpacing: '1px',
-                          textTransform: 'uppercase',
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                          background: 'var(--pb-raised)',
-                          color: 'var(--pb-muted)',
-                        }}>
-                          {service.category === 'docs' ? 'Document Xerox' : service.category === 'photo' ? 'Photo & ID' : service.category === 'binding' ? 'Binding' : 'Service'}
-                        </span>
-                        {service.badge && (
-                          <span style={{
-                            fontSize: '10px',
-                            fontWeight: 800,
-                            padding: '3px 8px',
-                            borderRadius: '6px',
-                            background: 'rgba(239, 68, 68, 0.12)',
-                            color: 'var(--pb-accent)',
-                          }}>
-                            {service.badge}
-                          </span>
-                        )}
-                      </div>
-
-                      <div>
-                        <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px' }}>{service.title}</h2>
-                        <div style={{ fontSize: '20px', fontWeight: 850, color: 'var(--pb-accent)', letterSpacing: '-0.5px' }}>
-                          {service.priceDisplay}
-                        </div>
-                      </div>
-
-                      {service.description && (
-                        <p style={{ fontSize: '12px', color: 'var(--pb-muted)', margin: 0, lineHeight: 1.5, minHeight: '36px' }}>
-                          {service.description}
-                        </p>
-                      )}
-
-                      {/* Discount status badge (strictly customized, never hardcoded) */}
-                      {service.hasDiscount && service.discountNote ? (
-                        <div style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '4px 10px',
-                          borderRadius: '6px',
-                          background: 'rgba(34, 197, 94, 0.15)',
-                          color: '#22c55e',
-                          fontSize: '11px',
-                          fontWeight: 750,
-                          width: 'fit-content',
-                        }}>
-                          🏷️ {service.discountNote}
-                        </div>
-                      ) : (
-                        <div style={{ fontSize: '11px', color: 'var(--pb-muted)', opacity: 0.6 }}>
-                          No discount active
-                        </div>
-                      )}
-
-                      {/* Features bullets */}
-                      {service.features && service.features.length > 0 && (
-                        <ul style={{ listStyle: 'none', padding: 0, margin: '4px 0 0', display: 'grid', gap: '6px', fontSize: '12px' }}>
-                          {service.features.map((feat, i) => (
-                            <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--pb-text)' }}>
-                              <CheckCircle2 size={13} color="var(--pb-accent)" style={{ flexShrink: 0 }} />
-                              <span style={{ overflowWrap: 'anywhere' }}>{feat}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-
-                      <div style={{ marginTop: 'auto', paddingTop: '14px', borderTop: '1px solid var(--pb-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '11px', color: 'var(--pb-muted)' }}>
-                          {service.turnaround || 'Instant Counter'}
-                        </span>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingServiceId(service.id);
-                              setServiceFormTitle(service.title);
-                              setServiceFormCategory(service.category || 'docs');
-                              setServiceFormPrice(service.priceDisplay);
-                              setServiceFormTurnaround(service.turnaround || 'Instant Counter Print');
-                              setServiceFormBadge(service.badge || '');
-                              setServiceFormDesc(service.description || '');
-                              setServiceFormFeatures((service.features || []).join('\n'));
-                              setServiceFormHasDiscount(!!service.hasDiscount);
-                              setServiceFormDiscountNote(service.discountNote || '');
-                              setIsServiceModalOpen(true);
-                            }}
-                            style={{ minHeight: '32px', padding: '4px 10px', fontSize: '11px', gap: '4px' }}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (confirm(`Delete service "${service.title}"?`)) {
-                                const remaining = shopServices.filter((s) => s.id !== service.id);
-                                handlePublishServices(remaining);
-                              }
-                            }}
-                            style={{ minHeight: '32px', padding: '4px 8px', fontSize: '11px', color: 'var(--pb-danger)', borderColor: 'var(--pb-border)' }}
-                            title="Delete Service"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                {shopServices.length === 0 && (
-                  <div className="ws-panel ws-empty" style={{ gridColumn: '1 / -1', padding: '48px 24px', textAlign: 'center' }}>
-                    <Sparkles size={48} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
-                    <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px' }}>No Services Configured</h2>
-                    <p style={{ color: 'var(--pb-muted)', fontSize: '13px', margin: '0 0 16px' }}>
-                      Add your shop's Xerox, printout, lamination, or binding services with your own pricing.
-                    </p>
-                    <button
-                      className="ws-primary"
-                      onClick={() => handlePublishServices(DEFAULT_SHOP_SERVICES)}
-                      style={{ margin: '0 auto' }}
-                    >
-                      Load Standard Starter Services
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* TAB: WEBSITE (SHOP DOMAIN & CUSTOMER ACCESS) */}
-          {activeTab === 'website' && (() => {
-            const shopSlug = (currentShop?.shopName || currentShop?.username || 'shop')
-              .toLowerCase()
-              .trim()
-              .replace(/[^a-z0-9]/g, '');
-            const cleanDomain = platformDomain.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
-            const shopWebUrl = `https://${cleanDomain}/${shopSlug}`;
-            const qrImageUrl = websiteQrDataUrl || `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(shopWebUrl)}`;
-
-            return (
-              <div className="ws-view">
-                <div className="ws-page-heading">
-                  <div>
-                    <span className="ws-eyebrow">ONLINE ACCESS</span>
-                    <h1>Shop Website &amp; QR Code</h1>
-                    <p>Customers can upload and print directly using your dedicated shop web link or counter stand QR code.</p>
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', alignItems: 'start' }}>
-                  {/* Left Column: Dedicated Shop Web Address */}
-                  <div className="ws-panel" style={{ padding: '24px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
-                      <Globe size={20} color="var(--pb-accent)" />
-                      <div>
-                        <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 750 }}>Shop Web Address</h3>
-                        <small style={{ color: 'var(--pb-muted)' }}>Dedicated web link for your customers to upload from their phones</small>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                      {/* Shop Web Portal URL */}
-                      <div style={{ padding: '16px', borderRadius: '12px', background: 'var(--pb-raised)', border: '1px solid var(--pb-accent)' }}>
-                        <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-accent)', letterSpacing: '0.5px' }}>YOUR DEDICATED SHOP WEB LINK</span>
-                          <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '4px', background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', fontWeight: 700 }}>LIVE URL PATH</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                          <code style={{ fontSize: '14px', fontWeight: 750, color: 'var(--pb-accent)', wordBreak: 'break-all' }}>{shopWebUrl}</code>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(shopWebUrl);
-                              setNotice('Copied shop web link to clipboard.');
-                            }}
-                            style={{ border: 0, padding: '6px 12px', fontSize: '11px', gap: '5px', flexShrink: 0 }}
-                          >
-                            <Copy size={13} /> Copy Link
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Column: Counter Stand QR Code */}
-                  <div className="ws-panel" style={{ padding: '28px', textAlign: 'center' }}>
-                    <div style={{ display: 'inline-flex', padding: '14px', borderRadius: '16px', background: '#fff', border: '1px solid var(--pb-border)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', marginBottom: '18px' }}>
-                      <img
-                        src={qrImageUrl}
-                        alt="Shop Counter Stand QR"
-                        style={{ width: '210px', height: '210px', display: 'block', borderRadius: '8px' }}
-                      />
-                    </div>
-
-                    <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px' }}>Counter Stand QR Code</h3>
-                    <p style={{ fontSize: '12px', color: 'var(--pb-muted)', margin: '0 0 20px', lineHeight: 1.5 }}>
-                      Customers scan this QR code with their phone camera to upload and pay without downloading an app.
-                    </p>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <button
-                        className="ws-primary"
-                        onClick={() => {
-                          const printWindow = window.open('', '_blank');
-                          if (printWindow) {
-                            printWindow.document.write(`
-                              <html>
-                                <head>
-                                  <title>Print Bot Counter QR - ${currentShop?.shopName}</title>
-                                  <style>
-                                    body { font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #fff; }
-                                    .card { border: 3px solid #18181b; border-radius: 24px; padding: 40px; text-align: center; max-width: 360px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-                                    h1 { margin: 0 0 8px; font-size: 24px; font-weight: 800; }
-                                    p { color: #52525b; margin: 0 0 24px; font-size: 14px; }
-                                    img { width: 240px; height: 240px; border-radius: 12px; }
-                                    .sub { margin-top: 20px; font-size: 13px; font-weight: 750; color: #18181b; word-break: break-all; }
-                                  </style>
-                                </head>
-                                <body>
-                                  <div class="card">
-                                    <h1>${currentShop?.shopName || 'Print Shop'}</h1>
-                                    <p>Scan to Upload &amp; Print from Phone</p>
-                                    <img src="${qrImageUrl}" alt="QR Code" />
-                                    <div class="sub">${shopWebUrl}</div>
-                                  </div>
-                                  <script>window.onload = function() { window.print(); };</script>
-                                </body>
-                              </html>
-                            `);
-                            printWindow.document.close();
-                          }
-                        }}
-                        style={{ width: '100%', justifyContent: 'center', minHeight: '40px', gap: '8px' }}
-                      >
-                        <Printer size={16} /> Print Counter Stand QR Card
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(shopWebUrl);
-                          setNotice('Copied customer web link to clipboard.');
-                        }}
-                        style={{ width: '100%', justifyContent: 'center', minHeight: '38px', gap: '6px' }}
-                      >
-                        <Copy size={14} /> Copy Customer Link
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+    <DesktopShell
+      currentShop={currentShop}
+      username={activeSession?.username || 'operator'}
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
+      queueCount={jobs.length}
+      printersCount={nativePrinters?.length || printers.length}
+      servicesCount={shopServices.length}
+      isAudioEnabled={isAudioEnabled}
+      setIsAudioEnabled={setIsAudioEnabled}
+      theme={theme}
+      setTheme={setTheme}
+      onLogout={handleLogout}
+      cloudSyncStatus="CONNECTED"
+      notice={notice}
+      onDismissNotice={() => setNotice(null)}
+    >
+      {activeTab === 'queue' && (
+        <QueueView
+          jobs={jobs}
+          filteredJobs={filteredJobs}
+          pendingCount={pendingCount}
+          queuedCount={queuedCount}
+          completedCount={completedCount}
+          attentionCount={attentionCount}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          onApproveAll={() => {
+            setJobs((prev) =>
+              prev.map((j) => (j.status === 'PENDING_APPROVAL' ? { ...j, status: 'QUEUED' } : j))
             );
-          })()}
+            setNotice(`Approved all ${pendingCount} pending jobs.`);
+          }}
+          onApproveJob={handleApproveJob}
+          onRejectJob={(jobId) => setRejectionModalJobId(jobId)}
+          onRefreshJobs={() => {
+            setNotice('Checking for incoming cloud orders...');
+          }}
+        />
+      )}
 
-          {/* TAB: SETTINGS */}
-          {activeTab === 'settings' && (
-            <div className="ws-view">
-              <div className="ws-page-heading">
-                <div>
-                  <span className="ws-eyebrow">CONFIGURATION</span>
-                  <h1>Shop settings.</h1>
-                  <p>Manage your shop identification, counter contact details, and workstation order dispatch mode.</p>
-                </div>
-              </div>
+      {activeTab === 'printers' && (
+        <PrintersView
+          nativePrinters={nativePrinters || []}
+          fallbackPrinters={printers}
+          onRefreshPrinters={async () => {
+            setIsRefreshingPrinters(true);
+            try {
+              const res = await discoverPrinters();
+              setNativePrinters(res);
+              setNotice(`Discovered ${res.length} connected printers.`);
+            } catch (err) {
+              console.warn('Printer discovery error:', err);
+            } finally {
+              setIsRefreshingPrinters(false);
+            }
+          }}
+          isRefreshing={isRefreshingPrinters}
+        />
+      )}
 
-              <div className="ws-panel" style={{ padding: '32px', maxWidth: '640px' }}>
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (!activeSession) return;
-                    const u = activeSession.username;
+      {activeTab === 'services' && (
+        <ServicesView
+          shopServices={shopServices}
+          servicesCategoryFilter={servicesCategoryFilter}
+          setServicesCategoryFilter={setServicesCategoryFilter}
+          isPublishingServices={isPublishingServices}
+          onOpenCreateServiceModal={() => {
+            setEditingServiceId(null);
+            setServiceFormTitle('');
+            setServiceFormCategory('docs');
+            setServiceFormPrice('');
+            setServiceFormTurnaround('Instant Counter Print');
+            setServiceFormBadge('');
+            setServiceFormDesc('');
+            setServiceFormFeatures('');
+            setServiceFormHasDiscount(false);
+            setServiceFormDiscountNote('');
+            setIsServiceModalOpen(true);
+          }}
+          onOpenEditServiceModal={(service) => {
+            setEditingServiceId(service.id);
+            setServiceFormTitle(service.title);
+            setServiceFormCategory(service.category || 'docs');
+            setServiceFormPrice(service.priceDisplay);
+            setServiceFormTurnaround(service.turnaround || 'Instant Counter Print');
+            setServiceFormBadge(service.badge || '');
+            setServiceFormDesc(service.description || '');
+            setServiceFormFeatures((service.features || []).join('\n'));
+            setServiceFormHasDiscount(!!service.hasDiscount);
+            setServiceFormDiscountNote(service.discountNote || '');
+            setIsServiceModalOpen(true);
+          }}
+          onDeleteService={(service) => {
+            if (confirm(`Delete service "${service.title}"?`)) {
+              const remaining = shopServices.filter((s) => s.id !== service.id);
+              handlePublishServices(remaining);
+            }
+          }}
+          onPublishServices={handlePublishServices}
+          onLoadDefaultServices={() => handlePublishServices(DEFAULT_SHOP_SERVICES)}
+        />
+      )}
 
-                    setLicenses((prev) => {
-                      const updated = {
-                        ...prev[u],
-                        orderMode: setupOrderMode,
-                      };
-                      return {
-                        ...prev,
-                        [u]: updated,
-                        ...(currentShop?.username ? { [currentShop.username.toLowerCase()]: updated } : {}),
-                        ...(currentShop?.shopName ? { [currentShop.shopName.toLowerCase()]: updated } : {}),
-                      };
-                    });
+      {activeTab === 'website' && (
+        <WebsiteView
+          currentShop={currentShop}
+          platformDomain={platformDomain}
+          websiteQrDataUrl={websiteQrDataUrl}
+          onCopyNotice={(msg) => setNotice(msg)}
+        />
+      )}
 
-                    // Sync dispatch mode to Supabase for the web portal
-                    try {
-                      const shopName = currentShop?.shopName || setupShopName || u;
-                      const username = currentShop?.username || u;
-                      const notesPayload = JSON.stringify({
-                        services: shopServices,
-                        orderMode: setupOrderMode,
-                        updatedAt: new Date().toISOString(),
-                      });
-
-                      let updated = false;
-                      if (currentShop?.appId) {
-                        const { data, error } = await supabase
-                          .from('pilot_applications')
-                          .update({ notes: notesPayload })
-                          .eq('id', currentShop.appId)
-                          .select();
-                        if (!error && data && data.length > 0) updated = true;
-                      }
-
-                      if (!updated) {
-                        const orFilter = `generated_username.ilike.${username},shop_name.ilike.${shopName},generated_username.ilike.${u},shop_name.ilike.${u}`;
-                        await supabase
-                          .from('pilot_applications')
-                          .update({ notes: notesPayload })
-                          .or(orFilter);
-                      }
-                    } catch (err) {
-                      console.warn('Failed to sync settings to cloud:', err);
-                    }
-
-                    setNotice('Shop settings updated successfully.');
-                  }}
-                  style={{ display: 'grid', gap: '20px' }}
-                >
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                        Shop Name
-                      </label>
-                      <input
-                        type="text"
-                        value={setupShopName}
-                        readOnly
-                        disabled
-                        style={{ opacity: 0.75, cursor: 'not-allowed', background: 'var(--pb-raised)' }}
-                        title="Automatically provisioned from License Key"
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                        Branch Location
-                      </label>
-                      <input
-                        type="text"
-                        value={setupLocation}
-                        readOnly
-                        disabled
-                        style={{ opacity: 0.75, cursor: 'not-allowed', background: 'var(--pb-raised)' }}
-                        title="Automatically provisioned from License Key"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                      Contact Phone
-                    </label>
-                    <input
-                      type="text"
-                      value={setupPhone}
-                      readOnly
-                      disabled
-                      style={{ opacity: 0.75, cursor: 'not-allowed', background: 'var(--pb-raised)' }}
-                      title="Automatically provisioned from License Key"
-                    />
-                  </div>
-
-                  {/* Workstation Order Dispatch Mode */}
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                      Workstation Order Dispatch Mode
-                    </label>
-                    <select
-                      value={setupOrderMode}
-                      onChange={(e) => setSetupOrderMode(e.target.value as 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC')}
-                      style={{ width: '100%' }}
-                    >
-                      <option value="MANUAL_APPROVAL">
-                        Manual Approval (Operator reviews &amp; clicks Approve before printing)
-                      </option>
-                      <option value="FULL_AUTOMATIC">
-                        Full Automatic (Directly prints once customer UPI payment is verified)
-                      </option>
-                    </select>
-                    <small style={{ color: 'var(--pb-muted)', fontSize: '11px', display: 'block', marginTop: '6px' }}>
-                      Switch anytime based on your counter rush. Manual approval lets you inspect customer files first.
-                    </small>
-                  </div>
-
-                  {/* Dedicated Services Callout Box */}
-                  <div style={{
-                    padding: '16px',
-                    borderRadius: '12px',
-                    background: 'var(--pb-raised)',
-                    border: '1px solid var(--pb-border)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '16px',
-                    marginTop: '8px'
-                  }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                        <Sparkles size={16} color="var(--pb-accent)" />
-                        <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 750 }}>Counter Services &amp; Custom Rates</h4>
-                      </div>
-                      <p style={{ margin: 0, fontSize: '12px', color: 'var(--pb-muted)' }}>
-                        Add services, set custom rates, and manage customer discounts on your dedicated Services page.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('services')}
-                      style={{ flexShrink: 0, fontSize: '12px', padding: '8px 14px', gap: '6px' }}
-                    >
-                      Open Services →
-                    </button>
-                  </div>
-
-                  <button type="submit" className="ws-primary" style={{ marginTop: '10px' }}>
-                    Save Settings
-                  </button>
-                </form>
-              </div>
-            </div>
-          )}
-        </main>
-      </div>
+      {activeTab === 'settings' && (
+        <SettingsView
+          currentShop={currentShop}
+          setupShopName={setupShopName}
+          setupLocation={setupLocation}
+          setupPhone={setupPhone}
+          setupOrderMode={setupOrderMode}
+          setSetupOrderMode={setSetupOrderMode}
+          onSaveSettings={handleSaveShopSettings}
+          onNavigateToServices={() => setActiveTab('services')}
+        />
+      )}
 
       {/* Rejection Modal */}
       {rejectionModalJobId && (
-        <Dialog title="Reject print job" onClose={() => setRejectionModalJobId(null)}>
-          <p>Select a clear reason for the customer:</p>
-          <select
-            value={rejectionReason}
-            onChange={(e) => setRejectionReason(e.target.value)}
-            style={{ marginBottom: '16px' }}
-          >
-            <option>Poor image resolution or blurred scan</option>
-            <option>Page bounds or margins exceed printable area</option>
-            <option>Incompatible paper size requested</option>
-            <option>Payment verification mismatch at counter</option>
-          </select>
-          <div className="ws-dialog-actions">
-            <button onClick={() => setRejectionModalJobId(null)}>Cancel</button>
-            <button className="ws-primary" onClick={handleRejectJob}>
-              Confirm Rejection
-            </button>
-          </div>
-        </Dialog>
+        <JobRejectModal
+          jobId={rejectionModalJobId}
+          job={jobs.find((j) => j.id === rejectionModalJobId)}
+          rejectionReason={rejectionReason}
+          setRejectionReason={setRejectionReason}
+          onConfirmReject={handleConfirmReject}
+          onClose={() => setRejectionModalJobId(null)}
+        />
       )}
 
-      {/* DIALOG: ADD / EDIT COUNTER SERVICE */}
+      {/* Service Edit / Create Modal */}
       {isServiceModalOpen && (
-        <Dialog
-          title={editingServiceId ? 'Edit Counter Service' : 'Add New Counter Service'}
+        <ServiceEditModal
+          editingServiceId={editingServiceId}
+          serviceFormTitle={serviceFormTitle}
+          setServiceFormTitle={setServiceFormTitle}
+          serviceFormCategory={serviceFormCategory}
+          setServiceFormCategory={setServiceFormCategory}
+          serviceFormPrice={serviceFormPrice}
+          setServiceFormPrice={setServiceFormPrice}
+          serviceFormTurnaround={serviceFormTurnaround}
+          setServiceFormTurnaround={setServiceFormTurnaround}
+          serviceFormBadge={serviceFormBadge}
+          setServiceFormBadge={setServiceFormBadge}
+          serviceFormDesc={serviceFormDesc}
+          setServiceFormDesc={setServiceFormDesc}
+          serviceFormFeatures={serviceFormFeatures}
+          setServiceFormFeatures={setServiceFormFeatures}
+          serviceFormHasDiscount={serviceFormHasDiscount}
+          setServiceFormHasDiscount={setServiceFormHasDiscount}
+          serviceFormDiscountNote={serviceFormDiscountNote}
+          setServiceFormDiscountNote={setServiceFormDiscountNote}
+          onSaveService={handleSaveServiceSubmit}
           onClose={() => setIsServiceModalOpen(false)}
-        >
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!serviceFormTitle.trim() || !serviceFormPrice.trim()) return;
-
-              const featuresArray = serviceFormFeatures
-                .split('\n')
-                .map((s) => s.trim())
-                .filter(Boolean);
-
-              const newService: ShopServiceItem = {
-                id: editingServiceId || `srv_${Date.now()}`,
-                title: serviceFormTitle.trim(),
-                category: serviceFormCategory,
-                priceDisplay: serviceFormPrice.trim(),
-                turnaround: serviceFormTurnaround.trim() || 'Instant Counter Print',
-                badge: serviceFormBadge.trim() || undefined,
-                description: serviceFormDesc.trim(),
-                features: featuresArray.length > 0 ? featuresArray : ['High-quality print', 'Instant counter pickup'],
-                hasDiscount: serviceFormHasDiscount,
-                discountNote: serviceFormHasDiscount ? serviceFormDiscountNote.trim() : undefined,
-              };
-
-              let updatedList: ShopServiceItem[];
-              if (editingServiceId) {
-                updatedList = shopServices.map((s) => (s.id === editingServiceId ? newService : s));
-              } else {
-                updatedList = [...shopServices, newService];
-              }
-
-              handlePublishServices(updatedList);
-              setIsServiceModalOpen(false);
-            }}
-            style={{ display: 'grid', gap: '16px' }}
-          >
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                Service Title / Name *
-              </label>
-              <input
-                type="text"
-                value={serviceFormTitle}
-                onChange={(e) => setServiceFormTitle(e.target.value)}
-                placeholder="e.g. Document Print & Xerox, Color Laser Print, Passport Photos..."
-                required
-              />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                  Category
-                </label>
-                <select
-                  value={serviceFormCategory}
-                  onChange={(e) => setServiceFormCategory(e.target.value)}
-                >
-                  <option value="docs">Document Xerox &amp; Print</option>
-                  <option value="photo">Photo &amp; ID Card</option>
-                  <option value="binding">Binding &amp; Finishing</option>
-                  <option value="other">Specialty &amp; Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                  Price / Rate Display *
-                </label>
-                <input
-                  type="text"
-                  value={serviceFormPrice}
-                  onChange={(e) => setServiceFormPrice(e.target.value)}
-                  placeholder="e.g. ₹2.00 / page, ₹50.00 / 8-sheet, From ₹30"
-                  required
-                />
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                  Turnaround Speed
-                </label>
-                <input
-                  type="text"
-                  value={serviceFormTurnaround}
-                  onChange={(e) => setServiceFormTurnaround(e.target.value)}
-                  placeholder="e.g. Instant Counter Print, 5–15 mins"
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                  Highlight Badge (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={serviceFormBadge}
-                  onChange={(e) => setServiceFormBadge(e.target.value)}
-                  placeholder="e.g. Most Popular, Studio Quality, Student Favorite"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                Description
-              </label>
-              <textarea
-                value={serviceFormDesc}
-                onChange={(e) => setServiceFormDesc(e.target.value)}
-                placeholder="Briefly describe what this service provides..."
-                rows={2}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                Key Features (One point per line)
-              </label>
-              <textarea
-                value={serviceFormFeatures}
-                onChange={(e) => setServiceFormFeatures(e.target.value)}
-                placeholder="A4, A3, Legal, Letter&#10;B&amp;W or Vibrant Color&#10;Crisp 1200 DPI Laser Finish"
-                rows={3}
-              />
-            </div>
-
-            {/* Discount Option: strictly shop owner customizable */}
-            <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', margin: 0, fontWeight: 700, fontSize: '13px' }}>
-                <input
-                  type="checkbox"
-                  checked={serviceFormHasDiscount}
-                  onChange={(e) => setServiceFormHasDiscount(e.target.checked)}
-                  style={{ width: '18px', height: '18px', minHeight: '18px', accentColor: 'var(--pb-accent)' }}
-                />
-                <span>Offer a discount on this service?</span>
-              </label>
-
-              {serviceFormHasDiscount && (
-                <div style={{ marginTop: '12px' }}>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                    Discount Tag / Details *
-                  </label>
-                  <input
-                    type="text"
-                    value={serviceFormDiscountNote}
-                    onChange={(e) => setServiceFormDiscountNote(e.target.value)}
-                    placeholder="e.g. Save 10% on 50+ copies, or Save 15% on 2-sided, or Student Offer"
-                    required={serviceFormHasDiscount}
-                  />
-                  <small style={{ color: 'var(--pb-muted)', display: 'block', marginTop: '4px' }}>
-                    This discount tag will appear prominently on the customer web portal card.
-                  </small>
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
-              <button type="button" onClick={() => setIsServiceModalOpen(false)}>
-                Cancel
-              </button>
-              <button type="submit" className="ws-primary">
-                {editingServiceId ? 'Save Changes' : 'Create Service'}
-              </button>
-            </div>
-          </form>
-        </Dialog>
+        />
       )}
-    </div>
+    </DesktopShell>
   );
 }
