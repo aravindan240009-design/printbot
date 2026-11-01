@@ -10,8 +10,7 @@ import { ContactPage } from './pages/ContactPage';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { TermsPage } from './pages/TermsPage';
 import { resolveShopSlugFromUrl } from './customer-web/utils/tenant';
-import { ArrowLeft, Home, Download, RefreshCw } from 'lucide-react';
-import { DOWNLOAD_CONFIG, triggerInstallerDownload } from './config/download';
+import { RefreshCw } from 'lucide-react';
 import './website.css';
 
 const CustomerWebApp = lazy(() => import('./customer-web/App'));
@@ -74,54 +73,16 @@ export const App: React.FC = () => {
   // Render Customer Web Platform if visiting a shop URL path or customer path
   if (shouldRenderCustomerWeb) {
     return (
-      <div className="min-h-screen bg-[#090B0F] text-slate-100 flex flex-col">
-        {/* Top return & workstation banner */}
-        <div className="bg-[#0E131F] border-b border-white/[0.1] px-4 py-2 flex items-center justify-between text-xs">
-          <button
-            onClick={() => {
-              navigate('/');
-            }}
-            className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Print Bot Official Site</span>
-          </button>
-          <div className="flex items-center gap-2">
-            <span className="text-slate-400">
-              Shop Counter: <strong className="text-white font-medium">{activeShopSlug}</strong>
-            </span>
-            <button
-              onClick={() => {
-                triggerInstallerDownload();
-                setDownloadModalOpen(true);
-              }}
-              className="px-2.5 py-1 bg-brand-blue hover:bg-blue-600 text-white rounded text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-            >
-              <Download className="w-3 h-3" />
-              <span>Get Windows Workstation</span>
-            </button>
+      <Suspense
+        fallback={
+          <div className="min-h-screen bg-[#090B0F] flex flex-col items-center justify-center gap-3 text-slate-400">
+            <RefreshCw className="w-6 h-6 animate-spin text-brand-400" />
+            <span className="text-sm font-medium">Initializing Customer Upload Portal...</span>
           </div>
-        </div>
-
-        {/* Customer Web Application */}
-        <div className="flex-1">
-          <Suspense
-            fallback={
-              <div className="min-h-[500px] flex flex-col items-center justify-center gap-3 text-slate-400">
-                <RefreshCw className="w-6 h-6 animate-spin text-brand-400" />
-                <span className="text-sm font-medium">Initializing Customer Upload Portal...</span>
-              </div>
-            }
-          >
-            <CustomerWebApp initialShopId={activeShopSlug} />
-          </Suspense>
-        </div>
-
-        <DownloadModal 
-          isOpen={downloadModalOpen} 
-          onClose={() => setDownloadModalOpen(false)} 
-        />
-      </div>
+        }
+      >
+        <CustomerWebApp initialShopId={activeShopSlug} onBackToHome={() => navigate('/')} />
+      </Suspense>
     );
   }
 
