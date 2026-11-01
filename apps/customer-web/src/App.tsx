@@ -76,10 +76,10 @@ const defaults: Options = {
 };
 
 const defaultShopSession: ShopSession = {
-  session_token: 'local-shop-session-anna-univ',
-  shop_id: 'shop-anna-univ-01',
-  shop_name: 'Anna University Quick Xerox',
-  shop_slug: 'anna-univ-quick-xerox',
+  session_token: 'shop-session-counter',
+  shop_id: 'shop-counter',
+  shop_name: 'Print Bot Counter',
+  shop_slug: 'print-bot-counter',
   expires_at: new Date(Date.now() + 86400000).toISOString(),
 };
 
