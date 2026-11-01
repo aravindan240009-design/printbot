@@ -1602,18 +1602,12 @@ export default function App() {
   const [notice, setNotice] = useState('');
   const [nativePrinters, setNativePrinters] = useState<NativePrinterInfo[] | null>(null);
   const [isRefreshingPrinters, setIsRefreshingPrinters] = useState(false);
-  const [theme, setTheme] = useState<string>(() => {
-    try {
-      return localStorage.getItem('printbot_theme') || 'dark';
-    } catch {
-      return 'dark';
-    }
-  });
+  const [theme, setTheme] = useState<string>('light');
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('printbot_theme', theme);
-  }, [theme]);
+    document.documentElement.setAttribute('data-theme', 'light');
+    localStorage.setItem('printbot_theme', 'light');
+  }, []);
 
   const [printers] = useState<ConnectedPrinter[]>([]);
 

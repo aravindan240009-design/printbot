@@ -95,30 +95,16 @@ export const DesktopShell: React.FC<DesktopShellProps> = ({
             {isAudioEnabled ? <Volume2 size={14} color="var(--pb-desk-accent)" /> : <VolumeX size={14} />}
           </button>
 
-          {/* Theme Switcher */}
-          <button
-            type="button"
-            className="pb-titlebar-btn"
-            title={`Current Theme: ${theme.toUpperCase()} (Click to toggle)`}
-            onClick={() => {
-              const nextTheme = theme === 'dark' ? 'light' : 'dark';
-              setTheme(nextTheme);
-              document.documentElement.setAttribute('data-theme', nextTheme);
-            }}
-          >
-            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-          </button>
-
           <div className="pb-titlebar-divider" />
 
           {/* Lock / Logout */}
           <button
             type="button"
-            className="pb-btn pb-btn-sm"
+            className="pb-btn pb-btn-secondary pb-btn-sm"
             onClick={onLogout}
-            style={{ gap: '5px', height: '26px' }}
+            style={{ gap: '5px', height: '28px' }}
           >
-            <Lock size={12} /> Lock
+            <Lock size={12} /> Lock Session
           </button>
         </div>
       </header>
