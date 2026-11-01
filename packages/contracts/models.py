@@ -309,7 +309,7 @@ class StaffRole(str, Enum):
 
 
 class StaffLoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
     totp_code: Optional[str] = None
 

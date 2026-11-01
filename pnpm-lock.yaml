@@ -35,6 +35,16 @@ importers:
       vite:
         specifier: ^5.4.10
         version: 5.4.21(@types/node@20.19.43)
+    devDependencies:
+      autoprefixer:
+        specifier: ^10.4.19
+        version: 10.6.1(postcss@8.5.31)
+      postcss:
+        specifier: ^8.4.38
+        version: 8.5.31
+      tailwindcss:
+        specifier: ^3.4.17
+        version: 3.4.19
 
   apps/customer-web:
     dependencies:

@@ -48,9 +48,11 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { ThemeProvider, ThemeSwitch, MotionSurface, PaperScene, PrinterScene, useGsapStagger } from '@xerox/ui';
-import { discoverPrinters, type NativePrinterInfo } from './native';
+import { discoverPrinters, bindWorkstation, getWorkstationDeviceIdentity, type NativePrinterInfo } from './native';
 import { supabase } from './supabase';
 import QRCode from 'qrcode';
+
+const API_BASE = ((import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '');
 
 // --- Models & Contracts ---
 
@@ -72,6 +74,7 @@ export interface ShopLicense {
   isConfigured: boolean;
   duration?: '1 Month' | '1 Year' | 'Lifetime Commercial';
   deviceId?: string | null;
+  deviceToken?: string | null;
   appId?: string;
   totalOrdersCount?: number;
   totalPagesCount?: number;
@@ -172,10 +175,11 @@ export interface ConnectedPrinter {
 
 // Auto-purge any legacy mock/seeded data from browser localStorage once
 try {
-  if (!localStorage.getItem('printbot_clean_v1')) {
+  if (!localStorage.getItem('printbot_clean_v5')) {
     localStorage.removeItem('printbot_licenses');
     localStorage.removeItem('printbot_audit_logs');
-    localStorage.setItem('printbot_clean_v1', 'true');
+    localStorage.removeItem('printbot_pilot_requests');
+    localStorage.setItem('printbot_clean_v5', 'true');
   }
 } catch {}
 
@@ -236,6 +240,7 @@ export default function App() {
   const [activeSession, setActiveSession] = useState<{
     role: 'SHOP_OWNER' | 'ADMIN';
     username: string;
+    token?: string;
   } | null>(() => {
     try {
       const saved = localStorage.getItem('printbot_session');
@@ -243,6 +248,40 @@ export default function App() {
     } catch {}
     return null;
   });
+
+  // Authoritative server-side verification of active Super Admin sessions (fails closed in production)
+  useEffect(() => {
+    if (activeSession?.role === 'ADMIN') {
+      // In dev/test builds, retain offline admin session without requiring remote verification
+      if (__DEV_OFFLINE_ADMIN_ENABLED__ && activeSession.token === 'dev_offline_admin_token') {
+        return;
+      }
+
+      if (!activeSession.token) {
+        // Client-side state without verified server token -> fail closed
+        setActiveSession(null);
+        localStorage.removeItem('printbot_session');
+        return;
+      }
+      fetch(`${API_BASE}/auth/me`, {
+        headers: { Authorization: `Bearer ${activeSession.token}` },
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error('Unauthorized');
+          return res.json();
+        })
+        .then((data) => {
+          if (!data.user?.is_superadmin) {
+            setActiveSession(null);
+            localStorage.removeItem('printbot_session');
+          }
+        })
+        .catch(() => {
+          setActiveSession(null);
+          localStorage.removeItem('printbot_session');
+        });
+    }
+  }, [activeSession?.token, activeSession?.role]);
 
   // Current Screen
   const screen: AppScreen = useMemo(() => {
@@ -270,10 +309,9 @@ export default function App() {
   const currentShop: ShopLicense | undefined =
     activeSession?.role === 'SHOP_OWNER' ? licenses[activeSession.username] : undefined;
 
-  // --- Admin Security & Password Persistence ---
-  const [adminCustomPassword, setAdminCustomPassword] = useState<string>(() => {
-    return localStorage.getItem('printbot_admin_key') || 'admin@123';
-  });
+  // --- Admin Security & MFA State ---
+  const [isMfaRequired, setIsMfaRequired] = useState(false);
+  const [adminMfaCode, setAdminMfaCode] = useState('');
 
   // --- Audit Trail State ---
   const [auditLogs, setAuditLogs] = useState<AdminAuditEntry[]>(() => {
@@ -307,8 +345,12 @@ export default function App() {
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState<Date | null>(null);
 
-  // Auto-uppercase and key formatting helper
+  // Auto-uppercase and key formatting helper (preserve password case for admin)
   const handleKeyChange = (val: string) => {
+    if (loginUsername.trim().toLowerCase() === 'admin') {
+      setLoginKey(val);
+      return;
+    }
     let formatted = val.toUpperCase();
     if (formatted.startsWith('PBKEY') && !formatted.startsWith('PB-KEY-')) {
       formatted = formatted.replace(/^PBKEY/, 'PB-KEY-');
@@ -328,28 +370,184 @@ export default function App() {
     const u = loginUsername.trim().toLowerCase();
     const k = loginKey.trim();
 
-    // 1. Admin Authentication Check (Matches custom password or default admin@123)
-    if (u === 'admin' && (k === adminCustomPassword || k === 'admin@123')) {
-      setFailedAttempts(0);
-      setLockoutUntil(null);
-      setActiveSession({ role: 'ADMIN', username: 'admin' });
-      return;
+    // 1. Server-Verified Admin Authentication Check
+    if (u === 'admin' || u.endsWith('@printbot.in')) {
+      let isBackendOffline = false;
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        const loginRes = await fetch(`${API_BASE}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: u,
+            password: k,
+            totp_code: adminMfaCode.trim() || undefined,
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (loginRes.ok) {
+          const authData = await loginRes.json();
+          if (authData.user && authData.user.is_superadmin) {
+            setFailedAttempts(0);
+            setLockoutUntil(null);
+            setIsMfaRequired(false);
+            setAdminMfaCode('');
+            setActiveSession({
+              role: 'ADMIN',
+              username: authData.user.email || 'admin',
+              token: authData.session_token,
+            });
+            return;
+          }
+        } else if (loginRes.status === 403) {
+          const errData = await loginRes.json().catch(() => ({}));
+          if (errData.detail && errData.detail.includes('MFA_REQUIRED')) {
+            setIsMfaRequired(true);
+            setLoginError('MFA verification code required for Super Admin account.');
+            return;
+          }
+        } else {
+          // Backend is online and answered, but rejected the credentials
+          const errData = await loginRes.json().catch(() => ({}));
+          setLoginError(errData.detail || 'Invalid administrative credentials.');
+          return;
+        }
+      } catch (adminErr) {
+        isBackendOffline = true;
+        console.warn('Backend admin auth unreachable:', adminErr);
+      }
+
+      // If backend server is offline or unreachable:
+      if (isBackendOffline) {
+        // Requirements 1, 2, 5, 6:
+        // For development/testing builds only, allow local offline admin login using test credentials.
+        // In production releases, __DEV_OFFLINE_ADMIN_ENABLED__ is false and dead-code eliminated.
+        if (
+          __DEV_OFFLINE_ADMIN_ENABLED__ &&
+          u === __DEV_TEST_ADMIN_USER__ &&
+          k === __DEV_TEST_ADMIN_PASS__
+        ) {
+          console.info('[Dev Auth] Backend unreachable. Authenticated via dev/test offline admin credentials.');
+          setFailedAttempts(0);
+          setLockoutUntil(null);
+          setIsMfaRequired(false);
+          setAdminMfaCode('');
+          setActiveSession({
+            role: 'ADMIN',
+            username: 'admin (dev-offline)',
+            token: 'dev_offline_admin_token',
+          });
+          setNotice('Logged in via offline development test admin.');
+          return;
+        }
+
+        setLoginError('Authentication server offline or unreachable. Administrative login failed closed.');
+        return;
+      }
     }
 
-    // 2. Shop Owner License Check (local cache)
-    const license = licenses[u];
-    if (license && license.licenseKey.trim().toUpperCase() === k.toUpperCase()) {
-      if (license.status === 'REVOKED') {
+    // 2. Local Workstation Shop License Check (Licenses issued on this machine by the Super Admin)
+    const localLicense = licenses[u] || Object.values(licenses).find((l) => l.username.toLowerCase() === u);
+    if (localLicense && localLicense.licenseKey.trim().toUpperCase() === k.toUpperCase()) {
+      if (localLicense.status === 'REVOKED') {
         setLoginError('This license key has been revoked by the Admin.');
         return;
       }
+      if (localLicense.expiresAt && localLicense.expiresAt !== 'LIFETIME') {
+        const exp = new Date(localLicense.expiresAt);
+        if (!isNaN(exp.getTime()) && exp < new Date()) {
+          setLoginError('This license key has expired. Please contact the Admin to renew.');
+          return;
+        }
+      }
+
+      try {
+        const devIdentity = await getWorkstationDeviceIdentity();
+        const devToken = localLicense.deviceToken || `devtoken:${u}:${devIdentity.device_id}:${Math.floor(Date.now() / 1000) + 86400 * 365}:station_local_auth`;
+        await bindWorkstation(devToken);
+        setLicenses((prev) => ({
+          ...prev,
+          [u]: {
+            ...prev[u],
+            deviceId: devIdentity.device_id,
+            deviceToken: devToken,
+          },
+        }));
+      } catch (bindErr) {
+        console.warn('Local workstation pairing note:', bindErr);
+      }
+
       setFailedAttempts(0);
       setLockoutUntil(null);
       setActiveSession({ role: 'SHOP_OWNER', username: u });
       return;
     }
 
-    // 3. Cloud Database Fallback (In case newly approved shop logs into a new PC)
+    // 3. Authoritative Server-Side Licence Validation Flow against Canonical Database
+    try {
+      const devIdentity = await getWorkstationDeviceIdentity();
+
+      const { data: authRes, error: rpcErr } = await supabase.rpc('validate_shop_license', {
+        p_username: u,
+        p_license_key: k.trim().toUpperCase(),
+        p_device_id: devIdentity.device_id,
+        p_hardware_hash: devIdentity.hardware_hash,
+      });
+
+      if (!rpcErr && authRes && authRes.success) {
+        const canonicalUsername = authRes.slug || u;
+        const newLic: ShopLicense = {
+          username: canonicalUsername,
+          appId: authRes.shop_id,
+          licenseKey: k.toUpperCase(),
+          shopName: authRes.shop_name || 'Print Shop',
+          location: authRes.city || '',
+          phone: authRes.contact_phone || '',
+          upiId: `${canonicalUsername}@upi`,
+          rates: {
+            bwPerSideRupees: (authRes.rates && authRes.rates.bwRate) ? Number(authRes.rates.bwRate) : 1.5,
+            colorPerSideRupees: (authRes.rates && authRes.rates.colorRate) ? Number(authRes.rates.colorRate) : 10.0,
+            duplexDiscountPercent: 15,
+          },
+          orderMode: authRes.order_mode || 'MANUAL_APPROVAL',
+          status: 'ACTIVE',
+          expiresAt: authRes.is_lifetime ? 'LIFETIME' : (authRes.expires_at ? authRes.expires_at.split('T')[0] : 'EXPIRED'),
+          isConfigured: true,
+          duration: authRes.is_lifetime ? 'Lifetime Commercial' : (authRes.plan || '1 Year'),
+          deviceId: devIdentity.device_id,
+          deviceToken: authRes.device_token || null,
+          totalOrdersCount: 0,
+          totalPagesCount: 0,
+          lastActive: 'Authenticated via Canonical Server RPC',
+        };
+
+        setLicenses((prev) => ({
+          ...prev,
+          [u]: newLic,
+          [canonicalUsername]: newLic,
+        }));
+        setFailedAttempts(0);
+        setLockoutUntil(null);
+
+        if (authRes.device_token) {
+          try {
+            await bindWorkstation(authRes.device_token);
+          } catch (bindErr) {
+            console.warn('Workstation pairing warning:', bindErr);
+          }
+        }
+
+        setActiveSession({ role: 'SHOP_OWNER', username: canonicalUsername });
+        return;
+      }
+    } catch (err) {
+      console.warn('Server-side RPC authentication check error:', err);
+    }
+
+    // 4. Cloud Database Fallback (pilot_applications table)
     try {
       const { data: cloudApp, error } = await supabase
         .from('pilot_applications')
@@ -370,28 +568,23 @@ export default function App() {
         else if (duration === '1 Year') expiry.setFullYear(expiry.getFullYear() + 1);
         else expiry.setFullYear(expiry.getFullYear() + 50);
 
-        let initBw = 1.5;
-        let initColor = 10.0;
-        if (cloudApp.notes) {
-          try {
-            const p = typeof cloudApp.notes === 'string' ? JSON.parse(cloudApp.notes) : cloudApp.notes;
-            if (p.bwRate !== undefined) initBw = Number(p.bwRate);
-            if (p.colorRate !== undefined) initColor = Number(p.colorRate);
-          } catch {}
-        }
+        const devIdentity = await getWorkstationDeviceIdentity();
+        const devToken = `devtoken:${u}:${devIdentity.device_id}:${Math.floor(Date.now() / 1000) + 86400 * 365}:cloud_auth`;
+        try {
+          await bindWorkstation(devToken);
+        } catch {}
 
-        const canonicalUsername = cloudApp.generated_username?.toLowerCase() || u;
         const newLic: ShopLicense = {
-          username: canonicalUsername,
-          appId: cloudApp.id,
+          username: u,
+          appId: app.id,
           licenseKey: k.toUpperCase(),
           shopName: app.shopName,
           location: app.city || 'Counter 01',
           phone: app.contactNumber.startsWith('+91') ? app.contactNumber : `+91 ${app.contactNumber}`,
-          upiId: `${canonicalUsername}@upi`,
+          upiId: `${u}@upi`,
           rates: {
-            bwPerSideRupees: initBw,
-            colorPerSideRupees: initColor,
+            bwPerSideRupees: 1.5,
+            colorPerSideRupees: 10.0,
             duplexDiscountPercent: 15,
           },
           orderMode: 'MANUAL_APPROVAL',
@@ -399,25 +592,21 @@ export default function App() {
           expiresAt: expiry.toISOString().split('T')[0],
           isConfigured: true,
           duration: duration,
-          deviceId: null,
+          deviceId: devIdentity.device_id,
+          deviceToken: devToken,
           totalOrdersCount: 0,
           totalPagesCount: 0,
-          lastActive: 'Authenticated via Cloud',
+          lastActive: 'Authenticated via Cloud Application',
         };
 
-        setLicenses((prev) => ({
-          ...prev,
-          [u]: newLic,
-          [canonicalUsername]: newLic,
-          [app.shopName.toLowerCase()]: newLic,
-        }));
+        setLicenses((prev) => ({ ...prev, [u]: newLic }));
         setFailedAttempts(0);
         setLockoutUntil(null);
-        setActiveSession({ role: 'SHOP_OWNER', username: canonicalUsername });
+        setActiveSession({ role: 'SHOP_OWNER', username: u });
         return;
       }
-    } catch (err) {
-      console.warn('Cloud authentication check error:', err);
+    } catch (cloudErr) {
+      console.warn('Cloud application check error:', cloudErr);
     }
 
     // Increment failed attempts and lockout if needed
@@ -484,8 +673,8 @@ export default function App() {
       .trim()
       .replace(/[^a-z0-9]/g, '');
     const cleanDomain = platformDomain.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
-    const shopSubdomainUrl = `https://${shopSlug}.${cleanDomain}`;
-    QRCode.toDataURL(shopSubdomainUrl, { width: 280, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
+    const shopWebUrl = `https://${cleanDomain}/${shopSlug}`;
+    QRCode.toDataURL(shopWebUrl, { width: 280, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
       .then(setWebsiteQrDataUrl)
       .catch((err) => console.warn('QR code generation error:', err));
   }, [currentShop?.shopName, currentShop?.username, platformDomain]);
@@ -520,29 +709,19 @@ export default function App() {
       const saved = localStorage.getItem('printbot_pilot_requests');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Permanently strip out any legacy mock applications
+          return parsed.filter(
+            (a: any) =>
+              a.id !== 'APP-PILOT-8492' &&
+              a.id !== 'APP-PILOT-5120' &&
+              !a.shopName?.includes('Sri Raghavendra') &&
+              !a.shopName?.includes('Balaji Photocopy')
+          );
+        }
       }
     } catch {}
-    return [
-      {
-        id: 'APP-PILOT-8492',
-        shopName: 'Sri Raghavendra Xerox & Digital Hub',
-        city: 'Coimbatore, Tamil Nadu',
-        contactNumber: '9843212345',
-        plan: '1 Year',
-        appliedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-        status: 'PENDING',
-      },
-      {
-        id: 'APP-PILOT-5120',
-        shopName: 'Balaji Photocopy & Stationers',
-        city: 'Madurai, Tamil Nadu',
-        contactNumber: '9789012345',
-        plan: '1 Month',
-        appliedAt: new Date(Date.now() - 3600000 * 28).toISOString(),
-        status: 'PENDING',
-      },
-    ];
+    return [];
   });
 
   const [appSearchQuery, setAppSearchQuery] = useState('');
@@ -563,9 +742,10 @@ export default function App() {
     } catch {}
   }, [applications]);
 
-  // Fetch applications from Supabase Cloud Database & Hydrate Licenses
+  // Fetch applications directly from Supabase Cloud Database & Hydrate Licenses
   const fetchApplicationsFromCloud = async () => {
     setIsSyncing(true);
+
     try {
       const { data, error } = await supabase
         .from('pilot_applications')
@@ -578,6 +758,7 @@ export default function App() {
       } else if (data) {
         const mapped = data.map(mapSupabaseRowToApp);
         setApplications(mapped);
+        setCloudSyncStatus('CONNECTED');
         try {
           localStorage.setItem('printbot_pilot_requests', JSON.stringify(mapped));
         } catch {}
@@ -589,7 +770,8 @@ export default function App() {
             const next = { ...prev };
             for (const app of mapped) {
               if (app.status === 'APPROVED' && app.generatedUsername && app.generatedKey) {
-                if (!next[app.generatedUsername]) {
+                const uKey = app.generatedUsername.toLowerCase();
+                if (!next[uKey]) {
                   let duration: '1 Month' | '1 Year' | 'Lifetime Commercial' = '1 Year';
                   if (typeof app.plan === 'string') {
                     if (app.plan.includes('Month') || app.plan === '1 Month') duration = '1 Month';
@@ -600,13 +782,14 @@ export default function App() {
                   else if (duration === '1 Year') expiry.setFullYear(expiry.getFullYear() + 1);
                   else expiry.setFullYear(expiry.getFullYear() + 50);
 
-                  next[app.generatedUsername] = {
-                    username: app.generatedUsername,
+                  next[uKey] = {
+                    username: uKey,
+                    appId: app.id,
                     licenseKey: app.generatedKey,
                     shopName: app.shopName,
                     location: app.city || 'Counter 01',
                     phone: app.contactNumber.startsWith('+91') ? app.contactNumber : `+91 ${app.contactNumber}`,
-                    upiId: `${app.generatedUsername}@upi`,
+                    upiId: `${uKey}@upi`,
                     rates: {
                       bwPerSideRupees: 1.5,
                       colorPerSideRupees: 10.0,
@@ -629,7 +812,6 @@ export default function App() {
             return changed ? next : prev;
           });
         }
-        setCloudSyncStatus('CONNECTED');
       }
     } catch (err) {
       console.warn('Network offline, using local cache:', err);
@@ -705,11 +887,31 @@ export default function App() {
       })
     );
 
-    // Sync modification with cloud database
+    // Sync modification directly to Supabase cloud database
     try {
-      await supabase.from('pilot_applications').update({ plan: newPlan }).eq('id', appId);
-    } catch (err) {
-      console.warn('Failed to update plan in Supabase:', err);
+      const { error: sbErr } = await supabase
+        .from('pilot_applications')
+        .update({ plan: newPlan })
+        .eq('id', appId);
+      if (sbErr) console.error('Supabase plan update error:', sbErr.message);
+    } catch (sbEx) {
+      console.warn('Failed to update plan on Supabase:', sbEx);
+    }
+
+    // Also sync modification with authenticated backend if online
+    if (activeSession?.token) {
+      try {
+        await fetch(`${API_BASE}/superadmin/applications/${appId}/plan`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${activeSession.token}`,
+          },
+          body: JSON.stringify({ plan: newPlan }),
+        });
+      } catch (err) {
+        console.warn('Failed to update plan on server:', err);
+      }
     }
 
     logAdminAction('KEY_EXTENDED', `Modified subscription for application ${appId} to ${newPlan}`);
@@ -782,9 +984,9 @@ export default function App() {
       )
     );
 
-    // Sync generated credentials with Supabase Cloud
+    // Sync generated credentials directly to Supabase cloud database
     try {
-      await supabase
+      const { error: sbErr } = await supabase
         .from('pilot_applications')
         .update({
           status: 'APPROVED',
@@ -794,8 +996,29 @@ export default function App() {
           approved_at: nowIso,
         })
         .eq('id', app.id);
-    } catch (err) {
-      console.warn('Failed to update generated credentials in Supabase:', err);
+      if (sbErr) console.error('Supabase credentials approval error:', sbErr.message);
+    } catch (sbEx) {
+      console.warn('Failed to sync approval to Supabase:', sbEx);
+    }
+
+    // Also sync generated credentials with authenticated backend if online
+    if (activeSession?.token) {
+      try {
+        await fetch(`${API_BASE}/superadmin/applications/${app.id}/approve`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${activeSession.token}`,
+          },
+          body: JSON.stringify({
+            generated_username: u,
+            generated_key: key,
+            plan: duration,
+          }),
+        });
+      } catch (err) {
+        console.warn('Failed to update generated credentials on server:', err);
+      }
     }
 
     logAdminAction(
@@ -815,13 +1038,32 @@ export default function App() {
 
   const handleRejectApp = async (appId: string) => {
     setApplications((prev) => prev.map((a) => (a.id === appId ? { ...a, status: 'REJECTED' } : a)));
+
+    // Sync rejection directly to Supabase cloud database
     try {
-      await supabase.from('pilot_applications').update({ status: 'REJECTED' }).eq('id', appId);
-    } catch (err) {
-      console.warn('Failed to mark rejected in Supabase:', err);
+      const { error: sbErr } = await supabase
+        .from('pilot_applications')
+        .update({ status: 'REJECTED' })
+        .eq('id', appId);
+      if (sbErr) console.error('Supabase reject update error:', sbErr.message);
+    } catch (sbEx) {
+      console.warn('Failed to update rejection on Supabase:', sbEx);
+    }
+
+    if (activeSession?.token) {
+      try {
+        await fetch(`${API_BASE}/superadmin/applications/${appId}/reject`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${activeSession.token}`,
+          },
+        });
+      } catch (err) {
+        console.warn('Failed to mark rejected on server:', err);
+      }
     }
     logAdminAction('KEY_REVOKED', `Rejected pilot application ${appId}`);
-    setAdminNotice('Application marked as rejected.');
+    setAdminNotice('Application marked as rejected in Supabase.');
   };
 
   const handleDeleteApp = async (appId: string) => {
@@ -842,26 +1084,34 @@ export default function App() {
       }
     } catch {}
 
-    // 3. Delete from Supabase Cloud Database
+    // 3. Delete directly from Supabase cloud database
     try {
-      const { data, error } = await supabase.from('pilot_applications').delete().eq('id', appId).select();
-      if (error) {
-        console.error('Failed to delete application from Supabase:', error.message);
-        setAdminNotice(`Cloud delete error: ${error.message}`);
-        // Re-fetch to synchronize state
-        fetchApplicationsFromCloud();
-        return;
-      }
-      if (!data || data.length === 0) {
-        console.warn('Supabase delete returned 0 rows affected (RLS policy may be blocking anon delete)');
-        setAdminNotice('Notice: Cloud RLS policy did not permit delete. Please run DELETE policy SQL in Supabase.');
+      const { error: sbErr } = await supabase
+        .from('pilot_applications')
+        .delete()
+        .eq('id', appId);
+      if (sbErr) {
+        console.error('Supabase deletion error:', sbErr.message);
       } else {
         logAdminAction('KEY_DELETED', `Permanently deleted application record ${appId}`);
-        setAdminNotice('Application permanently deleted from Cloud.');
+        setAdminNotice('Application permanently deleted from Supabase.');
       }
-    } catch (err: any) {
-      console.warn('Network offline while deleting from Supabase:', err);
-      setAdminNotice(`Delete notice: ${err?.message || 'Network offline'}`);
+    } catch (sbEx) {
+      console.warn('Network offline while deleting via Supabase:', sbEx);
+    }
+
+    // Also notify backend if active session exists
+    if (activeSession?.token) {
+      try {
+        await fetch(`${API_BASE}/superadmin/applications/${appId}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${activeSession.token}`,
+          },
+        });
+      } catch (err) {
+        console.warn('Network offline while deleting via backend:', err);
+      }
     }
   };
 
@@ -920,7 +1170,9 @@ export default function App() {
     e.preventDefault();
     if (!newShopName.trim() || !newUsername.trim()) return;
 
-    const u = newUsername.trim().toLowerCase();
+    const shopNameVal = newShopName.trim();
+    const usernameVal = newUsername.trim().toLowerCase();
+    const generatedId = `APP-PILOT-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
     const randomHex = Math.random().toString(36).substring(2, 6).toUpperCase();
     const randomHex2 = Math.random().toString(36).substring(2, 6).toUpperCase();
     const key = `PB-KEY-${randomHex}-${randomHex2}`;
@@ -937,9 +1189,10 @@ export default function App() {
     const expiryStr = expiry.toISOString().split('T')[0];
 
     const newLicense: ShopLicense = {
-      username: u,
+      username: usernameVal,
+      appId: generatedId,
       licenseKey: key,
-      shopName: newShopName.trim(),
+      shopName: shopNameVal,
       location: 'Branch Counter 01',
       phone: '+91 90000 00000',
       upiId: 'shop@upi',
@@ -959,12 +1212,58 @@ export default function App() {
       lastActive: 'Just now',
     };
 
-    setLicenses((prev) => ({ ...prev, [u]: newLicense }));
+    setLicenses((prev) => ({ ...prev, [usernameVal]: newLicense }));
     setGeneratedKey(key);
-    logAdminAction('KEY_ISSUED', `Issued ${newDuration} license (${key}) to ${newShopName.trim()} (${u})`);
-    setAdminNotice(`Generated new license key for ${newShopName.trim()}!`);
+    logAdminAction('KEY_ISSUED', `Issued ${newDuration} license (${key}) to ${shopNameVal} (${usernameVal})`);
+    setAdminNotice(`Generated new license key for ${shopNameVal}!`);
     setNewShopName('');
     setNewUsername('');
+
+    // Directly store approved license into Supabase cloud database
+    try {
+      supabase
+        .from('pilot_applications')
+        .insert({
+          id: generatedId,
+          shop_name: shopNameVal,
+          city: 'Branch Counter 01',
+          contact_number: '+91 90000 00000',
+          plan: newDuration,
+          status: 'APPROVED',
+          generated_username: usernameVal,
+          generated_key: key,
+          applied_at: new Date().toISOString(),
+          approved_at: new Date().toISOString(),
+        })
+        .then(({ error: sbErr }) => {
+          if (sbErr) console.error('Supabase issue license error:', sbErr.message);
+          else fetchApplicationsFromCloud();
+        });
+    } catch (sbEx) {
+      console.warn('Failed to insert new license into Supabase:', sbEx);
+    }
+
+    // Also asynchronously sync to Authenticated Backend if available
+    if (activeSession?.token) {
+      try {
+        fetch(`${API_BASE}/superadmin/licenses/issue`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${activeSession.token}`,
+          },
+          body: JSON.stringify({
+            id: generatedId,
+            shop_name: shopNameVal,
+            username: usernameVal,
+            license_key: key,
+            plan: newDuration,
+            city: 'Branch Counter 01',
+            phone: '+91 90000 00000',
+          }),
+        });
+      } catch {}
+    }
   };
 
   const handleRevokeKey = (username: string) => {
@@ -973,6 +1272,16 @@ export default function App() {
       ...prev,
       [username]: { ...prev[username], status: isCurrentlyActive ? 'REVOKED' : 'ACTIVE' },
     }));
+    if (activeSession?.token) {
+      try {
+        fetch(`${API_BASE}/superadmin/licenses/${username}/revoke`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${activeSession.token}`,
+          },
+        });
+      } catch {}
+    }
     logAdminAction(
       isCurrentlyActive ? 'KEY_REVOKED' : 'KEY_REACTIVATED',
       `${isCurrentlyActive ? 'Revoked' : 'Reactivated'} license for ${licenses[username]?.shopName || username}`
@@ -993,6 +1302,17 @@ export default function App() {
       delete copy[username];
       return copy;
     });
+
+    // Delete corresponding record from Supabase
+    try {
+      if (lic?.appId) {
+        supabase.from('pilot_applications').delete().eq('id', lic.appId).then(() => {});
+      } else {
+        supabase.from('pilot_applications').delete().eq('generated_username', username).then(() => {});
+      }
+    } catch (sbEx) {
+      console.warn('Failed to delete license from Supabase:', sbEx);
+    }
 
     logAdminAction('KEY_DELETED', `Permanently deleted license key for ${shopName} (${username})`);
     setAdminNotice(`License key for "${shopName}" was successfully deleted.`);
@@ -1040,14 +1360,9 @@ export default function App() {
   const [confirmPassInput, setConfirmPassInput] = useState('');
   const [passChangeStatus, setPassChangeStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
-  const handleChangeAdminPassword = (e: React.FormEvent) => {
+  const handleChangeAdminPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPassChangeStatus(null);
-
-    if (currentPassInput !== adminCustomPassword && currentPassInput !== 'admin@123') {
-      setPassChangeStatus({ type: 'error', msg: 'Current password does not match.' });
-      return;
-    }
 
     if (newPassInput.length < 6) {
       setPassChangeStatus({ type: 'error', msg: 'New password must be at least 6 characters.' });
@@ -1059,13 +1374,38 @@ export default function App() {
       return;
     }
 
-    localStorage.setItem('printbot_admin_key', newPassInput);
-    setAdminCustomPassword(newPassInput);
-    logAdminAction('PASSWORD_UPDATED', 'Super-admin credential updated successfully.');
-    setPassChangeStatus({ type: 'success', msg: 'Admin password updated! Use this new key on next login.' });
-    setCurrentPassInput('');
-    setNewPassInput('');
-    setConfirmPassInput('');
+    if (!activeSession?.token) {
+      setPassChangeStatus({ type: 'error', msg: 'Authenticated Super Admin session required.' });
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${activeSession.token}`,
+        },
+        body: JSON.stringify({
+          current_password: currentPassInput,
+          new_password: newPassInput,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Failed to update password' }));
+        setPassChangeStatus({ type: 'error', msg: err.detail || 'Current password incorrect.' });
+        return;
+      }
+
+      logAdminAction('PASSWORD_UPDATED', 'Super-admin credential updated on server. Previous password invalidated.');
+      setPassChangeStatus({ type: 'success', msg: 'Admin password updated on server! Previous password has been invalidated.' });
+      setCurrentPassInput('');
+      setNewPassInput('');
+      setConfirmPassInput('');
+    } catch {
+      setPassChangeStatus({ type: 'error', msg: 'Unable to connect to authentication server.' });
+    }
   };
 
   // --- Workstation Queue State ---
@@ -1085,10 +1425,19 @@ export default function App() {
 
   // Fetch native Windows spooler printers if available
   useEffect(() => {
-    discoverPrinters()
-      .then(setNativePrinters)
-      .catch(() => setNativePrinters(null));
-  }, []);
+    const bindAndDiscover = async () => {
+      try {
+        if (currentShop?.deviceToken) {
+          await bindWorkstation(currentShop.deviceToken);
+        }
+        const discovered = await discoverPrinters();
+        setNativePrinters(discovered);
+      } catch {
+        setNativePrinters(null);
+      }
+    };
+    bindAndDiscover();
+  }, [currentShop?.username, currentShop?.deviceToken]);
 
   const handleApproveJob = (jobId: string) => {
     setJobs((prev) =>
@@ -1229,7 +1578,7 @@ export default function App() {
               <div style={{ position: 'relative' }}>
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="Enter key (e.g. PB-KEY-2026-XEROX or admin@123)"
+                  placeholder="Enter key (e.g. PB-KEY-2026-XEROX) or Admin Password"
                   value={loginKey}
                   onChange={(e) => handleKeyChange(e.target.value)}
                   disabled={Boolean(lockoutUntil && new Date() < lockoutUntil)}
@@ -1260,6 +1609,23 @@ export default function App() {
               </div>
             </div>
 
+            {isMfaRequired && (
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px', color: 'var(--pb-warning, #f59e0b)' }}>
+                  Authenticator TOTP Code (6 Digits)
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  placeholder="e.g. 123456"
+                  value={adminMfaCode}
+                  onChange={(e) => setAdminMfaCode(e.target.value.replace(/\D/g, ''))}
+                  autoFocus
+                  required
+                />
+              </div>
+            )}
+
             <div
               style={{
                 background: 'var(--pb-raised)',
@@ -1272,9 +1638,9 @@ export default function App() {
                 textAlign: 'center',
               }}
             >
-              <strong>Super Admin Portal:</strong> Username: <code>admin</code> | Key: <code>admin@123</code>
+              <strong>Workstation & Portal Login</strong>
               <div style={{ marginTop: '4px', fontSize: '10px' }}>
-                Shop owners log in with their issued License Key created by the Super Admin.
+                Shop operators sign in with their issued License Key. Platform administrators sign in with verified server credentials.
               </div>
             </div>
 
@@ -1817,10 +2183,19 @@ export default function App() {
                         width: '7px',
                         height: '7px',
                         borderRadius: '50%',
-                        background: cloudSyncStatus === 'CONNECTED' ? '#10b981' : '#ef4444',
+                        background:
+                          cloudSyncStatus === 'CONNECTED'
+                            ? '#10b981'
+                            : cloudSyncStatus === 'CONNECTING'
+                            ? '#f59e0b'
+                            : '#ef4444',
                       }}
                     />
-                    {cloudSyncStatus === 'CONNECTED' ? 'Cloud Connected' : 'Local Fallback'}
+                    {cloudSyncStatus === 'CONNECTED'
+                      ? 'Cloud Connected'
+                      : cloudSyncStatus === 'CONNECTING'
+                      ? 'Connecting Cloud...'
+                      : 'Cloud Offline'}
                   </div>
 
                   {/* Sync Button */}
@@ -3429,7 +3804,7 @@ export default function App() {
                     </label>
                     <input
                       type="password"
-                      placeholder="e.g. admin@123"
+                      placeholder="Enter current password"
                       value={currentPassInput}
                       onChange={(e) => setCurrentPassInput(e.target.value)}
                       required
@@ -4084,8 +4459,8 @@ export default function App() {
               .trim()
               .replace(/[^a-z0-9]/g, '');
             const cleanDomain = platformDomain.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
-            const shopSubdomainUrl = `https://${shopSlug}.${cleanDomain}`;
-            const qrImageUrl = websiteQrDataUrl || `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(shopSubdomainUrl)}`;
+            const shopWebUrl = `https://${cleanDomain}/${shopSlug}`;
+            const qrImageUrl = websiteQrDataUrl || `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(shopWebUrl)}`;
 
             return (
               <div className="ws-view">
@@ -4093,42 +4468,42 @@ export default function App() {
                   <div>
                     <span className="ws-eyebrow">ONLINE ACCESS</span>
                     <h1>Shop Website &amp; QR Code</h1>
-                    <p>Customers can upload and print directly using your dedicated shop owner subdomain or counter stand QR code.</p>
+                    <p>Customers can upload and print directly using your dedicated shop web link or counter stand QR code.</p>
                   </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', alignItems: 'start' }}>
-                  {/* Left Column: Dedicated Shop Subdomain */}
+                  {/* Left Column: Dedicated Shop Web Address */}
                   <div className="ws-panel" style={{ padding: '24px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
                       <Globe size={20} color="var(--pb-accent)" />
                       <div>
-                        <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 750 }}>Shop Owner Subdomain</h3>
-                        <small style={{ color: 'var(--pb-muted)' }}>Dedicated web address for your customers to upload from their phones</small>
+                        <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 750 }}>Shop Web Address</h3>
+                        <small style={{ color: 'var(--pb-muted)' }}>Dedicated web link for your customers to upload from their phones</small>
                       </div>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                      {/* Shop Subdomain Portal */}
+                      {/* Shop Web Portal URL */}
                       <div style={{ padding: '16px', borderRadius: '12px', background: 'var(--pb-raised)', border: '1px solid var(--pb-accent)' }}>
                         <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-accent)', letterSpacing: '0.5px' }}>YOUR DEDICATED SHOP SUBDOMAIN</span>
-                          <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '4px', background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', fontWeight: 700 }}>LIVE SUBDOMAIN</span>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--pb-accent)', letterSpacing: '0.5px' }}>YOUR DEDICATED SHOP WEB LINK</span>
+                          <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '4px', background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', fontWeight: 700 }}>LIVE URL PATH</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                          <code style={{ fontSize: '14px', fontWeight: 750, color: 'var(--pb-accent)', wordBreak: 'break-all' }}>{shopSubdomainUrl}</code>
+                          <code style={{ fontSize: '14px', fontWeight: 750, color: 'var(--pb-accent)', wordBreak: 'break-all' }}>{shopWebUrl}</code>
                           <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                             <button
                               onClick={() => {
-                                navigator.clipboard.writeText(shopSubdomainUrl);
-                                setNotice('Copied shop subdomain link to clipboard.');
+                                navigator.clipboard.writeText(shopWebUrl);
+                                setNotice('Copied shop web link to clipboard.');
                               }}
                               style={{ border: 0, padding: '5px 10px', fontSize: '11px', gap: '4px' }}
                             >
                               <Copy size={12} /> Copy
                             </button>
                             <a
-                              href={shopSubdomainUrl}
+                              href={shopWebUrl}
                               target="_blank"
                               rel="noreferrer"
                               style={{
@@ -4144,7 +4519,7 @@ export default function App() {
                                 fontWeight: 650
                               }}
                             >
-                              <ExternalLink size={12} /> Visit Subdomain
+                              <ExternalLink size={12} /> Visit Web Link
                             </a>
                           </div>
                         </div>
@@ -4155,7 +4530,7 @@ export default function App() {
                         <div style={{ marginBottom: '8px' }}>
                           <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--pb-text)' }}>Platform Root / Custom Domain</span>
                           <p style={{ margin: '4px 0 10px', fontSize: '11px', color: 'var(--pb-muted)', lineHeight: 1.4 }}>
-                            Wildcard subdomains (<code>*.yourdomain.com</code>) require a custom domain on Vercel with a wildcard DNS record. Vercel does not route multi-level subdomains on default <code>vercel.app</code> domains.
+                            Base platform web domain (e.g. <code>printbotak.vercel.app</code> or your custom domain). Customers access your shop directly via URL path (e.g. <code>/{shopSlug}</code>) without needing wildcard subdomains.
                           </p>
                         </div>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -4163,7 +4538,7 @@ export default function App() {
                             type="text"
                             value={customDomainInput}
                             onChange={(e) => setCustomDomainInput(e.target.value)}
-                            placeholder="e.g. printbotak.com or yourdomain.com"
+                            placeholder="e.g. printbotak.vercel.app or yourdomain.com"
                             style={{
                               flex: 1,
                               padding: '8px 12px',
@@ -4231,7 +4606,7 @@ export default function App() {
                                     <h1>${currentShop?.shopName || 'Print Shop'}</h1>
                                     <p>Scan to Upload &amp; Print from Phone</p>
                                     <img src="${qrImageUrl}" alt="QR Code" />
-                                    <div class="sub">${shopSubdomainUrl}</div>
+                                    <div class="sub">${shopWebUrl}</div>
                                   </div>
                                   <script>window.onload = function() { window.print(); };</script>
                                 </body>
@@ -4247,8 +4622,8 @@ export default function App() {
 
                       <button
                         onClick={() => {
-                          navigator.clipboard.writeText(shopSubdomainUrl);
-                          setNotice('Copied shop subdomain link to clipboard.');
+                          navigator.clipboard.writeText(shopWebUrl);
+                          setNotice('Copied customer web link to clipboard.');
                         }}
                         style={{ width: '100%', justifyContent: 'center', minHeight: '38px', gap: '6px' }}
                       >

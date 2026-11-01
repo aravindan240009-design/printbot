@@ -10,6 +10,8 @@ Handles:
 """
 
 import hashlib
+import hmac
+import time
 import uuid
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Tuple
@@ -22,7 +24,49 @@ from packages.contracts.models import (
     StolenDeviceReport,
 )
 from services.api.services.audit_service import audit_service
+from services.api.core.config import settings
 from services.api.services.device_service import device_service, DeviceRecord
+
+
+class LicenseValidationRequest(BaseModel):
+    username: str
+    license_key: str
+    device_id: str
+    hardware_hash: Optional[str] = None
+
+
+class LicenseValidationResponse(BaseModel):
+    success: bool
+    shop_id: Optional[str] = None
+    shop_name: Optional[str] = None
+    slug: Optional[str] = None
+    city: Optional[str] = None
+    contact_phone: Optional[str] = None
+    plan: Optional[str] = None
+    is_lifetime: bool = False
+    expires_at: Optional[str] = None
+    rates: Optional[Dict[str, Any]] = None
+    order_mode: Optional[str] = None
+    device_id: Optional[str] = None
+    device_token: Optional[str] = None
+    error: Optional[str] = None
+
+
+class CanonicalLicense(BaseModel):
+    shop_id: str
+    shop_name: str
+    slug: str
+    city: str = "Chennai"
+    contact_phone: str = "+91 9840111111"
+    license_key_hash: str
+    plan: str = "1 Year"
+    is_lifetime: bool = False
+    starts_at: datetime = Field(default_factory=datetime.utcnow)
+    expires_at: Optional[datetime] = None
+    is_revoked: bool = False
+    max_devices: int = 2
+    rates: Dict[str, Any] = Field(default_factory=lambda: {"bwRate": 1.5, "colorRate": 10.0})
+    order_mode: str = "MANUAL_APPROVAL"
 
 
 def compute_sha256_fingerprint(public_key_str: str) -> str:
@@ -72,6 +116,9 @@ class LicenseService:
         self._device_ips: Dict[str, List[Tuple[str, datetime]]] = {}
         # List of security alerts
         self._alerts: List[DeviceSecurityAlert] = []
+        self._failed_attempts: Dict[str, List[datetime]] = {}
+        self._canonical_licenses: Dict[str, CanonicalLicense] = {}
+        self._registered_devices: Dict[str, Dict[str, Any]] = {}
         self._init_defaults()
 
     def _init_defaults(self):
@@ -254,11 +301,192 @@ class LicenseService:
                 return a
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Alert '{alert_id}' not found.")
 
+    def register_canonical_license(self, record: CanonicalLicense):
+        self._canonical_licenses[record.slug.lower().strip()] = record
+
+    def revoke_workstation_device(self, shop_id: str, device_id: str, reason: str = "Decommissioned") -> bool:
+        clean_dev_id = device_id.strip()
+        dev = self._registered_devices.get(clean_dev_id)
+        if dev and dev.get("shop_id") == shop_id:
+            dev["status"] = "REVOKED"
+            audit_service.record_event(
+                actor_type="SYSTEM",
+                actor_id="ADMIN",
+                action="DEVICE_REVOKED",
+                resource_type="device",
+                resource_id=clean_dev_id,
+                shop_id=shop_id,
+                metadata={"reason": reason}
+            )
+            return True
+        return False
+
+    def validate_license(
+        self,
+        username: str,
+        license_key: str,
+        device_id: str,
+        hardware_hash: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Authoritative backend licence verification against canonical records:
+        - Rate limiting: max 5 failed attempts in 15 minutes.
+        - Constant-time HMAC comparison using server pepper.
+        - Expiry and revocation checks on canonical records.
+        - Workstation device ownership, quota, and revocation checks.
+        - Issues authentic HMAC-SHA256 device pairing token.
+        """
+        now = datetime.utcnow()
+        clean_user = username.strip().lower()
+
+        # 1. Rate limiting check
+        attempts = [t for t in self._failed_attempts.get(clean_user, []) if (now - t).total_seconds() < 900]
+        self._failed_attempts[clean_user] = attempts
+        if len(attempts) >= 5:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many failed validation attempts. Account temporarily locked for 15 minutes."
+            )
+
+        # 2. Keyed HMAC computation using server-only pepper
+        pepper = getattr(settings, "LICENSE_PEPPER", settings.SECRET_KEY)
+        clean_key = license_key.strip().upper()
+        computed_hash = hmac.new(
+            pepper.encode("utf-8"),
+            clean_key.encode("utf-8"),
+            hashlib.sha256
+        ).hexdigest()
+
+        # 3. Lookup canonical shop license record
+        lic = self._canonical_licenses.get(clean_user)
+        if not lic:
+            self._failed_attempts[clean_user].append(now)
+            audit_service.record_event(
+                actor_type="WORKSTATION",
+                actor_id=device_id or "UNKNOWN",
+                action="LICENSE_VALIDATION_FAILED",
+                resource_type="license",
+                resource_id=clean_user,
+                shop_id=clean_user,
+                metadata={"reason": "Shop not found"}
+            )
+            return {
+                "success": False,
+                "error": "Invalid shop username or licence key."
+            }
+
+        # 4. Constant-time HMAC match
+        if not hmac.compare_digest(computed_hash, lic.license_key_hash):
+            self._failed_attempts[clean_user].append(now)
+            audit_service.record_event(
+                actor_type="WORKSTATION",
+                actor_id=device_id or "UNKNOWN",
+                action="LICENSE_VALIDATION_FAILED",
+                resource_type="license",
+                resource_id=clean_user,
+                shop_id=lic.shop_id,
+                metadata={"reason": "Invalid key"}
+            )
+            return {
+                "success": False,
+                "error": "Invalid shop username or licence key."
+            }
+
+        # 5. Revocation, Activation & Expiry Invariants
+        if lic.is_revoked:
+            return {"success": False, "error": "Licence has been revoked or suspended."}
+
+        if lic.starts_at > now:
+            return {"success": False, "error": "Licence is not yet active."}
+
+        if not lic.is_lifetime:
+            if not lic.expires_at:
+                return {"success": False, "error": "Subscription configuration error. Contact support."}
+            if lic.expires_at <= now:
+                return {"success": False, "error": f"Subscription expired on {lic.expires_at.strftime('%Y-%m-%d')}"}
+
+        # 6. Device Verification, Ownership & Quota Enforcement
+        clean_dev_id = device_id.strip()
+        if not clean_dev_id:
+            return {"success": False, "error": "Device identifier is required for workstation pairing."}
+
+        existing_dev = self._registered_devices.get(clean_dev_id)
+        if existing_dev:
+            if existing_dev["shop_id"] != lic.shop_id:
+                audit_service.record_event(
+                    actor_type="WORKSTATION",
+                    actor_id=clean_dev_id,
+                    action="DEVICE_CROSS_SHOP_PAIRING_BLOCKED",
+                    resource_type="device",
+                    resource_id=clean_dev_id,
+                    shop_id=lic.shop_id,
+                    metadata={"attempted_shop": lic.shop_id, "registered_shop": existing_dev["shop_id"]}
+                )
+                return {"success": False, "error": "Workstation is already paired to another shop. Cross-shop access denied."}
+
+            if existing_dev.get("status") == "REVOKED":
+                return {"success": False, "error": "This workstation device has been revoked by the administrator. Contact support."}
+
+            existing_dev["last_heartbeat"] = now
+            if hardware_hash:
+                existing_dev["hardware_hash"] = hardware_hash
+        else:
+            active_devices = [d for d in self._registered_devices.values() if d["shop_id"] == lic.shop_id and d.get("status") == "ACTIVE"]
+            if len(active_devices) >= lic.max_devices:
+                return {"success": False, "error": f"Device quota exceeded: Maximum of {lic.max_devices} active workstations allowed."}
+
+            self._registered_devices[clean_dev_id] = {
+                "shop_id": lic.shop_id,
+                "device_id": clean_dev_id,
+                "hardware_hash": hardware_hash or "UNKNOWN_HARDWARE",
+                "status": "ACTIVE",
+                "last_heartbeat": now,
+                "paired_at": now
+            }
+
+        # Clear failed attempts on success
+        self._failed_attempts.pop(clean_user, None)
+
+        # 7. Generate authentic signed device token using HMAC-SHA256 with server pepper
+        exp_ts = int(time.time()) + (30 * 86400)
+        token_payload = f"{lic.shop_id}:{clean_dev_id}:{exp_ts}"
+        sig = hmac.new(pepper.encode("utf-8"), token_payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        device_token = f"devtoken:{token_payload}:{sig}"
+
+        audit_service.record_event(
+            actor_type="WORKSTATION",
+            actor_id=clean_dev_id,
+            action="LICENSE_VALIDATION_SUCCESS",
+            resource_type="license",
+            resource_id=lic.shop_id,
+            shop_id=lic.shop_id,
+            metadata={"plan": lic.plan}
+        )
+
+        return {
+            "success": True,
+            "shop_id": lic.shop_id,
+            "shop_name": lic.shop_name,
+            "slug": lic.slug,
+            "city": lic.city,
+            "contact_phone": lic.contact_phone,
+            "plan": lic.plan,
+            "is_lifetime": lic.is_lifetime,
+            "expires_at": lic.expires_at.isoformat() if lic.expires_at else None,
+            "rates": lic.rates,
+            "order_mode": lic.order_mode,
+            "device_id": clean_dev_id,
+            "device_token": device_token,
+        }
+
     def clear(self):
         self._hardware_assurance.clear()
         self._agent_versions.clear()
         self._device_ips.clear()
         self._alerts.clear()
+        self._failed_attempts.clear()
+        self._canonical_licenses.clear()
+        self._registered_devices.clear()
         self._init_defaults()
 
 

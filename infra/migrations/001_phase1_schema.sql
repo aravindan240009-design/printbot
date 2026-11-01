@@ -1,524 +1,688 @@
 -- ==============================================================================
--- Print Bot SaaS Phase 1 Production Multi-Tenant Schema
+-- Print Bot SaaS Phase 1 Definitive Multi-Tenant Production Schema
 -- ==============================================================================
--- PostgreSQL Schema with strict Row-Level Security (RLS) forced on all tenant tables,
--- UUID primary keys, immutable creator lineage, composite tenant keys,
--- Single All-Inclusive Subscription Plan, and Windows Device Cryptographic Enrollment.
+-- PostgreSQL 16+ Multi-Tenant Schema with strict Row-Level Security (RLS),
+-- cryptographically protected licensing, idempotency tracking, audit logging,
+-- and safe zero-downtime pilot data migration.
+-- Clean non-deprecated code using core gen_random_uuid() and sha256().
 -- ==============================================================================
 
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Ensure Supabase-compatible roles exist in standalone/local PostgreSQL environments
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'anon') THEN
+        CREATE ROLE anon NOLOGIN;
+    END IF;
+    IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'authenticated') THEN
+        CREATE ROLE authenticated NOLOGIN;
+    END IF;
+    IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'service_role') THEN
+        CREATE ROLE service_role NOLOGIN;
+    END IF;
+END
+$$;
+
+-- Ensure auth schema and auth.jwt() exist for standalone/local PostgreSQL environments
+CREATE SCHEMA IF NOT EXISTS auth;
+CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb
+LANGUAGE sql STABLE AS $$
+    SELECT coalesce(
+        nullif(current_setting('request.jwt.claims', true), '')::jsonb,
+        '{}'::jsonb
+    );
+$$;
 
 -- ------------------------------------------------------------------------------
--- 1. Shops (Root Tenant Entity)
+-- 1. Standardized Licence Pepper Secret Retrieval & Hash Calculation
 -- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS shops (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+-- Restricted strictly to trusted database operations / service_role.
+-- Never exposed to public RPC or client roles.
+CREATE OR REPLACE FUNCTION public.get_license_pepper() 
+RETURNS TEXT
+LANGUAGE plpgsql 
+SECURITY DEFINER 
+SET search_path = public, pg_temp AS $$
+DECLARE
+    v_pepper TEXT;
+BEGIN
+    v_pepper := current_setting('app.settings.license_pepper', true);
+    IF v_pepper IS NULL OR length(v_pepper) < 32 THEN
+        BEGIN
+            SELECT decrypted_secret INTO v_pepper 
+            FROM vault.decrypted_secrets 
+            WHERE name = 'license_pepper';
+        EXCEPTION WHEN OTHERS THEN
+            v_pepper := NULL;
+        END;
+    END IF;
+    IF v_pepper IS NULL OR length(v_pepper) < 32 THEN
+        RAISE EXCEPTION 'FATAL: Server license pepper is missing or under 32 characters in configuration/vault.' 
+        USING ERRCODE = 'P0001';
+    END IF;
+    RETURN v_pepper;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.get_license_pepper() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_license_pepper() TO service_role;
+
+CREATE OR REPLACE FUNCTION public.compute_license_hash(p_key TEXT, p_pepper TEXT)
+RETURNS TEXT
+LANGUAGE plpgsql IMMUTABLE STRICT
+SET search_path = public, pg_temp AS $$
+DECLARE
+    v_key_bytes BYTEA;
+    v_msg_bytes BYTEA;
+    v_ipad BYTEA;
+    v_opad BYTEA;
+    v_inner BYTEA;
+    i INT;
+    v_byte INT;
+BEGIN
+    -- Check if extensions.hmac is available (standard on Supabase)
+    BEGIN
+        RETURN encode(extensions.hmac(convert_to(UPPER(TRIM(p_key)), 'UTF8'), convert_to(p_pepper, 'UTF8'), 'sha256'), 'hex');
+    EXCEPTION WHEN OTHERS THEN
+        NULL;
+    END;
+
+    -- RFC 2104 compliant pure PL/pgSQL HMAC-SHA256 implementation
+    v_key_bytes := convert_to(p_pepper, 'UTF8');
+    v_msg_bytes := convert_to(UPPER(TRIM(p_key)), 'UTF8');
+
+    IF length(v_key_bytes) > 64 THEN
+        v_key_bytes := sha256(v_key_bytes);
+    END IF;
+    IF length(v_key_bytes) < 64 THEN
+        v_key_bytes := v_key_bytes || decode(repeat('00', 64 - length(v_key_bytes)), 'hex');
+    END IF;
+
+    v_ipad := decode(repeat('00', 64), 'hex');
+    v_opad := decode(repeat('00', 64), 'hex');
+    FOR i IN 0..63 LOOP
+        v_byte := get_byte(v_key_bytes, i);
+        v_ipad := set_byte(v_ipad, i, v_byte # 54);  -- 0x36
+        v_opad := set_byte(v_opad, i, v_byte # 92);  -- 0x5c
+    END LOOP;
+
+    v_inner := sha256(v_ipad || v_msg_bytes);
+    RETURN encode(sha256(v_opad || v_inner), 'hex');
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.compute_license_hash(TEXT, TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.compute_license_hash(TEXT, TEXT) TO service_role;
+
+-- ------------------------------------------------------------------------------
+-- 2. Audit & Idempotency Infrastructure Tables
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.migration_audit_log (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    legacy_id TEXT NOT NULL,
+    flag_reason TEXT NOT NULL,
+    payload JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ------------------------------------------------------------------------------
+-- 3. Core Multi-Tenant Entities (Reconciled Canonical Schema)
+-- ------------------------------------------------------------------------------
+
+-- (a) Shops (Root Tenant Entity)
+CREATE TABLE IF NOT EXISTS public.shops (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    legacy_source_id VARCHAR(255) UNIQUE,
     slug VARCHAR(100) UNIQUE NOT NULL,
     name VARCHAR(255) NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- ------------------------------------------------------------------------------
--- 2. Shop Profiles
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS shop_profiles (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    brand_name VARCHAR(255) NOT NULL,
-    logo_url VARCHAR(1000),
-    contact_phone VARCHAR(50),
-    contact_email VARCHAR(255),
-    address_line TEXT,
     city VARCHAR(100) NOT NULL DEFAULT 'Chennai',
-    state VARCHAR(100) NOT NULL DEFAULT 'Tamil Nadu',
-    postal_code VARCHAR(20),
-    supported_languages JSONB NOT NULL DEFAULT '["en", "ta"]'::jsonb,
+    contact_phone VARCHAR(50) NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('PENDING', 'ACTIVE', 'SUSPENDED')),
+    rates JSONB NOT NULL DEFAULT '{"bwRate": 1.5, "colorRate": 10.0, "duplexDiscountPercent": 15}'::jsonb,
+    order_mode VARCHAR(50) NOT NULL DEFAULT 'MANUAL_APPROVAL' CHECK (order_mode IN ('FULL_AUTOMATIC', 'MANUAL_APPROVAL')),
+    operating_hours JSONB NOT NULL DEFAULT '{"monday": {"open": "08:00", "close": "21:30"}}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_shop_profile UNIQUE (shop_id)
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ------------------------------------------------------------------------------
--- 3. QR Links
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS qr_links (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    code VARCHAR(100) UNIQUE NOT NULL,
-    destination_url VARCHAR(1000) NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    scan_count BIGINT NOT NULL DEFAULT 0,
+-- (b) Shop Licences (Cryptographic Key Hash Storage)
+CREATE TABLE IF NOT EXISTS public.shop_licenses (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    shop_id UUID NOT NULL REFERENCES public.shops(id) ON DELETE RESTRICT,
+    legacy_source_id VARCHAR(255) UNIQUE,
+    license_key_hash VARCHAR(255) UNIQUE NOT NULL,
+    plan VARCHAR(50) NOT NULL DEFAULT '1 Year',
+    is_lifetime BOOLEAN NOT NULL DEFAULT FALSE,
+    max_devices INT NOT NULL DEFAULT 2,
+    migration_status VARCHAR(100) NOT NULL DEFAULT 'VERIFIED',
+    starts_at TIMESTAMPTZ,
     expires_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- ------------------------------------------------------------------------------
--- 4. Shop Settings (Order mode, payment methods, retention)
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS shop_settings (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    order_mode VARCHAR(50) NOT NULL DEFAULT 'FULL_AUTOMATIC' CHECK (order_mode IN ('FULL_AUTOMATIC', 'MANUAL_APPROVAL')),
-    cash_allowed BOOLEAN NOT NULL DEFAULT TRUE,
-    upi_allowed BOOLEAN NOT NULL DEFAULT TRUE,
-    retention_hours INT NOT NULL DEFAULT 24,
-    max_file_size_mb INT NOT NULL DEFAULT 100,
-    operating_hours JSONB NOT NULL DEFAULT '{"monday": {"open": "09:00", "close": "21:00"}}'::jsonb,
+    is_revoked BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_shop_settings UNIQUE (shop_id)
+    CONSTRAINT uq_shop_license UNIQUE (shop_id)
 );
 
--- ------------------------------------------------------------------------------
--- 5. Staff (Global identity for platform & shop operators)
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS staff (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    full_name VARCHAR(255) NOT NULL,
-    phone VARCHAR(50),
-    is_superadmin BOOLEAN NOT NULL DEFAULT FALSE,
-    mfa_enabled BOOLEAN NOT NULL DEFAULT FALSE,
-    mfa_secret VARCHAR(255),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- (c) Workstation Devices (Hardware Enrolment)
+CREATE TABLE IF NOT EXISTS public.devices (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    shop_id UUID NOT NULL REFERENCES public.shops(id) ON DELETE RESTRICT,
+    device_id VARCHAR(100) UNIQUE NOT NULL,
+    public_key_pem TEXT,
+    hardware_hash VARCHAR(255) NOT NULL,
+    device_name VARCHAR(255) NOT NULL,
+    agent_version VARCHAR(50) NOT NULL DEFAULT '1.0.0',
+    status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'REVOKED', 'PENDING')),
+    last_heartbeat TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    paired_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE INDEX IF NOT EXISTS idx_devices_shop ON public.devices(shop_id, status);
 
--- ------------------------------------------------------------------------------
--- 6. Roles
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS roles (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(50) UNIQUE NOT NULL,
-    permissions JSONB NOT NULL,
-    description TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- ------------------------------------------------------------------------------
--- 7. Shop Memberships (Staff RBAC per Shop)
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS shop_memberships (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    staff_id UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
-    role_id UUID NOT NULL REFERENCES roles(id) ON DELETE RESTRICT,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_shop_staff UNIQUE (shop_id, staff_id)
-);
-
--- ------------------------------------------------------------------------------
--- 8. Subscriptions (Exactly One All-Inclusive Plan; Unlimited Printers)
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS subscriptions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    plan_id VARCHAR(50) NOT NULL DEFAULT 'ALL_INCLUSIVE',
-    billing_interval VARCHAR(20) NOT NULL DEFAULT 'monthly' CHECK (billing_interval IN ('monthly', 'annual')),
-    status VARCHAR(50) NOT NULL DEFAULT 'trial' CHECK (status IN ('trial', 'active', 'past_due', 'grace', 'suspended', 'canceled')),
-    current_period_start TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    current_period_end TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '30 days'),
-    trial_end TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '14 days'),
-    grace_period_end TIMESTAMPTZ,
-    cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE,
-    features JSONB NOT NULL DEFAULT '{"unlimited_printers": true, "automatic_routing": true, "timed_xerox": true, "custom_branding": true, "multi_language": true, "all_paper_sizes": true}'::jsonb,
-    quota_limits JSONB NOT NULL DEFAULT '{"max_monthly_bandwidth_bytes": 107374182400, "max_storage_bytes": 53687091200, "max_daily_orders": 10000}'::jsonb,
-    admin_override BOOLEAN NOT NULL DEFAULT FALSE,
-    admin_override_reason TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_shop_subscription UNIQUE (shop_id)
-);
-
--- ------------------------------------------------------------------------------
--- 9. Invoices
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS invoices (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
-    invoice_number VARCHAR(100) UNIQUE NOT NULL,
-    amount_paise INT NOT NULL,
-    currency VARCHAR(3) NOT NULL DEFAULT 'INR',
-    status VARCHAR(50) NOT NULL DEFAULT 'open' CHECK (status IN ('draft', 'open', 'paid', 'void', 'uncollectible')),
-    due_date TIMESTAMPTZ NOT NULL,
-    paid_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- ------------------------------------------------------------------------------
--- 10. Billing Events
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS billing_events (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    subscription_id UUID REFERENCES subscriptions(id) ON DELETE SET NULL,
-    event_type VARCHAR(100) NOT NULL,
-    payload JSONB NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- ------------------------------------------------------------------------------
--- 11. Device Pairing Codes (Short TTL, Single-Use)
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS device_pairing_codes (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    code VARCHAR(32) NOT NULL,
-    created_by UUID REFERENCES staff(id) ON DELETE SET NULL,
-    expires_at TIMESTAMPTZ NOT NULL,
-    used_at TIMESTAMPTZ,
-    used_by_device_id UUID,
-    revoked BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_pairing_codes_lookup ON device_pairing_codes (code, expires_at);
-
--- ------------------------------------------------------------------------------
--- 12. Devices (Windows Workstations)
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS devices (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    device_identifier VARCHAR(255) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    os_info VARCHAR(255),
-    status VARCHAR(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'revoked', 'pending')),
-    paired_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    revoked_at TIMESTAMPTZ,
-    revoked_reason TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_shop_device UNIQUE (shop_id, device_identifier)
-);
-
--- ------------------------------------------------------------------------------
--- 13. Device Public Keys (Asymmetric Key Cryptography / Ed25519)
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS device_public_keys (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    device_id UUID NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
-    public_key_pem TEXT NOT NULL,
-    key_type VARCHAR(50) NOT NULL DEFAULT 'Ed25519',
-    key_fingerprint VARCHAR(100) NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    rotated_at TIMESTAMPTZ
-);
-
--- ------------------------------------------------------------------------------
--- 14. Device Heartbeats
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS device_heartbeats (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    device_id UUID NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
-    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    metrics JSONB NOT NULL DEFAULT '{}'::jsonb,
-    agent_version VARCHAR(50) NOT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'ONLINE',
-    ip_address VARCHAR(50)
-);
-
-CREATE INDEX IF NOT EXISTS idx_device_heartbeats_recent ON device_heartbeats (device_id, timestamp DESC);
-
--- ------------------------------------------------------------------------------
--- 15. Printers (Unlimited per Shop)
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS printers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    device_id UUID REFERENCES devices(id) ON DELETE SET NULL,
-    name VARCHAR(255) NOT NULL,
-    system_name VARCHAR(255) NOT NULL,
-    driver_name VARCHAR(255),
-    is_online BOOLEAN NOT NULL DEFAULT TRUE,
-    is_default BOOLEAN NOT NULL DEFAULT FALSE,
-    color_capable BOOLEAN NOT NULL DEFAULT TRUE,
-    duplex_capable BOOLEAN NOT NULL DEFAULT TRUE,
-    supported_formats JSONB NOT NULL DEFAULT '["A4", "A3", "Letter", "Legal"]'::jsonb,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_shop_printer_name UNIQUE (shop_id, name)
-);
-
--- ------------------------------------------------------------------------------
--- 16. Printer Capability Snapshots
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS printer_capability_snapshots (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    printer_id UUID NOT NULL REFERENCES printers(id) ON DELETE CASCADE,
-    snapshot_hash VARCHAR(64) NOT NULL,
-    devmode_capabilities JSONB NOT NULL,
-    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- ------------------------------------------------------------------------------
--- 17. Guest Sessions (Short-lived, Shop-bound)
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS guest_sessions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    session_token VARCHAR(255) UNIQUE NOT NULL,
-    expires_at TIMESTAMPTZ NOT NULL,
-    ip_hash VARCHAR(64),
-    user_agent VARCHAR(500),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_guest_sessions_lookup ON guest_sessions (session_token, expires_at);
-
--- ------------------------------------------------------------------------------
--- 18. Pricing Versions
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS pricing_versions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    version_number INT NOT NULL,
-    rates JSONB NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    effective_from TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    effective_to TIMESTAMPTZ,
-    created_by UUID REFERENCES staff(id) ON DELETE SET NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_shop_pricing_version UNIQUE (shop_id, version_number)
-);
-
--- ------------------------------------------------------------------------------
--- 19. Orders
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS orders (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    guest_session_id UUID REFERENCES guest_sessions(id) ON DELETE SET NULL,
-    customer_identifier VARCHAR(100),
-    customer_phone_hash VARCHAR(64),
-    total_paise INT NOT NULL,
-    currency VARCHAR(3) NOT NULL DEFAULT 'INR',
-    status VARCHAR(50) NOT NULL DEFAULT 'PENDING_PAYMENT' CHECK (status IN (
-        'DRAFT', 'SUBMITTED', 'PENDING_APPROVAL', 'PENDING_PAYMENT',
-        'PAID', 'APPROVED', 'REJECTED', 'QUEUED', 'IN_PROGRESS', 'READY_FOR_PICKUP',
-        'COMPLETED', 'CANCELED', 'REFUNDED'
-    )),
-    order_mode VARCHAR(50) NOT NULL DEFAULT 'FULL_AUTOMATIC',
-    pricing_version_id UUID REFERENCES pricing_versions(id) ON DELETE SET NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_orders_shop_status ON orders (shop_id, status, created_at DESC);
-
--- ------------------------------------------------------------------------------
--- 20. Order Items
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS order_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-    item_index INT NOT NULL,
-    file_asset_id UUID,
-    print_plan JSONB NOT NULL,
-    calculated_paise INT NOT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- ------------------------------------------------------------------------------
--- 21. Assets (Tenant-scoped object storage metadata)
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS assets (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    storage_path VARCHAR(1000) NOT NULL,
-    file_name VARCHAR(500) NOT NULL,
-    mime_type VARCHAR(100) NOT NULL,
+-- (d) Storage Assets (Upload Metadata & Auto-Purge TTL)
+CREATE TABLE IF NOT EXISTS public.storage_assets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    shop_id UUID NOT NULL REFERENCES public.shops(id) ON DELETE RESTRICT,
+    storage_path TEXT NOT NULL,
+    original_filename VARCHAR(255) NOT NULL,
     file_size_bytes BIGINT NOT NULL,
-    sha256_hash VARCHAR(64) NOT NULL,
-    uploaded_by_session_id UUID,
-    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    retention_until TIMESTAMPTZ NOT NULL,
+    page_count INT NOT NULL DEFAULT 1,
+    is_encrypted BOOLEAN NOT NULL DEFAULT FALSE,
+    status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'PENDING_DELETION', 'PURGED')),
+    retry_count INT NOT NULL DEFAULT 0,
+    expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '48 hours'),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE INDEX IF NOT EXISTS idx_storage_assets_expiry ON public.storage_assets(expires_at, status);
 
-CREATE INDEX IF NOT EXISTS idx_assets_retention ON assets (retention_until) WHERE is_deleted = FALSE;
-
--- ------------------------------------------------------------------------------
--- 22. Jobs (Execution units dispatched to printers)
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS jobs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-    order_item_id UUID NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
-    printer_id UUID REFERENCES printers(id) ON DELETE SET NULL,
-    device_id UUID REFERENCES devices(id) ON DELETE SET NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'QUEUED' CHECK (status IN (
-        'QUEUED', 'ASSIGNED', 'SPOOLING', 'PRINTING', 'COMPLETED', 'COMPLETION_UNKNOWN', 'FAILED', 'CANCELED'
-    )),
-    spooler_job_id VARCHAR(100),
-    physical_sheets INT NOT NULL DEFAULT 1,
-    rendered_sides INT NOT NULL DEFAULT 1,
-    logical_pages INT NOT NULL DEFAULT 1,
-    error_message TEXT,
+-- (e) Print Jobs (Unified 20-State Machine Print Queue & Orders)
+CREATE TABLE IF NOT EXISTS public.print_jobs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    shop_id UUID NOT NULL REFERENCES public.shops(id) ON DELETE RESTRICT,
+    asset_id UUID REFERENCES public.storage_assets(id) ON DELETE RESTRICT,
+    order_number VARCHAR(50) UNIQUE NOT NULL,
+    pickup_pin VARCHAR(10) NOT NULL,
+    tracking_secret_hash VARCHAR(255) NOT NULL,
+    customer_phone VARCHAR(50) NOT NULL,
+    customer_name VARCHAR(255),
+    options JSONB NOT NULL,
+    page_count INT NOT NULL,
+    physical_sheets INT NOT NULL,
+    calculated_price_paise INT NOT NULL,
+    quote_hash VARCHAR(255) NOT NULL,
+    payment_method VARCHAR(20) NOT NULL CHECK (payment_method IN ('upi', 'cash')),
+    status VARCHAR(50) NOT NULL DEFAULT 'AWAITING_PAYMENT' 
+        CHECK (status IN (
+            'AWAITING_PAYMENT', 'PAID', 'PENDING_APPROVAL', 'QUEUED', 
+            'LEASED', 'SPOOL_SUBMITTED', 'PRINTING', 'PRINT_CONFIRMED', 
+            'READY_FOR_PICKUP', 'COMPLETED', 'CANCELLED', 'REJECTED', 'COMPLETION_UNKNOWN'
+        )),
+    rejection_reason TEXT,
+    version INT NOT NULL DEFAULT 1,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE INDEX IF NOT EXISTS idx_print_jobs_shop_status ON public.print_jobs(shop_id, status);
+CREATE INDEX IF NOT EXISTS idx_print_jobs_tracking ON public.print_jobs(tracking_secret_hash);
 
-CREATE INDEX IF NOT EXISTS idx_jobs_shop_status ON jobs (shop_id, status, created_at ASC);
-
--- ------------------------------------------------------------------------------
--- 23. Job Events
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS job_events (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    job_id UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
-    event_type VARCHAR(100) NOT NULL,
-    payload JSONB NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- ------------------------------------------------------------------------------
--- 24. Payment Ledger
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS payment_ledger (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-    order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+-- (f) Payments (Reconciled Financial Ledger)
+CREATE TABLE IF NOT EXISTS public.payments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    shop_id UUID NOT NULL REFERENCES public.shops(id) ON DELETE RESTRICT,
+    job_id UUID NOT NULL REFERENCES public.print_jobs(id) ON DELETE RESTRICT,
+    gateway VARCHAR(50) NOT NULL DEFAULT 'RAZORPAY',
+    gateway_order_id VARCHAR(255),
+    gateway_payment_id VARCHAR(255) UNIQUE,
     amount_paise INT NOT NULL,
-    currency VARCHAR(3) NOT NULL DEFAULT 'INR',
-    payment_method VARCHAR(50) NOT NULL CHECK (payment_method IN ('UPI', 'CASH', 'CARD', 'NETBANKING')),
-    provider VARCHAR(50),
-    provider_reference VARCHAR(255),
-    status VARCHAR(50) NOT NULL DEFAULT 'INITIATED' CHECK (status IN ('INITIATED', 'VERIFIED', 'FAILED', 'REFUNDED')),
-    idempotency_key VARCHAR(255) UNIQUE NOT NULL,
-    payload JSONB,
+    status VARCHAR(50) NOT NULL DEFAULT 'SUCCESS' CHECK (status IN ('SUCCESS', 'REFUNDED', 'FAILED')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ------------------------------------------------------------------------------
--- 25. Webhook Inbox (Deduplication & Replay Prevention)
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS webhook_inbox (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    provider VARCHAR(50) NOT NULL,
-    event_id VARCHAR(255) UNIQUE NOT NULL,
-    payload_hash VARCHAR(64) NOT NULL,
-    raw_payload JSONB NOT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'RECEIVED' CHECK (status IN ('RECEIVED', 'PROCESSED', 'FAILED', 'IGNORED')),
-    processed_at TIMESTAMPTZ,
-    error_message TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- ------------------------------------------------------------------------------
--- 26. Audit Events (Immutable Lineage & Superadmin Overrides)
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS audit_events (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shop_id UUID REFERENCES shops(id) ON DELETE SET NULL,
-    actor_id UUID,
-    actor_type VARCHAR(50) NOT NULL CHECK (actor_type IN ('STAFF', 'SUPERADMIN', 'DEVICE', 'GUEST', 'SYSTEM')),
-    action VARCHAR(100) NOT NULL,
-    resource_type VARCHAR(100) NOT NULL,
-    resource_id VARCHAR(255) NOT NULL,
+-- (g) Spool Events (Physical Telemetry Audit)
+CREATE TABLE IF NOT EXISTS public.spool_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    job_id UUID NOT NULL REFERENCES public.print_jobs(id) ON DELETE RESTRICT,
+    event_type VARCHAR(50) NOT NULL CHECK (event_type IN ('INTENT', 'SPOOL_SUBMITTED', 'PRINTING', 'PRINT_CONFIRMED', 'JAMMED', 'ERROR')),
+    spooler_job_id INT,
     metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-    ip_address VARCHAR(50),
-    user_agent VARCHAR(500),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_audit_events_shop ON audit_events (shop_id, created_at DESC);
+-- (h) Audit Events (Immutable Platform Action Ledger)
+CREATE TABLE IF NOT EXISTS public.audit_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    shop_id UUID NOT NULL REFERENCES public.shops(id) ON DELETE RESTRICT,
+    actor_type VARCHAR(50) NOT NULL CHECK (actor_type IN ('CUSTOMER', 'STAFF', 'WORKSTATION', 'SYSTEM')),
+    actor_id VARCHAR(255) NOT NULL,
+    action VARCHAR(100) NOT NULL,
+    entity_id UUID NOT NULL,
+    payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+    ip_address VARCHAR(50),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
--- ==============================================================================
--- ROW-LEVEL SECURITY (RLS) FORCED ON ALL TENANT-OWNED TABLES
--- ==============================================================================
--- Guarantees that even table owners or superuser roles with RLS enabled cannot
--- inadvertently leak tenant data when current_setting('app.current_tenant_id') is active.
+-- (i) Idempotency Records
+CREATE TABLE IF NOT EXISTS public.idempotency_records (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    shop_id UUID NOT NULL REFERENCES public.shops(id) ON DELETE RESTRICT,
+    idempotency_key VARCHAR(255) NOT NULL,
+    request_hash VARCHAR(64) NOT NULL,
+    response_code INT NOT NULL,
+    response_body JSONB NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_shop_idempotency UNIQUE(shop_id, idempotency_key)
+);
+CREATE INDEX IF NOT EXISTS idx_idempotency_lookup ON public.idempotency_records(shop_id, idempotency_key, expires_at);
 
+-- (j) Dead Letter Cleanup (Failed Object Deletion Escalations)
+CREATE TABLE IF NOT EXISTS public.dead_letter_cleanup (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    asset_id UUID NOT NULL REFERENCES public.storage_assets(id) ON DELETE RESTRICT,
+    storage_path TEXT NOT NULL,
+    failure_reason TEXT NOT NULL,
+    retry_count INT NOT NULL DEFAULT 5,
+    escalated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    resolved_at TIMESTAMPTZ,
+    resolved_by VARCHAR(255)
+);
+
+-- ------------------------------------------------------------------------------
+-- 4. Idempotent Data Migration from pilot_applications
+-- ------------------------------------------------------------------------------
 DO $$
 DECLARE
-    t text;
-    tenant_tables text[] := ARRAY[
-        'shop_profiles', 'qr_links', 'shop_settings', 'shop_memberships',
-        'subscriptions', 'invoices', 'billing_events', 'device_pairing_codes',
-        'devices', 'device_public_keys', 'device_heartbeats', 'printers',
-        'printer_capability_snapshots', 'guest_sessions', 'pricing_versions',
-        'orders', 'order_items', 'assets', 'jobs', 'job_events', 'payment_ledger'
-    ];
+    rec RECORD;
+    v_shop_id UUID;
+    v_bw NUMERIC;
+    v_color NUMERIC;
+    v_plan TEXT;
+    v_is_lifetime BOOLEAN;
+    v_expires_at TIMESTAMPTZ;
+    v_starts_at TIMESTAMPTZ;
+    v_migration_status TEXT;
+    v_revoked BOOLEAN;
+    v_base_slug TEXT;
+    v_slug TEXT;
+    v_pepper TEXT;
 BEGIN
-    FOREACH t IN ARRAY tenant_tables LOOP
-        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', t);
-        EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY;', t);
-        EXECUTE format('DROP POLICY IF EXISTS tenant_isolation_%I ON %I;', t, t);
-        EXECUTE format(
-            'CREATE POLICY tenant_isolation_%I ON %I FOR ALL USING (shop_id = NULLIF(current_setting(''app.current_tenant_id'', true), '''信)::uuid);',
-            t, t
-        );
-    END LOOP;
+    -- Only run migration if legacy pilot_applications table exists
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'pilot_applications' AND table_type = 'BASE TABLE'
+    ) THEN
+        v_pepper := public.get_license_pepper();
+
+        FOR rec IN SELECT * FROM public.pilot_applications LOOP
+            -- 1. Explicit variable resets on EVERY iteration
+            v_bw := 1.5;
+            v_color := 10.0;
+            v_plan := NULL;
+            v_is_lifetime := FALSE;
+            v_expires_at := NULL;
+            v_starts_at := NULL;
+            v_migration_status := 'VERIFIED';
+            v_revoked := FALSE;
+
+            -- 2. Idempotency Check: Skip if already migrated via legacy_source_id
+            IF EXISTS (SELECT 1 FROM public.shops WHERE legacy_source_id = rec.id) THEN
+                CONTINUE;
+            END IF;
+
+            -- 3. Base slug sanitization
+            v_base_slug := LOWER(REGEXP_REPLACE(TRIM(COALESCE(rec.generated_username, '')), '[^a-z0-9\-]', '', 'g'));
+            IF v_base_slug IS NULL OR v_base_slug = '' THEN
+                v_base_slug := LOWER(REGEXP_REPLACE(TRIM(COALESCE(rec.shop_name, 'counter')), '[^a-z0-9\-]', '', 'g'));
+            END IF;
+            v_slug := v_base_slug;
+
+            -- 4. Deterministic Slug Collision Handling
+            IF EXISTS (SELECT 1 FROM public.shops WHERE slug = v_slug) THEN
+                v_slug := v_base_slug || '-' || SUBSTRING(MD5(rec.id) FROM 1 FOR 6);
+                v_migration_status := 'SLUG_COLLISION_RESOLVED';
+                INSERT INTO public.migration_audit_log (legacy_id, flag_reason, payload)
+                VALUES (rec.id, 'Deterministic slug collision resolved; assigned slug: ' || v_slug, to_jsonb(rec));
+            END IF;
+
+            -- 5. Rate parsing
+            IF rec.notes IS NOT NULL AND rec.notes != '' THEN
+                BEGIN
+                    v_bw := COALESCE((rec.notes::jsonb->>'bwRate')::numeric, 1.5);
+                    v_color := COALESCE((rec.notes::jsonb->>'colorRate')::numeric, 10.0);
+                EXCEPTION WHEN OTHERS THEN
+                    v_bw := 1.5; v_color := 10.0;
+                END;
+            END IF;
+
+            -- 6. Verified activation date validation (NO arbitrary NOW() fallback)
+            IF rec.approved_at IS NOT NULL THEN
+                v_starts_at := rec.approved_at;
+            ELSIF rec.applied_at IS NOT NULL THEN
+                v_starts_at := rec.applied_at;
+            ELSE
+                v_starts_at := NULL;
+                v_migration_status := 'MISSING_ACTIVATION_DATE_REQUIRES_MANUAL_REVIEW';
+                v_revoked := TRUE;
+                INSERT INTO public.migration_audit_log (legacy_id, flag_reason, payload)
+                VALUES (rec.id, 'Missing activation and application timestamps', to_jsonb(rec));
+            END IF;
+
+            -- 7. Plan duration calculation
+            IF rec.plan ILIKE '%1 Month%' THEN
+                v_plan := '1 Month';
+                v_is_lifetime := FALSE;
+                v_expires_at := v_starts_at + INTERVAL '30 days';
+            ELSIF rec.plan ILIKE '%1 Year%' THEN
+                v_plan := '1 Year';
+                v_is_lifetime := FALSE;
+                v_expires_at := v_starts_at + INTERVAL '365 days';
+            ELSIF rec.plan ILIKE '%Lifetime%' THEN
+                v_plan := 'Lifetime Commercial';
+                v_is_lifetime := TRUE;
+                v_expires_at := NULL;
+            ELSE
+                v_plan := COALESCE(rec.plan, 'UNKNOWN');
+                v_migration_status := 'UNKNOWN_PLAN_REQUIRES_MANUAL_REVIEW';
+                v_revoked := TRUE;
+                INSERT INTO public.migration_audit_log (legacy_id, flag_reason, payload)
+                VALUES (rec.id, 'Unrecognized subscription plan name', to_jsonb(rec));
+            END IF;
+
+            -- Check past expiration
+            IF v_expires_at IS NOT NULL AND v_expires_at < NOW() THEN
+                v_revoked := TRUE;
+            END IF;
+
+            -- 8. Insert canonical shop record
+            INSERT INTO public.shops (
+                legacy_source_id, slug, name, city, contact_phone, status, rates, order_mode
+            ) VALUES (
+                rec.id,
+                v_slug,
+                rec.shop_name,
+                COALESCE(rec.city, 'Counter Stand'),
+                COALESCE(rec.contact_number, '+91 0000000000'),
+                CASE WHEN rec.status = 'APPROVED' AND NOT v_revoked THEN 'ACTIVE' ELSE 'PENDING' END,
+                jsonb_build_object('bwRate', v_bw, 'colorRate', v_color, 'duplexDiscountPercent', 15),
+                'MANUAL_APPROVAL'
+            ) RETURNING id INTO v_shop_id;
+
+            -- 9. Insert canonical shop license with keyed hash
+            INSERT INTO public.shop_licenses (
+                shop_id, legacy_source_id, license_key_hash, plan, is_lifetime, max_devices,
+                migration_status, starts_at, expires_at, is_revoked
+            ) VALUES (
+                v_shop_id,
+                rec.id,
+                public.compute_license_hash(rec.generated_key, v_pepper),
+                v_plan,
+                v_is_lifetime,
+                2,
+                v_migration_status,
+                v_starts_at,
+                v_expires_at,
+                CASE WHEN rec.status = 'REJECTED' THEN TRUE ELSE v_revoked END
+            );
+        END LOOP;
+
+        -- 10. Safely archive legacy table
+        ALTER TABLE public.pilot_applications RENAME TO pilot_applications_historical_archive;
+    END IF;
 END $$;
 
--- ==============================================================================
--- SEED DATA: TWO DELIBERATELY ADVERSARIAL SHOPS & SEPARATE GUEST RECORDS
--- ==============================================================================
--- Shop A: Anna University Quick Xerox (Chennai) - 11111111-1111-1111-1111-111111111111
--- Shop B: Bharat Fast Prints (Madurai)          - 22222222-2222-2222-2222-222222222222
+-- ------------------------------------------------------------------------------
+-- 5. Backward-Compatibility View (Omits Plaintext Keys & Secrets)
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW public.pilot_applications AS
+SELECT 
+    s.id::text AS id,
+    s.name AS shop_name,
+    s.city,
+    s.contact_phone AS contact_number,
+    sl.plan,
+    sl.starts_at AS applied_at,
+    CASE WHEN s.status = 'ACTIVE' AND NOT sl.is_revoked THEN 'APPROVED' ELSE 'REJECTED' END AS status,
+    s.slug AS generated_username,
+    sl.starts_at AS approved_at,
+    jsonb_build_object(
+        'bwRate', (s.rates->>'bwRate')::numeric,
+        'colorRate', (s.rates->>'colorRate')::numeric,
+        'orderMode', s.order_mode
+    )::text AS notes
+FROM public.shops s
+JOIN public.shop_licenses sl ON s.id = sl.shop_id;
 
--- 1. Insert Adversarial Shops
-INSERT INTO shops (id, slug, name, is_active) VALUES
-('11111111-1111-1111-1111-111111111111', 'anna-chennai', 'Anna University Quick Xerox', true),
-('22222222-2222-2222-2222-222222222222', 'bharat-madurai', 'Bharat Fast Prints', true)
-ON CONFLICT (id) DO NOTHING;
+-- ------------------------------------------------------------------------------
+-- 6. Constant-Time Server-Side Licence Validation RPC
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.validate_shop_license(
+    p_username TEXT,
+    p_license_key TEXT,
+    p_device_id TEXT,
+    p_hardware_hash TEXT
+) RETURNS JSONB
+LANGUAGE plpgsql 
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_shop RECORD;
+    v_license RECORD;
+    v_device RECORD;
+    v_device_count INT;
+    v_computed_hash TEXT;
+    v_pepper TEXT;
+    v_failed_attempts INT;
+    v_token_exp BIGINT;
+    v_token_payload TEXT;
+    v_token_sig TEXT;
+    v_device_token TEXT;
+BEGIN
+    v_pepper := public.get_license_pepper();
 
--- 2. Shop Profiles
-INSERT INTO shop_profiles (shop_id, brand_name, contact_phone, contact_email, city, state) VALUES
-('11111111-1111-1111-1111-111111111111', 'Anna Xerox Guindy', '+91 98765 00001', 'contact@annaxerox.com', 'Chennai', 'Tamil Nadu'),
-('22222222-2222-2222-2222-222222222222', 'Bharat Prints Madurai', '+91 98765 00002', 'help@bharatprints.com', 'Madurai', 'Tamil Nadu')
-ON CONFLICT (shop_id) DO NOTHING;
+    -- 1. Find shop
+    SELECT * INTO v_shop FROM public.shops 
+    WHERE slug = LOWER(TRIM(p_username)) AND status = 'ACTIVE';
+    
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Invalid shop username or licence key.');
+    END IF;
 
--- 3. QR Links
-INSERT INTO qr_links (shop_id, code, destination_url) VALUES
-('11111111-1111-1111-1111-111111111111', 'qr_anna_guindy', 'https://printbot.in/qr/anna-guindy'),
-('22222222-2222-2222-2222-222222222222', 'qr_bharat_simmakkal', 'https://printbot.in/qr/bharat-simmakkal')
-ON CONFLICT (code) DO NOTHING;
+    -- Rate limiting check: max 5 failed attempts per shop in 15 minutes
+    SELECT COUNT(*) INTO v_failed_attempts
+    FROM public.audit_events
+    WHERE shop_id = v_shop.id 
+      AND action = 'LICENSE_VALIDATION_FAILED'
+      AND created_at > NOW() - INTERVAL '15 minutes';
+      
+    IF v_failed_attempts >= 5 THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Too many failed validation attempts. Account temporarily locked for 15 minutes.');
+    END IF;
 
--- 4. Shop Settings (Shop A: FULL_AUTOMATIC, Shop B: MANUAL_APPROVAL)
-INSERT INTO shop_settings (shop_id, order_mode, cash_allowed, upi_allowed, retention_hours) VALUES
-('11111111-1111-1111-1111-111111111111', 'FULL_AUTOMATIC', true, true, 24),
-('22222222-2222-2222-2222-222222222222', 'MANUAL_APPROVAL', true, true, 48)
-ON CONFLICT (shop_id) DO NOTHING;
+    -- 2. Compute constant-time hash
+    v_computed_hash := public.compute_license_hash(p_license_key, v_pepper);
 
--- 5. Subscriptions (Exactly One All-Inclusive Plan)
-INSERT INTO subscriptions (shop_id, plan_id, billing_interval, status, current_period_end) VALUES
-('11111111-1111-1111-1111-111111111111', 'ALL_INCLUSIVE', 'monthly', 'active', NOW() + INTERVAL '30 days'),
-('22222222-2222-2222-2222-222222222222', 'ALL_INCLUSIVE', 'annual', 'active', NOW() + INTERVAL '365 days')
-ON CONFLICT (shop_id) DO NOTHING;
+    -- 3. Match license
+    SELECT * INTO v_license FROM public.shop_licenses 
+    WHERE shop_id = v_shop.id AND license_key_hash = v_computed_hash;
 
--- 6. Printers (Unlimited per Shop)
-INSERT INTO printers (id, shop_id, name, system_name, driver_name, is_online, is_default) VALUES
-('a1111111-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'Canon imageRUNNER ADV C3530i', 'CANON_IR_C3530I', 'Canon Generic Plus UFR II', true, true),
-('a1111111-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', 'HP LaserJet Pro M404dn', 'HP_LJ_M404DN', 'HP LaserJet Pro M404-M405 PCL-6', true, false),
-('b2222222-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'Konica Minolta bizhub C224e', 'KM_BIZHUB_C224E', 'KONICA MINOLTA C364eSeriesPCL', true, true)
-ON CONFLICT (id) DO NOTHING;
+    IF NOT FOUND THEN
+        -- Audit failed validation attempt for rate limiting and incident response
+        INSERT INTO public.audit_events (shop_id, actor_type, actor_id, action, entity_id, payload)
+        VALUES (v_shop.id, 'WORKSTATION', COALESCE(p_device_id, 'UNKNOWN'), 'LICENSE_VALIDATION_FAILED', v_shop.id, jsonb_build_object('reason', 'Invalid key or username'));
+        RETURN jsonb_build_object('success', false, 'error', 'Invalid shop username or licence key.');
+    END IF;
 
--- 7. Pricing Versions
-INSERT INTO pricing_versions (shop_id, version_number, rates, is_active) VALUES
-('11111111-1111-1111-1111-111111111111', 1, '{"base_page_bw_paise": 150, "base_page_color_paise": 1000, "duplex_discount_percent": 15}'::jsonb, true),
-('22222222-2222-2222-2222-222222222222', 1, '{"base_page_bw_paise": 200, "base_page_color_paise": 800, "duplex_discount_percent": 20}'::jsonb, true)
-ON CONFLICT (shop_id, version_number) DO NOTHING;
+    -- 4. Strict status, revocation, and date checks
+    IF v_license.is_revoked IS TRUE THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Licence has been revoked or suspended.');
+    END IF;
 
--- 8. Separate Guest Sessions (Minimizing PII, strictly shop-bound)
-INSERT INTO guest_sessions (id, shop_id, session_token, expires_at) VALUES
-('e1111111-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'gst_anna_tok_99887711', NOW() + INTERVAL '2 hours'),
-('e2222222-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'gst_bharat_tok_33445522', NOW() + INTERVAL '2 hours')
-ON CONFLICT (id) DO NOTHING;
+    IF v_license.migration_status IS DISTINCT FROM 'VERIFIED' AND v_license.migration_status IS DISTINCT FROM 'SLUG_COLLISION_RESOLVED' THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Licence requires administrative verification. Contact support.');
+    END IF;
+
+    IF v_license.starts_at IS NULL OR v_license.starts_at > NOW() THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Licence is not yet active.');
+    END IF;
+
+    -- Expiry check for non-lifetime subscriptions
+    IF v_license.is_lifetime IS FALSE THEN
+        IF v_license.expires_at IS NULL THEN
+            RETURN jsonb_build_object('success', false, 'error', 'Subscription configuration error. Contact support.');
+        END IF;
+        IF v_license.expires_at <= NOW() THEN
+            RETURN jsonb_build_object('success', false, 'error', 'Subscription expired on ' || to_char(v_license.expires_at, 'YYYY-MM-DD'));
+        END IF;
+    END IF;
+
+    -- 5. Device Verification, Ownership & Quota Enforcement
+    IF p_device_id IS NULL OR TRIM(p_device_id) = '' THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Device identifier is required for workstation pairing.');
+    END IF;
+
+    SELECT * INTO v_device FROM public.devices WHERE device_id = TRIM(p_device_id);
+
+    IF FOUND THEN
+        -- Prevent cross-shop device hijacking
+        IF v_device.shop_id != v_shop.id THEN
+            INSERT INTO public.audit_events (shop_id, actor_type, actor_id, action, entity_id, payload)
+            VALUES (v_shop.id, 'WORKSTATION', TRIM(p_device_id), 'DEVICE_CROSS_SHOP_PAIRING_BLOCKED', v_shop.id, 
+                    jsonb_build_object('attempted_shop', v_shop.id, 'registered_shop', v_device.shop_id));
+            RETURN jsonb_build_object('success', false, 'error', 'Workstation is already paired to another shop. Cross-shop access denied.');
+        END IF;
+
+        -- Check if device is revoked
+        IF v_device.status = 'REVOKED' THEN
+            INSERT INTO public.audit_events (shop_id, actor_type, actor_id, action, entity_id, payload)
+            VALUES (v_shop.id, 'WORKSTATION', TRIM(p_device_id), 'REVOKED_DEVICE_ACCESS_BLOCKED', v_shop.id, 
+                    jsonb_build_object('reason', 'Device is revoked in canonical records'));
+            RETURN jsonb_build_object('success', false, 'error', 'This workstation device has been revoked by the administrator. Contact support.');
+        END IF;
+
+        -- Update heartbeat & hardware hash
+        UPDATE public.devices 
+        SET last_heartbeat = NOW(),
+            hardware_hash = COALESCE(p_hardware_hash, v_device.hardware_hash)
+        WHERE id = v_device.id;
+    ELSE
+        -- Check device limits for the shop license
+        SELECT COUNT(*) INTO v_device_count
+        FROM public.devices
+        WHERE shop_id = v_shop.id AND status = 'ACTIVE';
+
+        IF v_device_count >= v_license.max_devices THEN
+            RETURN jsonb_build_object('success', false, 'error', 'Device quota exceeded: Maximum of ' || v_license.max_devices::text || ' active workstations allowed.');
+        END IF;
+
+        -- Register new device for this shop
+        INSERT INTO public.devices (
+            shop_id, device_id, hardware_hash, device_name, agent_version, status, last_heartbeat, paired_at
+        ) VALUES (
+            v_shop.id, TRIM(p_device_id), COALESCE(p_hardware_hash, 'UNKNOWN_HARDWARE'), 'COUNTER-PC', '1.0.0', 'ACTIVE', NOW(), NOW()
+        );
+    END IF;
+
+    -- 6. Generate authentic signed device token using server-only pepper (RFC 2104 HMAC-SHA256)
+    v_token_exp := EXTRACT(EPOCH FROM (NOW() + INTERVAL '30 days'))::bigint;
+    v_token_payload := v_shop.id::text || ':' || TRIM(p_device_id) || ':' || v_token_exp::text;
+    v_token_sig := public.compute_license_hash(v_token_payload, v_pepper);
+    v_device_token := 'devtoken:' || v_token_payload || ':' || v_token_sig;
+
+    -- 7. Audit successful validation
+    INSERT INTO public.audit_events (shop_id, actor_type, actor_id, action, entity_id, payload)
+    VALUES (v_shop.id, 'WORKSTATION', TRIM(p_device_id), 'LICENSE_VALIDATION_SUCCESS', v_shop.id, jsonb_build_object('plan', v_license.plan));
+
+    -- Success: Return genuine canonical shop attributes (no placeholders)
+    RETURN jsonb_build_object(
+        'success', true,
+        'shop_id', v_shop.id,
+        'shop_name', v_shop.name,
+        'slug', v_shop.slug,
+        'city', v_shop.city,
+        'contact_phone', v_shop.contact_phone,
+        'plan', v_license.plan,
+        'is_lifetime', v_license.is_lifetime,
+        'expires_at', v_license.expires_at,
+        'rates', v_shop.rates,
+        'order_mode', v_shop.order_mode,
+        'device_id', TRIM(p_device_id),
+        'device_token', v_device_token
+    );
+END;
+$$;
+
+-- Helper function to support device / token revocation
+CREATE OR REPLACE FUNCTION public.revoke_device(
+    p_shop_id UUID,
+    p_device_id TEXT,
+    p_reason TEXT DEFAULT 'Revoked by administrator'
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp AS $$
+DECLARE
+    v_dev RECORD;
+BEGIN
+    SELECT * INTO v_dev FROM public.devices 
+    WHERE shop_id = p_shop_id AND device_id = TRIM(p_device_id);
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Device not found for this shop.');
+    END IF;
+
+    UPDATE public.devices 
+    SET status = 'REVOKED' 
+    WHERE id = v_dev.id;
+
+    INSERT INTO public.audit_events (shop_id, actor_type, actor_id, action, entity_id, payload)
+    VALUES (p_shop_id, 'SYSTEM', 'ADMIN', 'DEVICE_REVOKED', v_dev.id, jsonb_build_object('reason', p_reason, 'device_id', p_device_id));
+
+    RETURN jsonb_build_object('success', true, 'device_id', p_device_id, 'status', 'REVOKED');
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.revoke_device(UUID, TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.revoke_device(UUID, TEXT, TEXT) TO authenticated, service_role;
+
+-- Grant permissions explicitly
+REVOKE ALL ON FUNCTION public.validate_shop_license FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.validate_shop_license TO anon, authenticated, service_role;
+
+-- ------------------------------------------------------------------------------
+-- 7. Row-Level Security (RLS) Policies & Privilege Hardening
+-- ------------------------------------------------------------------------------
+ALTER TABLE public.shops ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.shop_licenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.devices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.storage_assets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.print_jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.spool_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.audit_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.idempotency_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.dead_letter_cleanup ENABLE ROW LEVEL SECURITY;
+
+-- Privilege Hardening: Revoke public update on critical financial/order tables
+REVOKE ALL ON TABLE public.shop_licenses FROM anon, authenticated, PUBLIC;
+GRANT SELECT ON TABLE public.shop_licenses TO service_role;
+
+REVOKE UPDATE, DELETE ON TABLE public.print_jobs FROM anon, authenticated;
+GRANT SELECT, INSERT ON TABLE public.print_jobs TO anon, authenticated;
+GRANT UPDATE, DELETE ON TABLE public.print_jobs TO service_role;
+
+-- Public can inspect active shops by slug
+DROP POLICY IF EXISTS "Public shops visible by active status" ON public.shops;
+CREATE POLICY "Public shops visible by active status"
+ON public.shops FOR SELECT USING (status = 'ACTIVE');
+
+-- Workstation and Shop Owner access on print_jobs
+DROP POLICY IF EXISTS "Workstation and Owner view shop jobs" ON public.print_jobs;
+CREATE POLICY "Workstation and Owner view shop jobs"
+ON public.print_jobs FOR SELECT TO authenticated
+USING ((auth.jwt() ->> 'shop_id')::uuid = shop_id);
+
+-- Customer access on print_jobs strictly via matching tracking_secret_hash
+DROP POLICY IF EXISTS "Customers track own job via hash" ON public.print_jobs;
+CREATE POLICY "Customers track own job via hash"
+ON public.print_jobs FOR SELECT
+USING (tracking_secret_hash = (auth.jwt() ->> 'tracking_secret_hash'));

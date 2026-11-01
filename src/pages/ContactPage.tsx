@@ -11,6 +11,7 @@ import {
   HelpCircle,
   Clock
 } from 'lucide-react';
+import { supabase } from '../customer-web/supabase';
 
 export const ContactPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -27,15 +28,38 @@ export const ContactPage: React.FC = () => {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     
-    // Simulate real submission
-    setTimeout(() => {
+    try {
+      const generatedId = `APP-PILOT-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const { error } = await supabase.from('pilot_applications').insert({
+        id: generatedId,
+        shop_name: formData.shopName || formData.contactName,
+        city: formData.city || 'Tamil Nadu',
+        contact_number: formData.phone,
+        plan: '1 Year',
+        status: 'PENDING',
+        applied_at: new Date().toISOString(),
+        notes: JSON.stringify({
+          contactName: formData.contactName,
+          email: formData.email,
+          printerCount: formData.printerCount,
+          subject: formData.subject,
+          message: formData.message,
+        }),
+      });
+
+      if (error) {
+        console.error('Supabase pilot application error:', error.message);
+      }
+    } catch (err) {
+      console.error('Error submitting pilot application to Supabase:', err);
+    } finally {
       setIsSubmitting(false);
       setSubmitted(true);
-    }, 1000);
+    }
   };
 
   return (

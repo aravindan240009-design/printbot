@@ -51,6 +51,8 @@ temp_uploads/
 .env.*.local
 *.pem
 *.key
+*.auth_credentials.json
+.auth_credentials.json
 
 # Local Taste-skill screenshots and report
 .taste-skill/inspect/
@@ -77,3 +79,4 @@ scratch/
 
 !public/downloads/*.exe
 !public/downloads/*.msi
+.vercel

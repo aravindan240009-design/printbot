@@ -2,91 +2,62 @@ import { supabase } from '../supabase';
 import { ShopSession } from '../types';
 
 /**
- * Resolves the shop slug/subdomain exclusively from:
- * 1. Hostname subdomain: e.g. "test1.yourdomain.com" or "test1.localhost" -> "test1"
- * 2. Fallback query parameter: e.g. "?shop=test1" or "?qr=test1"
+ * Resolves the shop slug exclusively from:
+ * 1. URL Path route: e.g. "/shop/testcase", "/s/testcase", or direct "/testcase"
+ * 2. Query parameter: e.g. "?shop=testcase" or "?qr=testcase"
  */
 export function resolveShopSlugFromUrl(): string | null {
   if (typeof window === 'undefined') return null;
 
-  const host = window.location.hostname.toLowerCase();
-
-  // 1. Subdomain extraction (Highest Priority for Shop Owner Subdomains)
-  // Localhost subdomain (e.g. test1.localhost)
-  if (host.includes('.localhost')) {
-    const sub = host.split('.localhost')[0];
-    if (sub && sub !== 'www') return sub.trim();
-  }
-
-  // Environment-configured platform domain if provided (e.g. printbotak.com)
-  const envDomain = ((import.meta.env.VITE_PLATFORM_DOMAIN as string) || '').toLowerCase().trim();
-  if (envDomain) {
-    const cleanEnvDomain = envDomain.replace(/^https?:\/\//, '').replace(/\/+$/, '');
-    if (host.endsWith(`.${cleanEnvDomain}`)) {
-      const sub = host.slice(0, -(cleanEnvDomain.length + 1)).trim();
-      if (sub && sub !== 'www') return sub;
-    }
-  }
-
-  // Primary platform domain: printbotak.vercel.app
-  const vercelDomain = 'printbotak.vercel.app';
-  if (host.endsWith(`.${vercelDomain}`)) {
-    const sub = host.slice(0, -(vercelDomain.length + 1)).trim();
-    if (sub && sub !== 'www') return sub;
-  }
-
-  // Any other *.vercel.app deployment (e.g. test1.<project>.vercel.app)
-  if (host.endsWith('.vercel.app')) {
-    const parts = host.split('.');
-    if (parts.length >= 4) {
-      const candidate = parts[0];
-      if (candidate !== 'www') return candidate.trim();
-    }
-  }
-
-  // Generic custom domains with subdomains (e.g. test1.yourdomain.com or test1.printbot.in)
-  if (!/^\d+\.\d+\.\d+\.\d+$/.test(host) && host !== 'localhost') {
-    const parts = host.split('.');
-    const twoPartTlds = ['co.in', 'com.au', 'co.uk', 'com.br', 'co.nz', 'co.za'];
-    const isTwoPartTld = twoPartTlds.some((tld) => host.endsWith(`.${tld}`));
-    const minPartsForSubdomain = isTwoPartTld ? 4 : 3;
-
-    if (parts.length >= minPartsForSubdomain) {
-      const candidate = parts[0];
-      const reservedSubdomains = ['www', 'app', 'api', 'admin', 'portal', 'status'];
-      if (!reservedSubdomains.includes(candidate)) {
-        return candidate.trim();
-      }
-    }
-  }
-
-  // 2. Query Parameter Fallback (?shop=test1 or ?qr=...)
-  const params = new URLSearchParams(window.location.search);
-  const qShop = params.get('shop') || params.get('qr');
-  if (qShop && qShop.trim()) {
-    const cleaned = qShop.trim().toLowerCase();
-    return cleaned.replace(/^qr_/, '');
-  }
-
-  // 3. Direct Path Fallback (/test1 or /shop/test1)
+  // 1. Direct URL Path resolution (Primary customer web workflow)
   const pathParts = window.location.pathname.split('/').filter(Boolean);
+
+  // Format: /shop/:slug or /s/:slug
   if ((pathParts[0] === 'shop' || pathParts[0] === 's') && pathParts[1]) {
     return pathParts[1].trim().toLowerCase();
   }
-  const reservedPaths = [
+
+  // System & Marketing Landing Page reserved paths that should not be treated as shop slugs
+  const reservedPaths = new Set([
+    '',
+    'features',
+    'download',
+    'downloads',
+    'about',
+    'contact',
+    'privacy',
+    'terms',
+    'customer',
+    'shop',
+    's',
+    'admin',
+    'portal',
+    'app',
     'api',
     'assets',
     'favicon.svg',
     'favicon.ico',
     'index.html',
-    'download',
     'docs',
     'cart',
     'checkout',
     'tracking',
-  ];
-  if (pathParts.length === 1 && !reservedPaths.includes(pathParts[0].toLowerCase())) {
+    'static',
+    'robots.txt',
+    'sitemap.xml',
+  ]);
+
+  // Format: /:slug (e.g. /testcase)
+  if (pathParts.length === 1 && !reservedPaths.has(pathParts[0].toLowerCase())) {
     return pathParts[0].trim().toLowerCase();
+  }
+
+  // 2. Query Parameter Fallback (?shop=testcase or ?qr=...)
+  const params = new URLSearchParams(window.location.search);
+  const qShop = params.get('shop') || params.get('qr');
+  if (qShop && qShop.trim()) {
+    const cleaned = qShop.trim().toLowerCase();
+    return cleaned.replace(/^qr_/, '');
   }
 
   return null;

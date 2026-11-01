@@ -21,7 +21,7 @@ export const App: React.FC = () => {
   const [currentPath, setCurrentPath] = useState<string>(() => {
     // If QR parameter exists in query, start in customer mode
     const searchParams = new URLSearchParams(window.location.search);
-    if (searchParams.has('qr')) {
+    if (searchParams.has('qr') || searchParams.has('shop')) {
       return '/customer';
     }
     const path = window.location.pathname;
@@ -34,7 +34,7 @@ export const App: React.FC = () => {
   useEffect(() => {
     const handlePopState = () => {
       const searchParams = new URLSearchParams(window.location.search);
-      if (searchParams.has('qr')) {
+      if (searchParams.has('qr') || searchParams.has('shop')) {
         setCurrentPath('/customer');
         return;
       }
@@ -51,28 +51,51 @@ export const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // If in Customer Mode (e.g. /customer or ?qr=...)
-  if (currentPath === '/customer' || currentPath.startsWith('/customer/')) {
-    const shopSlug = resolveShopSlugFromUrl() || 'test1';
+  // URL Path & Shop Resolution:
+  // Detects if the user is accessing a shop customer portal via URL path (e.g. /testcase, /shop/testcase)
+  // or query parameter (?shop=testcase, ?qr=testcase)
+  const detectedShopSlug = resolveShopSlugFromUrl();
+  const isCustomerExplicitPath = 
+    currentPath === '/customer' || 
+    currentPath.startsWith('/customer/') || 
+    currentPath.startsWith('/shop/') ||
+    currentPath.startsWith('/s/');
+
+  const shouldRenderCustomerWeb = Boolean(detectedShopSlug) || isCustomerExplicitPath;
+  const activeShopSlug = detectedShopSlug || 'testcase';
+
+  // Synchronize document title when on official commercial site
+  useEffect(() => {
+    if (!shouldRenderCustomerWeb) {
+      document.title = 'Print Bot — Desktop Printing and Shop Manager for Windows';
+    }
+  }, [shouldRenderCustomerWeb]);
+
+  // Render Customer Web Platform if visiting a shop URL path or customer path
+  if (shouldRenderCustomerWeb) {
     return (
       <div className="min-h-screen bg-[#090B0F] text-slate-100 flex flex-col">
-        {/* Top return bar */}
+        {/* Top return & workstation banner */}
         <div className="bg-[#0E131F] border-b border-white/[0.1] px-4 py-2 flex items-center justify-between text-xs">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => {
+              navigate('/');
+            }}
             className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back to Print Bot Official Site</span>
           </button>
           <div className="flex items-center gap-2">
-            <span className="text-slate-400">Shop Counter Preview: <strong>{shopSlug}</strong></span>
+            <span className="text-slate-400">
+              Shop Counter: <strong className="text-white font-medium">{activeShopSlug}</strong>
+            </span>
             <button
               onClick={() => {
                 triggerInstallerDownload();
                 setDownloadModalOpen(true);
               }}
-              className="px-2.5 py-1 bg-brand-blue hover:bg-blue-600 text-white rounded text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+              className="px-2.5 py-1 bg-brand-blue hover:bg-blue-600 text-white rounded text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
             >
               <Download className="w-3 h-3" />
               <span>Get Windows Workstation</span>
@@ -90,7 +113,7 @@ export const App: React.FC = () => {
               </div>
             }
           >
-            <CustomerWebApp initialShopId={shopSlug} />
+            <CustomerWebApp initialShopId={activeShopSlug} />
           </Suspense>
         </div>
 

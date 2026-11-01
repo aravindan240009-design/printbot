@@ -5,10 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build --mode test",
+    "build:test": "vite build --mode test",
+    "build:dev": "vite build --mode development",
+    "build:prod": "vite build --mode production",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
+    "tauri:build:prod": "tauri build -- --before-build \"pnpm build:prod\"",
     "test:native": "python native_printing_bridge.py"
   },
   "dependencies": {

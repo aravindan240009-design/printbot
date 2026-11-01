@@ -15,9 +15,31 @@ from pydantic import BaseModel
 from packages.contracts.models import (
     StolenDeviceReport,
 )
-from services.api.services.license_service import license_service, EnrichedDeviceRecord, DeviceSecurityAlert
+from services.api.services.license_service import (
+    license_service,
+    EnrichedDeviceRecord,
+    DeviceSecurityAlert,
+    LicenseValidationRequest,
+    LicenseValidationResponse,
+)
 
 router = APIRouter(prefix="/licenses", tags=["License Center & Hardware Security"])
+
+
+@router.post("/validate", response_model=LicenseValidationResponse)
+async def validate_license(req: LicenseValidationRequest):
+    """
+    Authoritative server-side licence validation:
+    Verifies key HMAC in constant-time, checks expiry/revocation, applies rate limiting,
+    and returns an authentic device pairing token.
+    """
+    res = license_service.validate_license(
+        username=req.username,
+        license_key=req.license_key,
+        device_id=req.device_id,
+        hardware_hash=req.hardware_hash,
+    )
+    return res
 
 
 @router.get("/devices", response_model=List[EnrichedDeviceRecord])

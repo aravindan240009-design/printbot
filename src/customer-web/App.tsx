@@ -81,7 +81,7 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
   const [activeFileId, setActiveFileId] = useState<string>('');
   const [applyToAll, setApplyAll] = useState<boolean>(true);
 
-  // Dynamically resolve shop slug from props, subdomain, query, or path route
+  // Dynamically resolve shop slug from props, URL path route, or query parameter
   const resolvedSlug = useMemo(() => initialShopId?.trim().toLowerCase() || resolveShopSlugFromUrl(), [initialShopId]);
   const [session, setSession] = useState<ShopSession>(() => {
     if (resolvedSlug) {
