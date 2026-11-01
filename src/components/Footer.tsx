@@ -8,7 +8,6 @@ import {
   FileText, 
   Activity, 
   Sparkles,
-  Github
 } from 'lucide-react';
 import { DOWNLOAD_CONFIG, triggerInstallerDownload } from '../config/download';
 
@@ -32,7 +31,7 @@ export const Footer: React.FC<FooterProps> = ({ navigate, onOpenDownloadModal })
   };
 
   return (
-    <footer className="border-t border-white/[0.08] bg-[#07090E] text-slate-400 text-sm">
+    <footer className="border-t border-slate-200 bg-white text-slate-600 text-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-20">
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-8 mb-16">
@@ -43,124 +42,87 @@ export const Footer: React.FC<FooterProps> = ({ navigate, onOpenDownloadModal })
               onClick={() => handleNav('/')}
               className="flex items-center gap-3 text-left focus:outline-none group cursor-pointer"
             >
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-blue to-brand-500 flex items-center justify-center text-white shadow-lg shadow-brand-blue/20">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
                 <Printer className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-xl font-bold tracking-tight text-white group-hover:text-brand-300 transition-colors">
+                <span className="text-lg font-bold tracking-tight text-slate-900 group-hover:text-blue-600 transition-colors">
                   Print Bot
                 </span>
-                <span className="ml-2 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/[0.08] text-slate-300 border border-white/[0.08]">
-                  v{DOWNLOAD_CONFIG.currentVersion}
-                </span>
+                <p className="text-xs text-slate-500 font-medium">
+                  Autonomous Print Shop Workstation & Customer Platform
+                </p>
               </div>
             </button>
 
-            <p className="text-slate-400 text-sm max-w-sm leading-relaxed">
-              The high-performance autonomous operating system for modern Xerox and print shops.
-              Connecting walk-in customer phones to physical Windows print spoolers with zero app friction.
+            <p className="text-slate-500 text-sm max-w-sm leading-relaxed">
+              Touchless QR counter upload, live page counting, and automated Windows print queue execution built specifically for Xerox shops, photo studios, and commercial copy centers.
             </p>
 
-            <div className="pt-2 flex flex-wrap items-center gap-3">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                Windows Spooler Online
+            <div className="pt-2 flex items-center gap-3 text-xs text-slate-500">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                System Operational
               </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-white/[0.04] text-slate-300 border border-white/[0.08]">
-                <Laptop className="w-3.5 h-3.5 text-brand-400" />
-                x86_64 Architecture
-              </span>
+              <span>•</span>
+              <span>Windows 10 / 11 Native</span>
             </div>
           </div>
 
           {/* Product links */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-200">
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-900 mb-4">
               Product
             </h4>
-            <ul className="space-y-2 text-sm">
+            <ul className="space-y-3">
               <li>
                 <button
                   onClick={() => handleNav('/features')}
-                  className="hover:text-white transition-colors cursor-pointer"
+                  className="text-slate-600 hover:text-blue-600 transition-colors cursor-pointer text-left"
                 >
-                  Workstation Architecture
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => handleNav('/features')}
-                  className="hover:text-white transition-colors cursor-pointer"
-                >
-                  Win32 Spooler Engine
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => handleNav('/features')}
-                  className="hover:text-white transition-colors cursor-pointer"
-                >
-                  Customer QR Engine
+                  Features & Workflow
                 </button>
               </li>
               <li>
                 <button
                   onClick={() => handleNav('/download')}
-                  className="hover:text-white transition-colors cursor-pointer"
+                  className="text-slate-600 hover:text-blue-600 transition-colors cursor-pointer text-left flex items-center gap-1.5"
+                >
+                  <span>Windows Installer</span>
+                  <span className="text-[10px] bg-blue-50 text-blue-700 font-semibold px-1.5 py-0.2 rounded">
+                    v1.0.0
+                  </span>
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={handleDownload}
+                  className="text-slate-600 hover:text-blue-600 transition-colors cursor-pointer text-left"
+                >
+                  Download Setup (.exe)
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => handleNav('/download')}
+                  className="text-slate-600 hover:text-blue-600 transition-colors cursor-pointer text-left"
                 >
                   System Requirements
                 </button>
               </li>
-              <li>
-                <button
-                  onClick={() => handleNav('/download')}
-                  className="hover:text-white transition-colors cursor-pointer"
-                >
-                  Release Notes & Changelog
-                </button>
-              </li>
             </ul>
           </div>
 
-          {/* Technical Resources */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-200">
-              Technology
+          {/* Company links */}
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-900 mb-4">
+              Company
             </h4>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <span className="text-slate-400">Tauri 2 + Rust Core</span>
-              </li>
-              <li>
-                <span className="text-slate-400">SQLite Journal Protocol</span>
-              </li>
-              <li>
-                <span className="text-slate-400">PostgreSQL Tenant Isolation</span>
-              </li>
-              <li>
-                <span className="text-slate-400">FastAPI Async Pipeline</span>
-              </li>
-              <li>
-                <button
-                  onClick={() => handleNav('/download')}
-                  className="hover:text-white transition-colors cursor-pointer"
-                >
-                  Verified SHA-256 Hashes
-                </button>
-              </li>
-            </ul>
-          </div>
-
-          {/* Company & Legal */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-200">
-              Company & Legal
-            </h4>
-            <ul className="space-y-2 text-sm">
+            <ul className="space-y-3">
               <li>
                 <button
                   onClick={() => handleNav('/about')}
-                  className="hover:text-white transition-colors cursor-pointer"
+                  className="text-slate-600 hover:text-blue-600 transition-colors cursor-pointer text-left"
                 >
                   About Print Bot
                 </button>
@@ -168,23 +130,32 @@ export const Footer: React.FC<FooterProps> = ({ navigate, onOpenDownloadModal })
               <li>
                 <button
                   onClick={() => handleNav('/contact')}
-                  className="hover:text-white transition-colors cursor-pointer"
+                  className="text-slate-600 hover:text-blue-600 transition-colors cursor-pointer text-left"
                 >
-                  Commercial Pilot Program
+                  Contact & Support
                 </button>
               </li>
               <li>
                 <button
                   onClick={() => handleNav('/contact')}
-                  className="hover:text-white transition-colors cursor-pointer"
+                  className="text-slate-600 hover:text-blue-600 transition-colors cursor-pointer text-left"
                 >
-                  Technical Support
+                  Shop Pilot Program
                 </button>
               </li>
+            </ul>
+          </div>
+
+          {/* Legal / Policy */}
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-900 mb-4">
+              Legal & Trust
+            </h4>
+            <ul className="space-y-3">
               <li>
                 <button
                   onClick={() => handleNav('/privacy')}
-                  className="hover:text-white transition-colors cursor-pointer"
+                  className="text-slate-600 hover:text-blue-600 transition-colors cursor-pointer text-left"
                 >
                   Privacy Policy
                 </button>
@@ -192,52 +163,50 @@ export const Footer: React.FC<FooterProps> = ({ navigate, onOpenDownloadModal })
               <li>
                 <button
                   onClick={() => handleNav('/terms')}
-                  className="hover:text-white transition-colors cursor-pointer"
+                  className="text-slate-600 hover:text-blue-600 transition-colors cursor-pointer text-left"
                 >
-                  Terms and Conditions
+                  Terms of Service
                 </button>
+              </li>
+              <li>
+                <span className="text-slate-400 text-xs block">
+                  Encrypted Spool Delivery
+                </span>
+              </li>
+              <li>
+                <span className="text-slate-400 text-xs block">
+                  Zero Customer Cloud Lock-in
+                </span>
               </li>
             </ul>
           </div>
 
         </div>
 
-        {/* Download Highlight Box */}
-        <div className="mb-12 p-6 rounded-2xl bg-white/[0.02] border border-white/[0.07] flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4 text-center sm:text-left">
-            <div className="w-12 h-12 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400 flex-shrink-0">
-              <Download className="w-6 h-6" />
-            </div>
-            <div>
-              <h5 className="text-white font-semibold text-base">
-                Ready to automate your print counter?
-              </h5>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Download Print Bot v{DOWNLOAD_CONFIG.currentVersion} for Windows 10 & 11 (2.81 MB setup).
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={handleDownload}
-            className="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold text-white bg-brand-blue hover:bg-blue-600 rounded-xl transition-all shadow-md shadow-brand-blue/20 hover:shadow-brand-blue/35 active:scale-95 flex items-center justify-center gap-2 cursor-pointer flex-shrink-0"
-          >
-            <Download className="w-4 h-4" />
-            <span>Download for Windows</span>
-          </button>
-        </div>
-
-        {/* Bottom Credits & Copyright */}
-        <div className="pt-8 border-t border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <div>
-            &copy; {new Date().getFullYear()} Print Bot Platform Inc. All rights reserved.
-          </div>
+        {/* Bottom bar */}
+        <div className="pt-8 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+          <p>
+            © {new Date().getFullYear()} Print Bot. All rights reserved. Built for professional print operators.
+          </p>
           <div className="flex items-center gap-6">
-            <span className="flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Production Authenticode Target</span>
-            </span>
-            <span className="hidden sm:inline">&bull;</span>
-            <span>Deployed on Vercel Edge</span>
+            <button
+              onClick={() => handleNav('/privacy')}
+              className="hover:text-slate-900 transition-colors cursor-pointer"
+            >
+              Privacy
+            </button>
+            <button
+              onClick={() => handleNav('/terms')}
+              className="hover:text-slate-900 transition-colors cursor-pointer"
+            >
+              Terms
+            </button>
+            <button
+              onClick={() => handleNav('/contact')}
+              className="hover:text-slate-900 transition-colors cursor-pointer"
+            >
+              Help Center
+            </button>
           </div>
         </div>
 
@@ -245,4 +214,3 @@ export const Footer: React.FC<FooterProps> = ({ navigate, onOpenDownloadModal })
     </footer>
   );
 };
-

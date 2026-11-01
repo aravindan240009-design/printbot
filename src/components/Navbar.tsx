@@ -5,10 +5,6 @@ import {
   Menu, 
   X, 
   ChevronRight, 
-  ExternalLink, 
-  Sliders, 
-  ShieldCheck, 
-  Sparkles
 } from 'lucide-react';
 import { DOWNLOAD_CONFIG, triggerInstallerDownload } from '../config/download';
 
@@ -56,8 +52,8 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, onOpenDow
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         isScrolled
-          ? 'bg-[#090B0F]/85 backdrop-blur-md border-b border-white/[0.08] shadow-2xl py-3.5'
-          : 'bg-transparent py-5'
+          ? 'bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-sm py-3.5'
+          : 'bg-white/80 backdrop-blur-sm border-b border-slate-100 py-4'
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -66,39 +62,39 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, onOpenDow
           {/* Brand Logo */}
           <button
             onClick={() => handleNavClick('/')}
-            className="flex items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-lg group"
+            className="flex items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg group cursor-pointer"
             aria-label="Print Bot Home"
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-blue to-brand-500 flex items-center justify-center text-white shadow-lg shadow-brand-blue/25 group-hover:scale-105 transition-transform duration-200">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform duration-200">
               <Printer className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-lg font-bold tracking-tight text-white group-hover:text-brand-300 transition-colors">
+                <span className="text-lg font-bold tracking-tight text-slate-900 group-hover:text-blue-600 transition-colors">
                   Print Bot
                 </span>
-                <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/[0.08] text-slate-300 border border-white/[0.08]">
+                <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/60">
                   v{DOWNLOAD_CONFIG.currentVersion}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 font-medium hidden sm:block">
-                Autonomous Print Shop OS
+              <p className="text-[11px] text-slate-500 font-medium hidden sm:block">
+                Print Shop & Xerox Counter Suite
               </p>
             </div>
           </button>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1 bg-white/[0.03] border border-white/[0.06] rounded-full p-1.5 backdrop-blur-md">
+          <nav className="hidden md:flex items-center gap-1 bg-slate-100/80 border border-slate-200/70 rounded-full p-1.5 backdrop-blur-md">
             {navLinks.map((link) => {
               const isActive = currentPath === link.path;
               return (
                 <button
                   key={link.path}
                   onClick={() => handleNavClick(link.path)}
-                  className={`px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 cursor-pointer ${
+                  className={`px-4 py-1.5 text-sm font-medium rounded-full transition-all duration-200 cursor-pointer ${
                     isActive
-                      ? 'bg-white/[0.12] text-white shadow-sm'
-                      : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
+                      ? 'bg-white text-blue-600 shadow-sm font-semibold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                   }`}
                 >
                   {link.label}
@@ -112,11 +108,11 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, onOpenDow
             {/* Primary Download CTA */}
             <button
               onClick={handleDownload}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-brand-blue to-brand-600 hover:from-blue-600 hover:to-brand-700 rounded-xl shadow-lg shadow-brand-blue/20 hover:shadow-brand-blue/35 transition-all duration-200 active:scale-[0.98] cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md shadow-blue-500/20 hover:shadow-blue-500/30 transition-all duration-200 active:scale-[0.98] cursor-pointer"
             >
               <Download className="w-4 h-4" />
               <span>Download</span>
-              <span className="hidden lg:inline text-xs opacity-75 font-normal">
+              <span className="hidden lg:inline text-xs opacity-85 font-normal">
                 (Windows)
               </span>
             </button>
@@ -126,15 +122,15 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, onOpenDow
           <div className="flex md:hidden items-center gap-2">
             <button
               onClick={handleDownload}
-              className="px-3 py-1.5 text-xs font-semibold text-white bg-brand-blue hover:bg-blue-600 rounded-lg flex items-center gap-1.5"
+              className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center gap-1.5 shadow-sm"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Get v1.0</span>
+              <span>Download</span>
             </button>
 
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-slate-400 hover:text-white hover:bg-white/[0.08] rounded-lg transition-colors cursor-pointer"
+              className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
               aria-label="Toggle navigation menu"
               aria-expanded={mobileMenuOpen}
             >
@@ -147,7 +143,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, onOpenDow
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-[#0D111A] border-b border-white/[0.1] px-4 pt-3 pb-6 space-y-3 animate-in fade-in slide-in-from-top-4 duration-200">
+        <div className="md:hidden bg-white border-b border-slate-200 shadow-xl px-4 pt-3 pb-6 space-y-3 animate-in fade-in slide-in-from-top-4 duration-200">
           <div className="grid gap-1">
             {navLinks.map((link) => {
               const isActive = currentPath === link.path;
@@ -157,27 +153,27 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, onOpenDow
                   onClick={() => handleNavClick(link.path)}
                   className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center justify-between ${
                     isActive
-                      ? 'bg-white/[0.1] text-white font-semibold'
-                      : 'text-slate-300 hover:bg-white/[0.05] hover:text-white'
+                      ? 'bg-blue-50 text-blue-700 font-semibold border-l-4 border-blue-600'
+                      : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                 >
                   <span>{link.label}</span>
-                  <ChevronRight className="w-4 h-4 text-slate-500" />
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
                 </button>
               );
             })}
           </div>
 
-          <div className="pt-2 border-t border-white/[0.08] grid gap-2">
+          <div className="pt-2 border-t border-slate-100 grid gap-2">
             <button
               onClick={() => {
                 setMobileMenuOpen(false);
                 handleDownload();
               }}
-              className="w-full py-2.5 px-4 text-sm font-semibold text-white bg-brand-blue hover:bg-blue-600 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-brand-blue/20"
+              className="w-full py-2.5 px-4 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl flex items-center justify-center gap-2 shadow-md shadow-blue-500/20"
             >
               <Download className="w-4 h-4" />
-              <span>Download Print Bot for Windows (2.81 MB)</span>
+              <span>Download Print Bot for Windows</span>
             </button>
           </div>
         </div>
@@ -185,4 +181,3 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, onOpenDow
     </header>
   );
 };
-
