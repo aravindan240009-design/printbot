@@ -44,8 +44,7 @@ import {
   Trash2,
   BarChart3,
   PieChart,
-  Globe,
-  ExternalLink
+  Globe
 } from 'lucide-react';
 import { ThemeProvider, ThemeSwitch, MotionSurface, PaperScene, PrinterScene, useGsapStagger } from '@xerox/ui';
 import { discoverPrinters, bindWorkstation, getWorkstationDeviceIdentity, type NativePrinterInfo } from './native';
@@ -651,14 +650,7 @@ export default function App() {
     }
   }, [currentShop]);
 
-  const [platformDomain, setPlatformDomain] = useState<string>(() => {
-    return (
-      localStorage.getItem('printbot_platform_domain') ||
-      (import.meta.env.VITE_PLATFORM_DOMAIN as string) ||
-      'printbotak.vercel.app'
-    );
-  });
-  const [customDomainInput, setCustomDomainInput] = useState<string>(() => {
+  const [platformDomain] = useState<string>(() => {
     return (
       localStorage.getItem('printbot_platform_domain') ||
       (import.meta.env.VITE_PLATFORM_DOMAIN as string) ||
@@ -4492,75 +4484,14 @@ export default function App() {
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                           <code style={{ fontSize: '14px', fontWeight: 750, color: 'var(--pb-accent)', wordBreak: 'break-all' }}>{shopWebUrl}</code>
-                          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(shopWebUrl);
-                                setNotice('Copied shop web link to clipboard.');
-                              }}
-                              style={{ border: 0, padding: '5px 10px', fontSize: '11px', gap: '4px' }}
-                            >
-                              <Copy size={12} /> Copy
-                            </button>
-                            <a
-                              href={shopWebUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '5px 10px',
-                                fontSize: '11px',
-                                borderRadius: '6px',
-                                background: 'var(--pb-accent)',
-                                color: '#fff',
-                                textDecoration: 'none',
-                                fontWeight: 650
-                              }}
-                            >
-                              <ExternalLink size={12} /> Visit Web Link
-                            </a>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Custom / Platform Domain Setting */}
-                      <div style={{ padding: '16px', borderRadius: '12px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
-                        <div style={{ marginBottom: '8px' }}>
-                          <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--pb-text)' }}>Platform Root / Custom Domain</span>
-                          <p style={{ margin: '4px 0 10px', fontSize: '11px', color: 'var(--pb-muted)', lineHeight: 1.4 }}>
-                            Base platform web domain (e.g. <code>printbotak.vercel.app</code> or your custom domain). Customers access your shop directly via URL path (e.g. <code>/{shopSlug}</code>) without needing wildcard subdomains.
-                          </p>
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          <input
-                            type="text"
-                            value={customDomainInput}
-                            onChange={(e) => setCustomDomainInput(e.target.value)}
-                            placeholder="e.g. printbotak.vercel.app or yourdomain.com"
-                            style={{
-                              flex: 1,
-                              padding: '8px 12px',
-                              borderRadius: '6px',
-                              border: '1px solid var(--pb-border)',
-                              background: 'var(--pb-bg)',
-                              color: 'var(--pb-text)',
-                              fontSize: '12px'
-                            }}
-                          />
                           <button
-                            className="ws-primary"
                             onClick={() => {
-                              const clean = customDomainInput.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
-                              if (!clean) return;
-                              setPlatformDomain(clean);
-                              localStorage.setItem('printbot_platform_domain', clean);
-                              setNotice(`Platform domain updated to ${clean}`);
+                              navigator.clipboard.writeText(shopWebUrl);
+                              setNotice('Copied shop web link to clipboard.');
                             }}
-                            style={{ padding: '8px 14px', fontSize: '12px', flexShrink: 0 }}
+                            style={{ border: 0, padding: '6px 12px', fontSize: '11px', gap: '5px', flexShrink: 0 }}
                           >
-                            Save Domain
+                            <Copy size={13} /> Copy Link
                           </button>
                         </div>
                       </div>
