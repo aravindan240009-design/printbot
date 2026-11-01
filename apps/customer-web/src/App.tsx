@@ -18,7 +18,6 @@ import {
   PrintOptions,
   ServerQuote,
   ShopSession,
-  TimedBooking,
 } from './types';
 import { getTranslation } from './locales';
 import { Header } from './components/common/Header';
@@ -31,7 +30,6 @@ import { CartView } from './components/cart/CartView';
 import { CheckoutView } from './components/checkout/CheckoutView';
 import { OrderTracker } from './components/tracking/OrderTracker';
 import { CustomerDashboard } from './components/dashboard/CustomerDashboard';
-import { TimedBookingView } from './components/timed/TimedBookingView';
 import { PasswordUnlockModal } from './components/common/PasswordUnlockModal';
 import { calculateDocumentQuote } from './utils/pricing';
 import {
@@ -273,38 +271,6 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
     }, 14000);
   };
 
-  const handleTimedBooking = (booking: TimedBooking) => {
-    const randomOrderId = 'TB-' + Math.floor(10000 + Math.random() * 90000);
-    const newOrder: PlacedOrder = {
-      orderId: randomOrderId,
-      pickupPin: booking.bookingCode.replace('TX-', ''),
-      shopId: session.shop_id,
-      shopName: session.shop_name,
-      totalRupees: 0,
-      totalSheets: booking.estimatedPages,
-      totalLogicalPages: booking.estimatedPages,
-      paymentMethod: 'cash',
-      paymentStatus: 'pending_cash',
-      status: 'ORDER_RECEIVED',
-      placedAt: `${booking.slotDate} at ${booking.slotTime}`,
-      items: [
-        {
-          name: `Timed Slot: ${booking.serviceType.replace('_', ' ').toUpperCase()}`,
-          copies: 1,
-          colorMode: 'Flexible',
-          sheets: booking.estimatedPages,
-          paperSize: 'A4',
-          finishing: 'None',
-        },
-      ],
-      qrToken: booking.bookingCode,
-      timedBooking: booking,
-    };
-
-    saveOrderToStorage(newOrder);
-    setOrders((prev) => [newOrder, ...prev]);
-  };
-
   const unlockingFile = files.find((f) => f.id === unlockingFileId);
 
   return (
@@ -349,14 +315,6 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
                     >
                       <Upload size={18} />
                       <span>{t.startPrintingCta}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="pb-btn-secondary"
-                      onClick={() => setActiveView('timed_booking')}
-                    >
-                      <Clock size={18} />
-                      <span>{t.navBookSlot}</span>
                     </button>
                   </div>
 
@@ -535,15 +493,6 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
                 }}
               />
             </div>
-          )}
-
-          {/* VIEW: TIMED BOOKING */}
-          {activeView === 'timed_booking' && (
-            <TimedBookingView
-              session={session}
-              onBookingConfirmed={handleTimedBooking}
-              t={t}
-            />
           )}
 
           {/* VIEW: CART */}

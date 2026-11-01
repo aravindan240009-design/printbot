@@ -14,7 +14,6 @@ export const hi: typeof en = {
   navServices: 'सेवाएं',
   navCart: 'कार्ट',
   navOrders: 'मेरे ऑर्डर',
-  navBookSlot: 'स्लॉट बुक करें',
 
   // Welcome Hero
   heroTitle: 'तेज़, सेल्फ़-सर्विस प्रिंटिंग और ज़ेरॉक्स',
@@ -33,8 +32,6 @@ export const hi: typeof en = {
   servicePhotoDesc: '8 पासपोर्ट फ़ोटो, 4x6 ग्लॉसी प्रिंट और दोनों तरफ़ के आईडी कार्ड।',
   serviceBindingTitle: 'प्रोजेक्ट और थीसिस बाइंडिंग',
   serviceBindingDesc: 'कॉर्नर स्टेपल, स्पाइरल बाइंडिंग और हार्ड बाउंड कवर।',
-  serviceTimedTitle: 'टाइम ज़ेरॉक्स स्लॉट बुकिंग',
-  serviceTimedDesc: 'बिना लाइन में लगे अपने चुने हुए समय पर प्रिंट प्राप्त करें।',
   viewPricing: '₹1.50/पेज से शुरू',
 
   // Stepper Header
@@ -161,20 +158,6 @@ export const hi: typeof en = {
   printAnotherCta: 'एक और दस्तावेज़ प्रिंट करें',
   downloadReceipt: 'रसीद डाउनलोड करें',
   shopLocationLabel: 'दुकान का पता',
-
-  // Timed Xerox Booking
-  timedTitle: 'टाइम स्लॉट बुकिंग',
-  timedSubtitle: 'लाइन से बचने के लिए पहले से समय आरक्षित करें।',
-  selectDate: 'तारीख चुनें',
-  selectTime: 'समय चुनें',
-  serviceType: 'सेवा का प्रकार',
-  serviceAssisted: 'सहायता प्राप्त काउंटर ज़ेरॉक्स (ऑपरेटर करेगा)',
-  serviceSelf: 'सेल्फ़-सर्विस ज़ेरॉक्स मशीन',
-  serviceRush: 'तत्काल प्राथमिकता प्रिंट (लाइन में आगे)',
-  estimatedPagesLabel: 'अनुमानित पेज संख्या',
-  bookSlotCta: 'स्लॉट बुक करें',
-  slotBookedSuccess: 'स्लॉट सफलतापूर्वक आरक्षित हो गया!',
-  slotCodeLabel: 'बुकिंग कोड',
 
   // Customer Dashboard & History
   dashboardTitle: 'ग्राहक डैशबोर्ड',

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Printer, Globe, Sun, Moon, ShoppingBag, Clock, Sparkles } from 'lucide-react';
+import { Printer, Globe, Sun, Moon, ShoppingBag, Sparkles } from 'lucide-react';
 import { Language, ShopSession, ActiveView } from '../../types';
 import { TranslationKeys } from '../../locales';
 
@@ -76,14 +76,6 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={() => onNavigate('services')}
             >
               {t.navServices}
-            </button>
-            <button
-              type="button"
-              className={`pb-nav-btn ${activeView === 'timed_booking' ? 'active' : ''}`}
-              onClick={() => onNavigate('timed_booking')}
-            >
-              <Clock size={15} aria-hidden="true" />
-              <span>{t.navBookSlot}</span>
             </button>
             <button
               type="button"

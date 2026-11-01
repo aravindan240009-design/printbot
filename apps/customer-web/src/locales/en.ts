@@ -12,7 +12,6 @@ export const en = {
   navServices: 'Services',
   navCart: 'Cart',
   navOrders: 'My Orders',
-  navBookSlot: 'Book Slot',
 
   // Welcome Hero
   heroTitle: 'Fast, Self-Service Printing & Xerox',
@@ -31,8 +30,6 @@ export const en = {
   servicePhotoDesc: '8-up passport photos, 4x6 glossy prints, and double-sided ID cards.',
   serviceBindingTitle: 'Project & Thesis Binding',
   serviceBindingDesc: 'Corner stapling, durable spiral binding, or executive gold-embossed hard covers.',
-  serviceTimedTitle: 'Timed Xerox Slot Booking',
-  serviceTimedDesc: 'Skip the line! Reserve an assisted counter slot or scheduled pickup time.',
   viewPricing: 'From ₹1.50/page',
 
   // Stepper Header
@@ -159,20 +156,6 @@ export const en = {
   printAnotherCta: 'Print Another Document',
   downloadReceipt: 'Download Receipt',
   shopLocationLabel: 'Shop Location',
-
-  // Timed Xerox Booking
-  timedTitle: 'Book Timed Xerox Slot',
-  timedSubtitle: 'Reserve scheduled counter service or priority rush printing to avoid waiting in queues.',
-  selectDate: 'Select Date',
-  selectTime: 'Select Time Slot',
-  serviceType: 'Service Type',
-  serviceAssisted: 'Assisted Counter Xerox (Operator handles original physical sheets)',
-  serviceSelf: 'Self-Service Copier Station (Dedicated machine reservation)',
-  serviceRush: 'Rush Priority Dispatch (Immediate printing queue skip)',
-  estimatedPagesLabel: 'Estimated Number of Pages',
-  bookSlotCta: 'Confirm Slot Booking',
-  slotBookedSuccess: 'Slot Reserved Successfully!',
-  slotCodeLabel: 'Reservation Code',
 
   // Customer Dashboard & History
   dashboardTitle: 'Customer Dashboard',

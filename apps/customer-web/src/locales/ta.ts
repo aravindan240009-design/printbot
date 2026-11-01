@@ -14,7 +14,6 @@ export const ta: typeof en = {
   navServices: 'சேவைகள்',
   navCart: 'கூடை',
   navOrders: 'என் ஆர்டர்கள்',
-  navBookSlot: 'நேரம் முன்பதிவு',
 
   // Welcome Hero
   heroTitle: 'விரைவான மொபைல் பிரிண்டிங் & ஜெராக்ஸ்',
@@ -33,8 +32,6 @@ export const ta: typeof en = {
   servicePhotoDesc: '8 பாஸ்போர்ட் படங்கள், 4x6 புகைப்படங்கள் மற்றும் இருபக்க அடையாள அட்டைகள்.',
   serviceBindingTitle: 'ப்ராஜெக்ட் & தீசிஸ் பைண்டிங்',
   serviceBindingDesc: 'கார்னர் ஸ்டேப்ளர், ஸ்பைரல் பைண்டிங் மற்றும் கோல்டன் எழுத்துக்களுடன் ஹார்ட் புக் பைண்டிங்.',
-  serviceTimedTitle: 'நேர முன்பதிவு ஜெராக்ஸ்',
-  serviceTimedDesc: 'வரிசையில் காத்திருக்காமல் குறிப்பிட்ட நேரத்தில் வந்து பெறலாம்.',
   viewPricing: 'பக்கத்திற்கு ₹1.50 முதல்',
 
   // Stepper Header
@@ -161,20 +158,6 @@ export const ta: typeof en = {
   printAnotherCta: 'மற்றொரு ஆவணத்தை அச்சிட',
   downloadReceipt: 'ரசீதைப் பதிவிறக்கு',
   shopLocationLabel: 'கடை முகவரி',
-
-  // Timed Xerox Booking
-  timedTitle: 'நேர முன்பதிவு சேவை',
-  timedSubtitle: 'நீண்ட வரிசையில் நிற்பதைத் தவிர்க்க முன்கூட்டியே நேரத்தை தேர்வு செய்யவும்.',
-  selectDate: 'தேதியை தேர்ந்தெடுக்கவும்',
-  selectTime: 'நேரத்தை தேர்ந்தெடுக்கவும்',
-  serviceType: 'சேவை வகை',
-  serviceAssisted: 'கவுண்டர் ஜெராக்ஸ் (ஊழியர் மூலமாக அச்சிடுதல்)',
-  serviceSelf: 'சுய சேவை ஜெராக்ஸ் இயந்திரம் (சுயமாக நகலெடுத்தல்)',
-  serviceRush: 'அவசர முன்னுரிமை பிரிண்ட் (வரிசை விலக்கு)',
-  estimatedPagesLabel: 'உத்தேச பக்கங்கள் எண்ணிக்கை',
-  bookSlotCta: 'நேரத்தை உறுதிசெய்க',
-  slotBookedSuccess: 'நேரம் வெற்றிகரமாக முன்பதிவு செய்யப்பட்டது!',
-  slotCodeLabel: 'முன்பதிவு குறியீடு',
 
   // Customer Dashboard & History
   dashboardTitle: 'வாடிக்கையாளர் பக்கம்',

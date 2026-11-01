@@ -71,19 +71,6 @@ export const ServiceCatalog: React.FC<ServiceCatalogProps> = ({ t, rates, onSele
         targetView: 'print' as ActiveView,
       },
       {
-        id: 'timed_xerox',
-        category: 'timed',
-        title: t.serviceTimedTitle,
-        description: t.serviceTimedDesc,
-        icon: <Clock size={24} />,
-        price: 'Zero Waiting',
-        turnaround: 'Reserved Slot',
-        badge: 'Skip The Queue',
-        badgeColor: 'cyan',
-        features: ['Assisted Counter Xerox', 'Dedicated Copier Reservation', 'Priority Rush Dispatch'],
-        targetView: 'timed_booking' as ActiveView,
-      },
-      {
         id: 'cert_print',
         category: 'docs',
         title: 'Certificates & Heavy Card',
@@ -118,7 +105,6 @@ export const ServiceCatalog: React.FC<ServiceCatalogProps> = ({ t, rates, onSele
     { id: 'docs', label: 'Document Xerox' },
     { id: 'photo', label: 'Photo & ID' },
     { id: 'binding', label: 'Binding' },
-    { id: 'timed', label: 'Timed Counter Slot' },
   ];
 
   const filteredServices = useMemo(() => {

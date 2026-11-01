@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Printer, Layers, ShoppingBag, Clock } from 'lucide-react';
+import { Home, Printer, Layers, ShoppingBag } from 'lucide-react';
 import { ActiveView } from '../../types';
 import { TranslationKeys } from '../../locales';
 
@@ -40,14 +40,6 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       >
         <Layers size={20} />
         <span>{t.navServices}</span>
-      </button>
-
-      <button
-        className={`pb-bottom-nav-item ${activeView === 'timed_booking' ? 'active' : ''}`}
-        onClick={() => onNavigate('timed_booking')}
-      >
-        <Clock size={20} />
-        <span>{t.navBookSlot}</span>
       </button>
 
       <button

@@ -35,16 +35,6 @@ export interface DocumentItem {
   unlockedPassword?: string;
 }
 
-export interface TimedBooking {
-  id: string;
-  serviceType: 'assisted_xerox' | 'self_service_copier' | 'priority_rush';
-  slotDate: string;
-  slotTime: string;
-  estimatedPages: number;
-  counterNotes?: string;
-  bookingCode: string;
-}
-
 export type OrderStatus =
   | 'PENDING_PAYMENT'
   | 'ORDER_RECEIVED'
@@ -79,7 +69,6 @@ export interface PlacedOrder {
   placedAt: string;
   items: PlacedOrderItem[];
   qrToken: string;
-  timedBooking?: TimedBooking;
 }
 
 export interface ShopRates {
@@ -115,7 +104,6 @@ export type ActiveView =
   | 'home'
   | 'print'
   | 'services'
-  | 'timed_booking'
   | 'cart'
   | 'checkout'
   | 'tracking'
