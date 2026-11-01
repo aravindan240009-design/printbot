@@ -43,7 +43,9 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   onUnifiedLogin,
 }) => {
   const [activeMode, setActiveMode] = useState<'OPERATOR' | 'ADMIN'>(
-    loginUsername.trim().toLowerCase() === 'admin' ? 'ADMIN' : 'OPERATOR'
+    loginUsername.trim().toLowerCase() === 'admin' || loginUsername.trim().toLowerCase().endsWith('@printbot.in')
+      ? 'ADMIN'
+      : 'OPERATOR'
   );
 
   const isLocked = Boolean(lockoutUntil && new Date() < lockoutUntil);
@@ -61,11 +63,22 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   const switchMode = (mode: 'OPERATOR' | 'ADMIN') => {
     setActiveMode(mode);
     if (mode === 'ADMIN') {
-      setLoginUsername('admin');
+      if (!loginUsername || loginUsername.trim() === '') {
+        setLoginUsername('admin');
+      }
     } else {
       if (loginUsername.trim().toLowerCase() === 'admin') {
         setLoginUsername('');
       }
+    }
+  };
+
+  const handleKeyInputChange = (val: string) => {
+    if (activeMode === 'ADMIN') {
+      // Allow exact password casing and symbols for admin
+      handleKeyChange(val);
+    } else {
+      handleKeyChange(val);
     }
   };
 
@@ -123,16 +136,15 @@ export const LockScreen: React.FC<LockScreenProps> = ({
         <form onSubmit={onUnifiedLogin} className="pb-lockscreen-form">
           <div className="pb-form-group">
             <label className="pb-form-label">
-              {activeMode === 'ADMIN' ? 'Administrator Account' : 'Counter Station Username'}
+              {activeMode === 'ADMIN' ? 'Administrator Account / Email' : 'Counter Station Username'}
             </label>
             <input
               type="text"
               className="pb-input"
-              placeholder={activeMode === 'ADMIN' ? 'admin' : 'e.g. ashwin, metro-xerox'}
+              placeholder={activeMode === 'ADMIN' ? 'admin or admin@printbot.in' : 'e.g. ashwin, metro-xerox'}
               value={loginUsername}
               onChange={(e) => setLoginUsername(e.target.value)}
-              disabled={activeMode === 'ADMIN'}
-              autoFocus={activeMode === 'OPERATOR'}
+              autoFocus={activeMode === 'ADMIN'}
               required
             />
           </div>
@@ -158,9 +170,9 @@ export const LockScreen: React.FC<LockScreenProps> = ({
               <input
                 type={showPassword ? 'text' : 'password'}
                 className="pb-input"
-                placeholder={activeMode === 'ADMIN' ? 'Enter admin password' : 'PB-KEY-2026-XXXX'}
+                placeholder={activeMode === 'ADMIN' ? 'Enter admin password (default: admin@123)' : 'PB-KEY-2026-XXXX'}
                 value={loginKey}
-                onChange={(e) => handleKeyChange(e.target.value)}
+                onChange={(e) => handleKeyInputChange(e.target.value)}
                 disabled={isLocked}
                 style={{ paddingRight: '42px', fontFamily: activeMode === 'OPERATOR' ? 'var(--pb-font-mono)' : 'inherit' }}
                 required
@@ -185,9 +197,13 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                 {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
             </div>
-            {activeMode === 'OPERATOR' && (
+            {activeMode === 'OPERATOR' ? (
               <span className="pb-form-hint">
                 Format: <code>PB-KEY-YEAR-TOKEN</code> (auto-capitalized on typing)
+              </span>
+            ) : (
+              <span className="pb-form-hint">
+                Default: <code>admin@123</code> (can be customized in Admin Center)
               </span>
             )}
           </div>
