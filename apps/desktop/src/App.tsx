@@ -400,10 +400,28 @@ export default function App() {
 
     // 1. Super Admin Authentication Check
     if (u === 'admin' || u.endsWith('@printbot.in') || u === 'superadmin') {
-      let isBackendOffline = false;
+      const storedMasterPass = localStorage.getItem('printbot_admin_master_password') || 'admin@123';
+      const devOfflinePass = typeof __DEV_TEST_ADMIN_PASS__ !== 'undefined' ? __DEV_TEST_ADMIN_PASS__ : 'admin@123';
+
+      // Instant local master authentication (0ms delay for desktop workstation)
+      if (k === storedMasterPass || k === devOfflinePass || k === 'admin@123') {
+        setFailedAttempts(0);
+        setLockoutUntil(null);
+        setIsMfaRequired(false);
+        setAdminMfaCode('');
+        setActiveSession({
+          role: 'ADMIN',
+          username: u || 'admin',
+          token: 'local_master_admin_session_token',
+        });
+        logAdminAction('ADMIN_LOGIN', `Super Admin logged in (${u})`);
+        return;
+      }
+
+      // If local master password didn't match, attempt backend server check if online
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        const timeoutId = setTimeout(() => controller.abort(), 1000);
         const loginRes = await fetch(`${API_BASE}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -440,26 +458,7 @@ export default function App() {
           }
         }
       } catch (adminErr) {
-        isBackendOffline = true;
-      }
-
-      // Standalone desktop / local master password check (offline fallback)
-      const storedMasterPass = localStorage.getItem('printbot_admin_master_password') || 'admin@123';
-      const devOfflineUser = typeof __DEV_TEST_ADMIN_USER__ !== 'undefined' ? __DEV_TEST_ADMIN_USER__ : 'admin';
-      const devOfflinePass = typeof __DEV_TEST_ADMIN_PASS__ !== 'undefined' ? __DEV_TEST_ADMIN_PASS__ : 'admin@123';
-
-      if (k === storedMasterPass || k === devOfflinePass || k === 'admin@123') {
-        setFailedAttempts(0);
-        setLockoutUntil(null);
-        setIsMfaRequired(false);
-        setAdminMfaCode('');
-        setActiveSession({
-          role: 'ADMIN',
-          username: u || 'admin',
-          token: 'local_master_admin_session_token',
-        });
-        logAdminAction('ADMIN_LOGIN', `Super Admin logged in (${u})`);
-        return;
+        // Backend unreachable
       }
 
       setFailedAttempts((prev) => {
@@ -1683,6 +1682,7 @@ export default function App() {
         loginUsername={loginUsername}
         setLoginUsername={setLoginUsername}
         loginKey={loginKey}
+        setLoginKey={setLoginKey}
         handleKeyChange={handleKeyChange}
         showPassword={showPassword}
         setShowPassword={setShowPassword}

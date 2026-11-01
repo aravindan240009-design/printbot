@@ -17,6 +17,7 @@ interface LockScreenProps {
   loginUsername: string;
   setLoginUsername: (val: string) => void;
   loginKey: string;
+  setLoginKey: (val: string) => void;
   handleKeyChange: (val: string) => void;
   showPassword: boolean;
   setShowPassword: (val: boolean) => void;
@@ -32,6 +33,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   loginUsername,
   setLoginUsername,
   loginKey,
+  setLoginKey,
   handleKeyChange,
   showPassword,
   setShowPassword,
@@ -47,6 +49,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
       ? 'ADMIN'
       : 'OPERATOR'
   );
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isLocked = Boolean(lockoutUntil && new Date() < lockoutUntil);
   const remainingSeconds = lockoutUntil ? Math.max(1, Math.ceil((lockoutUntil.getTime() - Date.now()) / 1000)) : 0;
@@ -55,7 +58,11 @@ export const LockScreen: React.FC<LockScreenProps> = ({
     try {
       const text = await navigator.clipboard.readText();
       if (text) {
-        handleKeyChange(text.trim());
+        if (activeMode === 'ADMIN') {
+          setLoginKey(text.trim());
+        } else {
+          handleKeyChange(text.trim());
+        }
       }
     } catch {}
   };
@@ -75,10 +82,19 @@ export const LockScreen: React.FC<LockScreenProps> = ({
 
   const handleKeyInputChange = (val: string) => {
     if (activeMode === 'ADMIN') {
-      // Allow exact password casing and symbols for admin
-      handleKeyChange(val);
+      // In Admin mode, NEVER format or uppercase the password!
+      setLoginKey(val);
     } else {
       handleKeyChange(val);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    setIsSubmitting(true);
+    try {
+      await onUnifiedLogin(e);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -133,7 +149,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
         )}
 
         {/* Login Form */}
-        <form onSubmit={onUnifiedLogin} className="pb-lockscreen-form">
+        <form onSubmit={handleSubmit} className="pb-lockscreen-form">
           <div className="pb-form-group">
             <label className="pb-form-label">
               {activeMode === 'ADMIN' ? 'Administrator Account / Email' : 'Counter Station Username'}
@@ -247,11 +263,17 @@ export const LockScreen: React.FC<LockScreenProps> = ({
           <button
             type="submit"
             className="pb-btn pb-btn-primary pb-btn-lg"
-            disabled={isLocked}
+            disabled={isLocked || isSubmitting}
             style={{ width: '100%', marginTop: '6px' }}
           >
-            <Unlock size={16} />
-            <span>{activeMode === 'OPERATOR' ? 'Unlock Counter Station' : 'Authenticate Admin Session'}</span>
+            {isSubmitting ? (
+              <span>Authenticating...</span>
+            ) : (
+              <>
+                <Unlock size={16} />
+                <span>{activeMode === 'OPERATOR' ? 'Unlock Counter Station' : 'Authenticate Admin Session'}</span>
+              </>
+            )}
           </button>
         </form>
 
