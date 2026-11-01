@@ -4425,28 +4425,31 @@ export default function App() {
                       <div className="ws-printer-symbol">
                         <Printer size={48} />
                       </div>
-                      <h2>{prn.name}</h2>
-                      <p>{prn.status || 'Windows Print Spooler Driver'}</p>
-                      <dl>
-                        <div>
-                          <dt>Status</dt>
-                          <dd style={{ color: prn.is_online ? 'var(--pb-success)' : 'var(--pb-muted)', fontWeight: 700 }}>
-                            {prn.is_online ? 'Online / Ready' : 'Spooler Attached'}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>Color</dt>
-                          <dd>{prn.supports_color ? 'Color & Mono' : 'Monochrome'}</dd>
-                        </div>
-                        <div>
-                          <dt>Duplex</dt>
-                          <dd>{prn.supports_duplex ? 'Automatic Duplex' : 'Manual Duplex'}</dd>
-                        </div>
-                        <div>
-                          <dt>Supported Sizes</dt>
-                          <dd>{prn.supported_paper_sizes?.join(', ') || 'A4, Letter'}</dd>
-                        </div>
-                      </dl>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <h2 style={{ margin: 0, fontSize: '18px' }}>{prn.name}</h2>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '12px',
+                          fontWeight: 750,
+                          padding: '4px 10px',
+                          borderRadius: '999px',
+                          background: prn.is_online ? 'rgba(16, 185, 129, 0.12)' : 'rgba(148, 163, 184, 0.12)',
+                          color: prn.is_online ? 'var(--pb-success)' : 'var(--pb-muted)',
+                        }}>
+                          <span style={{
+                            width: '7px',
+                            height: '7px',
+                            borderRadius: '50%',
+                            background: prn.is_online ? 'var(--pb-success)' : 'var(--pb-muted)',
+                          }} />
+                          {prn.is_online ? 'Online / Ready' : 'Spooler Attached'}
+                        </span>
+                      </div>
+                      <p style={{ marginTop: '8px', minHeight: 'auto', color: 'var(--pb-muted)', fontSize: '12px' }}>
+                        {prn.status ? `Windows Spooler (${prn.status})` : 'Windows Print Spooler Driver'}
+                      </p>
                     </div>
                   ))
                 ) : printers.length > 0 ? (
@@ -4455,26 +4458,26 @@ export default function App() {
                       <div className="ws-printer-symbol">
                         <Printer size={48} />
                       </div>
-                      <h2>{prn.name}</h2>
-                      <p>{prn.driver_name}</p>
-                      <dl>
-                        <div>
-                          <dt>Port</dt>
-                          <dd>{prn.port}</dd>
-                        </div>
-                        <div>
-                          <dt>Status</dt>
-                          <dd style={{ color: 'var(--pb-success)', fontWeight: 700 }}>Online</dd>
-                        </div>
-                        <div>
-                          <dt>Color</dt>
-                          <dd>{prn.supports_color ? 'Color & Mono' : 'Monochrome'}</dd>
-                        </div>
-                        <div>
-                          <dt>Duplex</dt>
-                          <dd>{prn.supports_duplex ? 'Automatic Duplex' : 'Manual duplex'}</dd>
-                        </div>
-                      </dl>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <h2 style={{ margin: 0, fontSize: '18px' }}>{prn.name}</h2>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '12px',
+                          fontWeight: 750,
+                          padding: '4px 10px',
+                          borderRadius: '999px',
+                          background: 'rgba(16, 185, 129, 0.12)',
+                          color: 'var(--pb-success)',
+                        }}>
+                          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--pb-success)' }} />
+                          Online
+                        </span>
+                      </div>
+                      <p style={{ marginTop: '8px', minHeight: 'auto', color: 'var(--pb-muted)', fontSize: '12px' }}>
+                        {prn.driver_name || 'Windows Print Spooler Driver'}
+                      </p>
                     </div>
                   ))
                 ) : (
