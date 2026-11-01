@@ -7,8 +7,6 @@ export const ta: typeof en = {
   counterOnline: 'கவுண்டர் பிரிண்டர் தயார்',
   counterBusy: 'கவுண்டரில் அச்சிடப்படுகிறது',
   language: 'மொழி',
-  themeLight: 'வெளிச்சம்',
-  themeDark: 'இருள்',
   navHome: 'முகப்பு',
   navPrint: 'உடனடி பிரிண்ட்',
   navServices: 'சேவைகள்',

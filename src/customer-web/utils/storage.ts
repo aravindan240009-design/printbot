@@ -3,20 +3,14 @@ import { PlacedOrder, Language } from '../types';
 const THEME_KEY = 'pb_theme';
 const LANG_KEY = 'pb_lang';
 
-export function getStoredTheme(): 'light' | 'dark' {
-  try {
-    const val = localStorage.getItem(THEME_KEY);
-    if (val === 'dark' || val === 'light') return val;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  } catch {
-    return 'light';
-  }
+export function getStoredTheme(): 'light' {
+  return 'light';
 }
 
-export function setStoredTheme(theme: 'light' | 'dark'): void {
+export function setStoredTheme(_theme?: string): void {
   try {
-    localStorage.setItem(THEME_KEY, theme);
-    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem(THEME_KEY, 'light');
+    document.documentElement.setAttribute('data-theme', 'light');
   } catch {
     // ignore
   }

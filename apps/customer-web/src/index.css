@@ -3,7 +3,7 @@
    A refined, tactile, high-precision Print Atelier design system.
    ========================================================================== */
 
-:root, :root[data-theme="light"] {
+:root {
   --pb-bg: #f8fafc;
   --pb-surface: #ffffff;
   --pb-surface-alt: #f1f5f9;
@@ -71,61 +71,7 @@
   --pb-glass-border: 1px solid rgba(226, 232, 240, 0.8);
 }
 
-:root[data-theme="dark"] {
-  --pb-bg: #070a11;
-  --pb-surface: #0e1626;
-  --pb-surface-alt: #131e33;
-  --pb-raised: #182640;
-  --pb-overlay: rgba(14, 22, 38, 0.88);
-  --pb-border: #1e2e4a;
-  --pb-border-strong: #2c4166;
-  --pb-border-focus: #60a5fa;
-  --pb-rule: #17243c;
-  
-  --pb-text: #f8fafc;
-  --pb-text-secondary: #cbd5e1;
-  --pb-muted: #94a3b8;
-  --pb-faint: #64748b;
-  
-  /* Brand Palettes Dark */
-  --pb-brand: #3b82f6;
-  --pb-brand-hover: #60a5fa;
-  --pb-brand-active: #93c5fd;
-  --pb-brand-soft: #172554;
-  --pb-brand-border: #1e40af;
-  --pb-on-brand: #ffffff;
-  
-  /* Semantic Statuses Dark */
-  --pb-success: #10b981;
-  --pb-success-hover: #34d399;
-  --pb-success-soft: #064e3b;
-  --pb-success-border: #047857;
-  
-  --pb-warning: #fbbf24;
-  --pb-warning-soft: #451a03;
-  --pb-warning-border: #78350f;
-  
-  --pb-danger: #f87171;
-  --pb-danger-soft: #450a0a;
-  --pb-danger-border: #7f1d1d;
-  
-  --pb-info: #38bdf8;
-  --pb-info-soft: #082f49;
-  --pb-info-border: #075985;
 
-  --pb-cyan: #22d3ee;
-  --pb-cyan-soft: #164e63;
-  --pb-cyan-border: #0e7490;
-
-  /* Shadows Dark */
-  --pb-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --pb-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.4);
-  --pb-shadow-md: 0 6px 16px rgba(0, 0, 0, 0.45);
-  --pb-shadow-lg: 0 14px 32px rgba(0, 0, 0, 0.55);
-  --pb-shadow-card: 0 10px 30px -4px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.05);
-  --pb-shadow-floating: 0 20px 45px -8px rgba(0, 0, 0, 0.7), 0 0 15px rgba(59, 130, 246, 0.25);
-  --pb-glass-border: 1px solid rgba(255, 255, 255, 0.08);
-}
 
 /* ==========================================================================
    RESET & TYPOGRAPHY
@@ -137,7 +83,7 @@
 
 html {
   background: var(--pb-bg);
-  color-scheme: light dark;
+  color-scheme: light;
   scroll-behavior: smooth;
   font-size: 16px;
 }
@@ -200,14 +146,19 @@ button:disabled {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
   background: var(--pb-bg);
   color: var(--pb-text);
 }
 
 .pb-container {
-  width: min(var(--pb-max-width), 100%);
+  width: 100%;
+  max-width: min(var(--pb-max-width), 100%);
   margin: 0 auto;
   padding: 0 var(--pb-gutter);
+  box-sizing: border-box;
 }
 
 .pb-main-content {
@@ -401,22 +352,7 @@ button:disabled {
   color: var(--pb-muted);
 }
 
-.pb-theme-toggle-btn {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  min-height: 40px;
-  border-radius: var(--pb-radius-md);
-  background: var(--pb-surface);
-  border: 1px solid var(--pb-border);
-  color: var(--pb-text);
-}
 
-.pb-theme-toggle-btn:hover {
-  border-color: var(--pb-brand);
-  background: var(--pb-surface-alt);
-}
 
 .pb-cart-indicator-btn {
   display: inline-flex;
@@ -1440,7 +1376,7 @@ button:disabled {
   height: 60px;
   background: var(--pb-surface);
   border-top: 1px solid var(--pb-border);
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   align-items: center;
 }
 
@@ -1635,9 +1571,130 @@ button:disabled {
   }
   .pb-bottom-nav {
     display: grid;
+    grid-template-columns: repeat(4, 1fr);
   }
   .pb-services-grid {
     grid-template-columns: 1fr;
+  }
+  .pb-header-inner {
+    min-height: 56px;
+    padding: 6px 0;
+    gap: 8px;
+  }
+  .pb-header-brand {
+    gap: 8px;
+    padding: 2px;
+    min-width: 0;
+    flex-shrink: 1;
+  }
+  .pb-brand-logo-badge {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--pb-radius-sm);
+  }
+  .pb-brand-name {
+    font-size: 1.05rem;
+  }
+  .pb-brand-shop-name {
+    font-size: 0.72rem;
+    max-width: 140px;
+  }
+  .pb-header-actions {
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .pb-lang-select {
+    min-height: 36px;
+    height: 36px;
+    padding: 4px 26px 4px 10px;
+    font-size: 0.8rem;
+  }
+  .pb-lang-icon {
+    right: 8px;
+    width: 13px;
+    height: 13px;
+  }
+  .pb-cart-indicator-btn {
+    width: 38px;
+    height: 36px;
+    min-height: 36px;
+  }
+  .pb-hero-banner {
+    padding: 14px 0 10px;
+  }
+  .pb-hero-card {
+    padding: 22px 16px;
+    border-radius: 18px;
+  }
+  .pb-hero-headline {
+    font-size: 1.7rem;
+    line-height: 1.2;
+    margin-bottom: 10px;
+  }
+  .pb-hero-lead {
+    font-size: 0.88rem;
+    line-height: 1.5;
+    margin-bottom: 20px;
+  }
+  .pb-hero-actions {
+    margin-bottom: 20px;
+  }
+  .pb-hero-actions button,
+  .pb-hero-actions .pb-btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
+  .pb-hero-features-bar {
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 14px;
+  }
+  .pb-hero-feature-pill {
+    font-size: 0.8rem;
+  }
+  .pb-wizard-stepper {
+    padding: 6px 8px;
+    gap: 4px;
+    margin-bottom: 18px;
+    overflow-x: auto;
+  }
+  .pb-step-node {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    gap: 4px;
+    min-height: 32px;
+  }
+  .pb-step-number {
+    width: 20px;
+    height: 20px;
+    font-size: 0.7rem;
+  }
+  .pb-step-divider {
+    max-width: 14px;
+  }
+  .pb-upload-dropzone {
+    padding: 28px 16px;
+    border-radius: 16px;
+  }
+  .pb-upload-dropzone h3 {
+    font-size: 1.1rem;
+  }
+  .pb-upload-dropzone p {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .pb-brand-shop-name {
+    max-width: 110px;
+  }
+  .pb-lang-select {
+    max-width: 95px;
+    font-size: 0.75rem;
+    padding: 4px 22px 4px 6px;
+  }
+  .pb-hero-headline {
+    font-size: 1.5rem;
   }
 }
 

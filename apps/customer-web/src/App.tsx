@@ -33,8 +33,6 @@ import { CustomerDashboard } from './components/dashboard/CustomerDashboard';
 import { PasswordUnlockModal } from './components/common/PasswordUnlockModal';
 import { calculateDocumentQuote } from './utils/pricing';
 import {
-  getStoredTheme,
-  setStoredTheme,
   getStoredLanguage,
   setStoredLanguage,
   loadStoredOrders,
@@ -72,7 +70,6 @@ export interface CustomerWebAppProps {
 
 export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps = {}) {
   const [lang, setLang] = useState<Language>(getStoredLanguage);
-  const [theme, setTheme] = useState<'light' | 'dark'>(getStoredTheme);
   const [activeView, setActiveView] = useState<ActiveView>('home');
   const [printStep, setPrintStep] = useState<number>(1);
   const [files, setFiles] = useState<DocumentItem[]>([]);
@@ -101,11 +98,16 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
 
   const t = getTranslation(lang);
 
-  // Sync theme to root
+  // Enforce clean light mode across customer web portal
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    setStoredTheme(theme);
-  }, [theme]);
+    document.documentElement.setAttribute('data-theme', 'light');
+    document.documentElement.classList.remove('dark');
+    document.documentElement.style.colorScheme = 'light';
+    try {
+      localStorage.setItem('pb_theme', 'light');
+      localStorage.setItem('printbot-theme-v1', 'light');
+    } catch (_) {}
+  }, []);
 
   // Sync language
   useEffect(() => {
@@ -280,8 +282,6 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
         session={session}
         lang={lang}
         onLanguageChange={setLang}
-        theme={theme}
-        onThemeToggle={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
         activeView={activeView}
         onNavigate={setActiveView}
         cartCount={files.length}

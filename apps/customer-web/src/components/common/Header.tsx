@@ -1,5 +1,5 @@
 import React from 'react';
-import { Printer, Globe, Sun, Moon, ShoppingBag, Sparkles } from 'lucide-react';
+import { Printer, Globe, ShoppingBag } from 'lucide-react';
 import { Language, ShopSession, ActiveView } from '../../types';
 import { TranslationKeys } from '../../locales';
 
@@ -7,8 +7,6 @@ interface HeaderProps {
   session: ShopSession;
   lang: Language;
   onLanguageChange: (lang: Language) => void;
-  theme: 'light' | 'dark';
-  onThemeToggle: () => void;
   activeView: ActiveView;
   onNavigate: (view: ActiveView) => void;
   cartCount: number;
@@ -19,8 +17,6 @@ export const Header: React.FC<HeaderProps> = ({
   session,
   lang,
   onLanguageChange,
-  theme,
-  onThemeToggle,
   activeView,
   onNavigate,
   cartCount,
@@ -38,16 +34,10 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
           >
             <div className="pb-brand-logo-badge" aria-hidden="true">
-              <Printer size={22} />
+              <Printer size={20} />
             </div>
             <div className="pb-brand-titles">
-              <div className="pb-brand-title-row">
-                <span className="pb-brand-name">{t.brandName}</span>
-                <span className="pb-online-badge">
-                  <span className="pb-online-pulse" aria-hidden="true" />
-                  {t.counterOnline}
-                </span>
-              </div>
+              <span className="pb-brand-name">{t.brandName}</span>
               <span className="pb-brand-shop-name" title={session.shop_name}>
                 {session.shop_name || 'Print Bot Workstation'}
               </span>
@@ -86,7 +76,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </nav>
 
-          {/* Action Tools: Lang, Theme, Cart */}
+          {/* Action Tools: Lang, Cart */}
           <div className="pb-header-actions">
             {/* Language Switcher */}
             <div className="pb-lang-select-wrapper">
@@ -100,19 +90,8 @@ export const Header: React.FC<HeaderProps> = ({
                 <option value="ta">தமிழ் (Tamil)</option>
                 <option value="hi">हिन्दी (Hindi)</option>
               </select>
-              <Globe size={15} className="pb-lang-icon" aria-hidden="true" />
+              <Globe size={14} className="pb-lang-icon" aria-hidden="true" />
             </div>
-
-            {/* Dark / Light Toggle */}
-            <button
-              type="button"
-              className="pb-theme-toggle-btn"
-              onClick={onThemeToggle}
-              aria-label={`Switch to ${theme === 'dark' ? t.themeLight : t.themeDark} mode`}
-              title={`Switch to ${theme === 'dark' ? t.themeLight : t.themeDark} mode`}
-            >
-              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
 
             {/* Cart Trigger */}
             <button
@@ -131,4 +110,3 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
-

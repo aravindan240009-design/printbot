@@ -63,9 +63,16 @@ export const App: React.FC = () => {
   const shouldRenderCustomerWeb = Boolean(detectedShopSlug) || isCustomerExplicitPath;
   const activeShopSlug = detectedShopSlug || 'testcase';
 
-  // Synchronize document title when on official commercial site
+  // Synchronize document title and theme when switching between customer portal and commercial site
   useEffect(() => {
-    if (!shouldRenderCustomerWeb) {
+    if (shouldRenderCustomerWeb) {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.setAttribute('data-theme', 'light');
+      document.documentElement.style.colorScheme = 'light';
+    } else {
+      document.documentElement.classList.add('dark');
+      document.documentElement.setAttribute('data-theme', 'dark');
+      document.documentElement.style.colorScheme = 'dark';
       document.title = 'Print Bot — Desktop Printing and Shop Manager for Windows';
     }
   }, [shouldRenderCustomerWeb]);

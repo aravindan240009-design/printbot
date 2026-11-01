@@ -7,8 +7,6 @@ export const hi: typeof en = {
   counterOnline: 'काउंटर प्रिंटर ऑनलाइन है',
   counterBusy: 'काउंटर पर छपाई जारी है',
   language: 'भाषा',
-  themeLight: 'लाइट',
-  themeDark: 'डार्क',
   navHome: 'होम',
   navPrint: 'प्रिंट करें',
   navServices: 'सेवाएं',

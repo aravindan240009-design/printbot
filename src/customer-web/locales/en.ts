@@ -5,8 +5,6 @@ export const en = {
   counterOnline: 'Counter Spooler Online',
   counterBusy: 'Counter Printing Active',
   language: 'Language',
-  themeLight: 'Light',
-  themeDark: 'Dark',
   navHome: 'Home',
   navPrint: 'Print Now',
   navServices: 'Services',
