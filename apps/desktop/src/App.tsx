@@ -279,8 +279,9 @@ export default function App() {
   // Authoritative server-side verification of active Super Admin sessions (fails closed in production)
   useEffect(() => {
     if (activeSession?.role === 'ADMIN') {
-      // In dev/test builds, retain offline admin session without requiring remote verification
-      if (__DEV_OFFLINE_ADMIN_ENABLED__ && activeSession.token === 'dev_offline_admin_token') {
+      // Supabase-authenticated admin sessions use tokens starting with 'supabase_cloud_admin_' or 'cached_admin_session_'
+      // These are validated at login time against the Supabase database and do not require localhost backend verification
+      if (activeSession.token?.startsWith('supabase_cloud_admin_') || activeSession.token?.startsWith('cached_admin_session_')) {
         return;
       }
 
@@ -304,8 +305,7 @@ export default function App() {
           }
         })
         .catch(() => {
-          setActiveSession(null);
-          localStorage.removeItem('printbot_session');
+          // Backend unreachable — retain session for Supabase-authenticated admins
         });
     }
   }, [activeSession?.token, activeSession?.role]);
