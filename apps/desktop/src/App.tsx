@@ -66,6 +66,11 @@ export interface ShopLicense {
     bwPerSideRupees: number;
     colorPerSideRupees: number;
     duplexDiscountPercent: number;
+    photoRate?: number;
+    stapleRate?: number;
+    spiralRate?: number;
+    hardBoundRate?: number;
+    cardRate?: number;
   };
   orderMode: 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC';
   status: 'ACTIVE' | 'REVOKED';
@@ -573,6 +578,30 @@ export default function App() {
           await bindWorkstation(devToken);
         } catch {}
 
+        let parsedBw = 1.5;
+        let parsedColor = 10.0;
+        let parsedDuplex = 15;
+        let parsedPhoto = 30.0;
+        let parsedStaple = 5.0;
+        let parsedSpiral = 40.0;
+        let parsedHard = 150.0;
+        let parsedCard = 15.0;
+        let parsedOrderMode: 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC' = 'MANUAL_APPROVAL';
+        if (cloudApp.notes) {
+          try {
+            const p = typeof cloudApp.notes === 'string' ? JSON.parse(cloudApp.notes) : cloudApp.notes;
+            if (p.bwRate !== undefined) parsedBw = Number(p.bwRate);
+            if (p.colorRate !== undefined) parsedColor = Number(p.colorRate);
+            if (p.duplexDiscountPercent !== undefined) parsedDuplex = Number(p.duplexDiscountPercent);
+            if (p.photoRate !== undefined) parsedPhoto = Number(p.photoRate);
+            if (p.stapleRate !== undefined) parsedStaple = Number(p.stapleRate);
+            if (p.spiralRate !== undefined) parsedSpiral = Number(p.spiralRate);
+            if (p.hardBoundRate !== undefined) parsedHard = Number(p.hardBoundRate);
+            if (p.cardRate !== undefined) parsedCard = Number(p.cardRate);
+            if (p.orderMode) parsedOrderMode = p.orderMode;
+          } catch {}
+        }
+
         const newLic: ShopLicense = {
           username: u,
           appId: app.id,
@@ -582,11 +611,16 @@ export default function App() {
           phone: app.contactNumber.startsWith('+91') ? app.contactNumber : `+91 ${app.contactNumber}`,
           upiId: `${u}@upi`,
           rates: {
-            bwPerSideRupees: 1.5,
-            colorPerSideRupees: 10.0,
-            duplexDiscountPercent: 15,
+            bwPerSideRupees: parsedBw,
+            colorPerSideRupees: parsedColor,
+            duplexDiscountPercent: parsedDuplex,
+            photoRate: parsedPhoto,
+            stapleRate: parsedStaple,
+            spiralRate: parsedSpiral,
+            hardBoundRate: parsedHard,
+            cardRate: parsedCard,
           },
-          orderMode: 'MANUAL_APPROVAL',
+          orderMode: parsedOrderMode,
           status: 'ACTIVE',
           expiresAt: expiry.toISOString().split('T')[0],
           isConfigured: true,
@@ -632,6 +666,12 @@ export default function App() {
   const [setupPhone, setSetupPhone] = useState(currentShop?.phone || '');
   const [setupBwRate, setSetupBwRate] = useState(currentShop?.rates?.bwPerSideRupees ?? 1.5);
   const [setupColorRate, setSetupColorRate] = useState(currentShop?.rates?.colorPerSideRupees ?? 10.0);
+  const [setupDuplexDiscount, setSetupDuplexDiscount] = useState(currentShop?.rates?.duplexDiscountPercent ?? 15);
+  const [setupPhotoRate, setSetupPhotoRate] = useState(currentShop?.rates?.photoRate ?? 30.0);
+  const [setupStapleRate, setSetupStapleRate] = useState(currentShop?.rates?.stapleRate ?? 5.0);
+  const [setupSpiralRate, setSetupSpiralRate] = useState(currentShop?.rates?.spiralRate ?? 40.0);
+  const [setupHardBoundRate, setSetupHardBoundRate] = useState(currentShop?.rates?.hardBoundRate ?? 150.0);
+  const [setupCardRate, setSetupCardRate] = useState(currentShop?.rates?.cardRate ?? 15.0);
   const [setupOrderMode, setSetupOrderMode] = useState<'MANUAL_APPROVAL' | 'FULL_AUTOMATIC'>(
     currentShop?.orderMode || 'MANUAL_APPROVAL'
   );
@@ -645,6 +685,12 @@ export default function App() {
       if (currentShop.rates) {
         setSetupBwRate(currentShop.rates.bwPerSideRupees ?? 1.5);
         setSetupColorRate(currentShop.rates.colorPerSideRupees ?? 10.0);
+        setSetupDuplexDiscount(currentShop.rates.duplexDiscountPercent ?? 15);
+        setSetupPhotoRate(currentShop.rates.photoRate ?? 30.0);
+        setSetupStapleRate(currentShop.rates.stapleRate ?? 5.0);
+        setSetupSpiralRate(currentShop.rates.spiralRate ?? 40.0);
+        setSetupHardBoundRate(currentShop.rates.hardBoundRate ?? 150.0);
+        setSetupCardRate(currentShop.rates.cardRate ?? 15.0);
       }
       if (currentShop.orderMode) setSetupOrderMode(currentShop.orderMode);
     }
@@ -4586,14 +4632,28 @@ export default function App() {
                     const u = activeSession.username;
                     const bw = Number(setupBwRate) || 1.5;
                     const color = Number(setupColorRate) || 10.0;
+                    const duplex = Number(setupDuplexDiscount) || 15;
+                    const photo = Number(setupPhotoRate) || 30.0;
+                    const staple = Number(setupStapleRate) || 5.0;
+                    const spiral = Number(setupSpiralRate) || 40.0;
+                    const hardBound = Number(setupHardBoundRate) || 150.0;
+                    const card = Number(setupCardRate) || 15.0;
+
+                    const updatedRates = {
+                      bwPerSideRupees: bw,
+                      colorPerSideRupees: color,
+                      duplexDiscountPercent: duplex,
+                      photoRate: photo,
+                      stapleRate: staple,
+                      spiralRate: spiral,
+                      hardBoundRate: hardBound,
+                      cardRate: card,
+                    };
+
                     setLicenses((prev) => {
                       const updated = {
                         ...prev[u],
-                        rates: {
-                          bwPerSideRupees: bw,
-                          colorPerSideRupees: color,
-                          duplexDiscountPercent: 15,
-                        },
+                        rates: updatedRates,
                         orderMode: setupOrderMode,
                       };
                       return {
@@ -4608,7 +4668,18 @@ export default function App() {
                     try {
                       const shopName = currentShop?.shopName || setupShopName || u;
                       const username = currentShop?.username || u;
-                      const notesPayload = JSON.stringify({ bwRate: bw, colorRate: color, updatedAt: new Date().toISOString() });
+                      const notesPayload = JSON.stringify({
+                        bwRate: bw,
+                        colorRate: color,
+                        duplexDiscountPercent: duplex,
+                        photoRate: photo,
+                        stapleRate: staple,
+                        spiralRate: spiral,
+                        hardBoundRate: hardBound,
+                        cardRate: card,
+                        orderMode: setupOrderMode,
+                        updatedAt: new Date().toISOString(),
+                      });
 
                       // 1. Try updating by direct row id if known
                       let updated = false;
@@ -4689,18 +4760,19 @@ export default function App() {
                     />
                   </div>
 
-                  {/* Per-Page Pricing Rates (INR ₹) */}
+                  {/* Counter Services & Pricing Rates (INR ₹) */}
                   <div style={{ borderTop: '1px solid var(--pb-border)', paddingTop: '16px' }}>
                     <h3 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px' }}>
-                      Per-Page Pricing Rates (INR ₹)
+                      Counter Services &amp; Pricing Rates (INR ₹)
                     </h3>
-                    <p style={{ color: 'var(--pb-muted)', fontSize: '12px', margin: '0 0 12px' }}>
-                      These rates calculate customer preview quotes and counter receipts.
+                    <p style={{ color: 'var(--pb-muted)', fontSize: '12px', margin: '0 0 14px' }}>
+                      Customize your shop's per-page and service rates. These instantly update your customer web portal.
                     </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '14px' }}>
                       <div>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                          Black &amp; White Rate per Page (₹)
+                          B&amp;W Document Rate (₹)
                         </label>
                         <input
                           type="number"
@@ -4713,7 +4785,7 @@ export default function App() {
                       </div>
                       <div>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                          Full Color Rate per Page (₹)
+                          Color Document Rate (₹)
                         </label>
                         <input
                           type="number"
@@ -4721,6 +4793,91 @@ export default function App() {
                           min="1"
                           value={setupColorRate}
                           onChange={(e) => setSetupColorRate(Number(e.target.value))}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                          Duplex Discount (%)
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          min="0"
+                          max="50"
+                          value={setupDuplexDiscount}
+                          onChange={(e) => setSetupDuplexDiscount(Number(e.target.value))}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                          Passport &amp; Photo Print (₹ / 8-sheet)
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          min="5"
+                          value={setupPhotoRate}
+                          onChange={(e) => setSetupPhotoRate(Number(e.target.value))}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                          Certificates &amp; Heavy Card Rate (₹)
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          min="1"
+                          value={setupCardRate}
+                          onChange={(e) => setSetupCardRate(Number(e.target.value))}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                          Corner Staple (+₹)
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          min="0"
+                          value={setupStapleRate}
+                          onChange={(e) => setSetupStapleRate(Number(e.target.value))}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                          Spiral Binding (+₹)
+                        </label>
+                        <input
+                          type="number"
+                          step="5"
+                          min="0"
+                          value={setupSpiralRate}
+                          onChange={(e) => setSetupSpiralRate(Number(e.target.value))}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                          Hard Bound (+₹)
+                        </label>
+                        <input
+                          type="number"
+                          step="10"
+                          min="0"
+                          value={setupHardBoundRate}
+                          onChange={(e) => setSetupHardBoundRate(Number(e.target.value))}
                           required
                         />
                       </div>

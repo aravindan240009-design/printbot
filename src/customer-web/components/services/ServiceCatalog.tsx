@@ -26,78 +26,93 @@ export const ServiceCatalog: React.FC<ServiceCatalogProps> = ({ t, rates, onSele
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const services = useMemo(
-    () => [
-      {
-        id: 'doc_print',
-        category: 'docs',
-        title: t.serviceDocPrintTitle,
-        description: t.serviceDocPrintDesc,
-        icon: <FileText size={24} />,
-        price: `₹${(rates?.bwPerSideRupees ?? 1.5).toFixed(2)} / page`,
-        turnaround: 'Instant Counter Print',
-        badge: 'Most Popular',
-        badgeColor: 'brand',
-        features: [
-          'A4, A3, Legal, Letter',
-          'Black & White or Color',
-          `Single or Double-sided (Save ${rates?.duplexDiscountPercent ?? 15}%)`,
-        ],
-        targetView: 'print' as ActiveView,
-      },
-      {
-        id: 'photo_print',
-        category: 'photo',
-        title: t.servicePhotoTitle,
-        description: t.servicePhotoDesc,
-        icon: <Camera size={24} />,
-        price: '₹30.00 / 8-sheet',
-        turnaround: 'High Gloss Finish',
-        badge: 'Studio Quality',
-        badgeColor: 'amber',
-        features: ['8-Up Passport Photo Grid', 'ID Card Front & Back on 1 page', '220 GSM Premium Glossy Card'],
-        targetView: 'print' as ActiveView,
-      },
-      {
-        id: 'binding_thesis',
-        category: 'binding',
-        title: t.serviceBindingTitle,
-        description: t.serviceBindingDesc,
-        icon: <BookOpen size={24} />,
-        price: 'From +₹5.00',
-        turnaround: '5–15 mins',
-        badge: 'Thesis Grade',
-        badgeColor: 'emerald',
-        features: ['Corner Staple (+₹5)', 'Spiral Coil with OHP Sheet (+₹40)', 'Executive Hard Bound (+₹150)'],
-        targetView: 'print' as ActiveView,
-      },
-      {
-        id: 'cert_print',
-        category: 'docs',
-        title: 'Certificates & Heavy Card',
-        description: 'Crisp printing on 100 GSM Bond and 220 GSM Ivory cardstock for diplomas and official documents.',
-        icon: <Award size={24} />,
-        price: 'From ₹15.00',
-        turnaround: 'Archival Grade',
-        badge: 'Non-Smudge',
-        badgeColor: 'emerald',
-        features: ['220 GSM Heavy Ivory Card', 'High-density pigment toner', 'No ink bleed or smudge'],
-        targetView: 'print' as ActiveView,
-      },
-      {
-        id: 'nup_booklet',
-        category: 'docs',
-        title: 'Booklet & Study Handouts (N-Up)',
-        description: 'Condense large syllabus, lecture slides, and notes into 2-up, 4-up, or 6-up handouts.',
-        icon: <Layers size={24} />,
-        price: 'Save up to 60%',
-        turnaround: 'Paper Saver',
-        badge: 'Student Favorite',
-        badgeColor: 'brand',
-        features: ['2 / 4 / 6 / 9 / 16 pages per sheet', 'Perfect for exam revision booklets', 'Automatic margin scaling'],
-        targetView: 'print' as ActiveView,
-      },
-    ],
-    [t]
+    () => {
+      const bwPrice = rates?.bwPerSideRupees ?? 1.5;
+      const colorPrice = rates?.colorPerSideRupees ?? 10.0;
+      const duplexDiscount = rates?.duplexDiscountPercent ?? 15;
+      const photoPrice = rates?.photoRate ?? 30.0;
+      const staplePrice = rates?.stapleRate ?? 5.0;
+      const spiralPrice = rates?.spiralRate ?? 40.0;
+      const hardBoundPrice = rates?.hardBoundRate ?? 150.0;
+      const cardPrice = rates?.cardRate ?? 15.0;
+
+      return [
+        {
+          id: 'doc_print',
+          category: 'docs',
+          title: t.serviceDocPrintTitle,
+          description: t.serviceDocPrintDesc,
+          icon: <FileText size={24} />,
+          price: `₹${bwPrice.toFixed(2)} / page`,
+          turnaround: 'Instant Counter Print',
+          badge: 'Most Popular',
+          badgeColor: 'brand',
+          features: [
+            'A4, A3, Legal, Letter',
+            `B&W (₹${bwPrice.toFixed(2)}) · Color (₹${colorPrice.toFixed(2)})`,
+            `Single or Double-sided (Save ${duplexDiscount}%)`,
+          ],
+          targetView: 'print' as ActiveView,
+        },
+        {
+          id: 'photo_print',
+          category: 'photo',
+          title: t.servicePhotoTitle,
+          description: t.servicePhotoDesc,
+          icon: <Camera size={24} />,
+          price: `₹${photoPrice.toFixed(2)} / 8-sheet`,
+          turnaround: 'High Gloss Finish',
+          badge: 'Studio Quality',
+          badgeColor: 'amber',
+          features: ['8-Up Passport Photo Grid', 'ID Card Front & Back on 1 page', '220 GSM Premium Glossy Card'],
+          targetView: 'print' as ActiveView,
+        },
+        {
+          id: 'binding_thesis',
+          category: 'binding',
+          title: t.serviceBindingTitle,
+          description: t.serviceBindingDesc,
+          icon: <BookOpen size={24} />,
+          price: `From +₹${staplePrice.toFixed(2)}`,
+          turnaround: '5–15 mins',
+          badge: 'Thesis Grade',
+          badgeColor: 'emerald',
+          features: [
+            `Corner Staple (+₹${staplePrice})`,
+            `Spiral Coil with OHP Sheet (+₹${spiralPrice})`,
+            `Executive Hard Bound (+₹${hardBoundPrice})`,
+          ],
+          targetView: 'print' as ActiveView,
+        },
+        {
+          id: 'cert_print',
+          category: 'docs',
+          title: 'Certificates & Heavy Card',
+          description: 'Crisp printing on 100 GSM Bond and 220 GSM Ivory cardstock for diplomas and official documents.',
+          icon: <Award size={24} />,
+          price: `From ₹${cardPrice.toFixed(2)}`,
+          turnaround: 'Archival Grade',
+          badge: 'Non-Smudge',
+          badgeColor: 'emerald',
+          features: ['220 GSM Heavy Ivory Card', 'High-density pigment toner', 'No ink bleed or smudge'],
+          targetView: 'print' as ActiveView,
+        },
+        {
+          id: 'nup_booklet',
+          category: 'docs',
+          title: 'Booklet & Study Handouts (N-Up)',
+          description: 'Condense large syllabus, lecture slides, and notes into 2-up, 4-up, or 6-up handouts.',
+          icon: <Layers size={24} />,
+          price: `Save up to ${duplexDiscount}%`,
+          turnaround: 'Paper Saver',
+          badge: 'Student Favorite',
+          badgeColor: 'brand',
+          features: ['2 / 4 / 6 / 9 / 16 pages per sheet', 'Perfect for exam revision booklets', 'Automatic margin scaling'],
+          targetView: 'print' as ActiveView,
+        },
+      ];
+    },
+    [t, rates]
   );
 
   const categories = [

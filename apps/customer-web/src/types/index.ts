@@ -75,6 +75,11 @@ export interface ShopRates {
   bwPerSideRupees: number;
   colorPerSideRupees: number;
   duplexDiscountPercent?: number;
+  photoRate?: number;
+  stapleRate?: number;
+  spiralRate?: number;
+  hardBoundRate?: number;
+  cardRate?: number;
 }
 
 export interface ShopSession {

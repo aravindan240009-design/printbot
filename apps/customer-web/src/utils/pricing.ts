@@ -105,6 +105,10 @@ export function calculateDocumentQuote(
     bwPerSideRupees?: number;
     colorPerSideRupees?: number;
     duplexDiscountPercent?: number;
+    stapleRate?: number;
+    spiralRate?: number;
+    hardBoundRate?: number;
+    cardRate?: number;
   }
 ): ServerQuote {
   let totalLogicalPages = 0;
@@ -172,10 +176,14 @@ export function calculateDocumentQuote(
       }
     }
 
-    // Finishing charges per copy
-    if (f.options.finishing === 'staple') filePaise += 500 * copies;
-    if (f.options.finishing === 'spiral') filePaise += 4000 * copies;
-    if (f.options.finishing === 'hard_bind') filePaise += 15000 * copies;
+    // Finishing charges per copy (customized by shop owner in desktop workstation)
+    const stapleCostPaise = Math.round((customRates?.stapleRate ?? 5.0) * 100);
+    const spiralCostPaise = Math.round((customRates?.spiralRate ?? 40.0) * 100);
+    const hardBoundCostPaise = Math.round((customRates?.hardBoundRate ?? 150.0) * 100);
+
+    if (f.options.finishing === 'staple') filePaise += stapleCostPaise * copies;
+    if (f.options.finishing === 'spiral') filePaise += spiralCostPaise * copies;
+    if (f.options.finishing === 'hard_bind') filePaise += hardBoundCostPaise * copies;
 
     totalPaise += filePaise;
   });

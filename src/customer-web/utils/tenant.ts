@@ -125,6 +125,12 @@ export async function loadShopProfile(slug: string): Promise<ShopSession> {
     if (appData) {
       let customBw = 1.5;
       let customColor = 10.0;
+      let customDuplex = 15;
+      let customPhoto = 30.0;
+      let customStaple = 5.0;
+      let customSpiral = 40.0;
+      let customHardBound = 150.0;
+      let customCard = 15.0;
       let customOrderMode: 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC' = 'FULL_AUTOMATIC';
 
       // Parse custom pricing rates synced by the shop owner's desktop exe
@@ -134,6 +140,12 @@ export async function loadShopProfile(slug: string): Promise<ShopSession> {
             typeof appData.notes === 'string' ? JSON.parse(appData.notes) : appData.notes;
           if (parsed.bwRate !== undefined) customBw = Number(parsed.bwRate);
           if (parsed.colorRate !== undefined) customColor = Number(parsed.colorRate);
+          if (parsed.duplexDiscountPercent !== undefined) customDuplex = Number(parsed.duplexDiscountPercent);
+          if (parsed.photoRate !== undefined) customPhoto = Number(parsed.photoRate);
+          if (parsed.stapleRate !== undefined) customStaple = Number(parsed.stapleRate);
+          if (parsed.spiralRate !== undefined) customSpiral = Number(parsed.spiralRate);
+          if (parsed.hardBoundRate !== undefined) customHardBound = Number(parsed.hardBoundRate);
+          if (parsed.cardRate !== undefined) customCard = Number(parsed.cardRate);
           if (parsed.orderMode) customOrderMode = parsed.orderMode;
         } catch (e) {
           console.warn('Failed to parse shop notes JSON:', e);
@@ -151,7 +163,12 @@ export async function loadShopProfile(slug: string): Promise<ShopSession> {
         rates: {
           bwPerSideRupees: customBw,
           colorPerSideRupees: customColor,
-          duplexDiscountPercent: 15,
+          duplexDiscountPercent: customDuplex,
+          photoRate: customPhoto,
+          stapleRate: customStaple,
+          spiralRate: customSpiral,
+          hardBoundRate: customHardBound,
+          cardRate: customCard,
         },
         orderMode: customOrderMode,
         expires_at: new Date(Date.now() + 86400000).toISOString(),
@@ -189,6 +206,12 @@ export function subscribeToShopRealtime(
         if (rowUser === cleanId || rowName === cleanId) {
           let customBw = 1.5;
           let customColor = 10.0;
+          let customDuplex = 15;
+          let customPhoto = 30.0;
+          let customStaple = 5.0;
+          let customSpiral = 40.0;
+          let customHardBound = 150.0;
+          let customCard = 15.0;
           let orderMode: 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC' = 'FULL_AUTOMATIC';
 
           if (row.notes) {
@@ -197,6 +220,12 @@ export function subscribeToShopRealtime(
                 typeof row.notes === 'string' ? JSON.parse(row.notes) : row.notes;
               if (parsed.bwRate !== undefined) customBw = Number(parsed.bwRate);
               if (parsed.colorRate !== undefined) customColor = Number(parsed.colorRate);
+              if (parsed.duplexDiscountPercent !== undefined) customDuplex = Number(parsed.duplexDiscountPercent);
+              if (parsed.photoRate !== undefined) customPhoto = Number(parsed.photoRate);
+              if (parsed.stapleRate !== undefined) customStaple = Number(parsed.stapleRate);
+              if (parsed.spiralRate !== undefined) customSpiral = Number(parsed.spiralRate);
+              if (parsed.hardBoundRate !== undefined) customHardBound = Number(parsed.hardBoundRate);
+              if (parsed.cardRate !== undefined) customCard = Number(parsed.cardRate);
               if (parsed.orderMode) orderMode = parsed.orderMode;
             } catch {}
           }
@@ -208,7 +237,12 @@ export function subscribeToShopRealtime(
             rates: {
               bwPerSideRupees: customBw,
               colorPerSideRupees: customColor,
-              duplexDiscountPercent: 15,
+              duplexDiscountPercent: customDuplex,
+              photoRate: customPhoto,
+              stapleRate: customStaple,
+              spiralRate: customSpiral,
+              hardBoundRate: customHardBound,
+              cardRate: customCard,
             },
             orderMode,
           });
