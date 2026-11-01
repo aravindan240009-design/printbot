@@ -19,6 +19,7 @@ import {
   PaperGsm,
   FinishingOption,
   PhotoPreset,
+  ShopRates,
 } from '../../types';
 import { TranslationKeys } from '../../locales';
 import { VisualPageRangePicker } from './VisualPageRangePicker';
@@ -31,6 +32,7 @@ interface DocumentConfiguratorProps {
   onToggleApplyToAll: (checked: boolean) => void;
   onUpdateOptions: (patch: Partial<PrintOptions>) => void;
   t: TranslationKeys;
+  rates?: ShopRates;
 }
 
 export const DocumentConfigurator: React.FC<DocumentConfiguratorProps> = ({
@@ -41,6 +43,7 @@ export const DocumentConfigurator: React.FC<DocumentConfiguratorProps> = ({
   onToggleApplyToAll,
   onUpdateOptions,
   t,
+  rates,
 }) => {
   const options = activeFile.options;
 
@@ -187,13 +190,15 @@ export const DocumentConfigurator: React.FC<DocumentConfiguratorProps> = ({
         </div>
       </div>
 
-      {/* Duplex (Print Sides) with 15% discount badge */}
+      {/* Duplex (Print Sides) */}
       <div className="pb-form-group">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
           <label className="pb-form-label" style={{ margin: 0 }}>{t.duplex}</label>
-          <span style={{ fontSize: '0.72rem', background: 'var(--pb-success-soft)', color: 'var(--pb-success)', padding: '2px 7px', borderRadius: 'var(--pb-radius-full)', fontWeight: 750, border: '1px solid var(--pb-success-border)' }}>
-            🌱 Save 15% on 2-Sided
-          </span>
+          {rates?.duplexDiscountPercent && rates.duplexDiscountPercent > 0 ? (
+            <span style={{ fontSize: '0.72rem', background: 'var(--pb-success-soft)', color: 'var(--pb-success)', padding: '2px 7px', borderRadius: 'var(--pb-radius-full)', fontWeight: 750, border: '1px solid var(--pb-success-border)' }}>
+              🌱 Save {rates.duplexDiscountPercent}% on 2-Sided
+            </span>
+          ) : null}
         </div>
         <div className="pb-pill-grid">
           <button

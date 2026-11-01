@@ -119,7 +119,7 @@ export function calculateDocumentQuote(
   const bwRatePaise = Math.round((customRates?.bwPerSideRupees ?? 1.5) * 100);
   const colorRatePaise = Math.round((customRates?.colorPerSideRupees ?? 10.0) * 100);
   const grayscaleRatePaise = Math.round(bwRatePaise * 1.33);
-  const duplexDiscountFactor = 1 - (customRates?.duplexDiscountPercent ?? 15) / 100;
+  const duplexDiscountFactor = 1 - (customRates?.duplexDiscountPercent ?? 0) / 100;
 
   files.forEach((f) => {
     const rawPages = f.pageCount && f.pageCount > 0 ? f.pageCount : 1;

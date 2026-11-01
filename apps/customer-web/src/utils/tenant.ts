@@ -132,12 +132,16 @@ export async function loadShopProfile(slug: string): Promise<ShopSession> {
       let customHardBound = 150.0;
       let customCard = 15.0;
       let customOrderMode: 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC' = 'FULL_AUTOMATIC';
+      let customServices: any[] | undefined = undefined;
 
-      // Parse custom pricing rates synced by the shop owner's desktop exe
+      // Parse custom pricing rates and services synced by the shop owner's desktop exe
       if (appData.notes) {
         try {
           const parsed =
             typeof appData.notes === 'string' ? JSON.parse(appData.notes) : appData.notes;
+          if (parsed.services && Array.isArray(parsed.services)) {
+            customServices = parsed.services;
+          }
           if (parsed.bwRate !== undefined) customBw = Number(parsed.bwRate);
           if (parsed.colorRate !== undefined) customColor = Number(parsed.colorRate);
           if (parsed.duplexDiscountPercent !== undefined) customDuplex = Number(parsed.duplexDiscountPercent);
@@ -170,6 +174,7 @@ export async function loadShopProfile(slug: string): Promise<ShopSession> {
           hardBoundRate: customHardBound,
           cardRate: customCard,
         },
+        services: customServices,
         orderMode: customOrderMode,
         expires_at: new Date(Date.now() + 86400000).toISOString(),
       };
@@ -213,11 +218,15 @@ export function subscribeToShopRealtime(
           let customHardBound = 150.0;
           let customCard = 15.0;
           let orderMode: 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC' = 'FULL_AUTOMATIC';
+          let customServices: any[] | undefined = undefined;
 
           if (row.notes) {
             try {
               const parsed =
                 typeof row.notes === 'string' ? JSON.parse(row.notes) : row.notes;
+              if (parsed.services && Array.isArray(parsed.services)) {
+                customServices = parsed.services;
+              }
               if (parsed.bwRate !== undefined) customBw = Number(parsed.bwRate);
               if (parsed.colorRate !== undefined) customColor = Number(parsed.colorRate);
               if (parsed.duplexDiscountPercent !== undefined) customDuplex = Number(parsed.duplexDiscountPercent);
@@ -244,6 +253,7 @@ export function subscribeToShopRealtime(
               hardBoundRate: customHardBound,
               cardRate: customCard,
             },
+            services: customServices,
             orderMode,
           });
         }

@@ -124,11 +124,12 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
   // Dynamic Shop Resolution: load profile & subscribe to live rate updates from Desktop Workstation
   useEffect(() => {
     if (!resolvedSlug) return;
+    document.title = `${resolvedSlug.toUpperCase()} • Touchless Print Counter`;
     let unsubRealtime: (() => void) | undefined;
 
     loadShopProfile(resolvedSlug).then((profile) => {
       setSession(profile);
-      document.title = `${profile.shop_name} — Instant Mobile Printing`;
+      document.title = `${profile.shop_name} • Touchless Print Counter`;
     });
 
     unsubRealtime = subscribeToShopRealtime(resolvedSlug, (updated) => {
@@ -136,6 +137,7 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
         ...prev,
         ...updated,
         rates: updated.rates ? { ...prev.rates, ...updated.rates } : prev.rates,
+        services: updated.services !== undefined ? updated.services : prev.services,
       }));
     });
 
@@ -339,6 +341,7 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
               <ServiceCatalog
                 t={t}
                 rates={session.rates}
+                services={session.services}
                 onSelectService={(serviceKey, targetView) => {
                   setActiveView(targetView);
                   if (serviceKey === 'photo_print') {
@@ -468,6 +471,7 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
                       onToggleApplyToAll={setApplyAll}
                       onUpdateOptions={handleUpdateOptions}
                       t={t}
+                      rates={session.rates}
                     />
 
                     <LivePriceBreakdown
@@ -488,6 +492,7 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
               <ServiceCatalog
                 t={t}
                 rates={session.rates}
+                services={session.services}
                 onSelectService={(serviceKey, targetView) => {
                   setActiveView(targetView);
                 }}

@@ -82,6 +82,19 @@ export interface ShopRates {
   cardRate?: number;
 }
 
+export interface ShopServiceItem {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  priceDisplay: string;
+  badge?: string;
+  turnaround?: string;
+  features: string[];
+  hasDiscount?: boolean;
+  discountNote?: string;
+}
+
 export interface ShopSession {
   session_token: string;
   shop_id: string;
@@ -91,6 +104,7 @@ export interface ShopSession {
   shop_phone?: string;
   operating_hours?: string;
   rates?: ShopRates;
+  services?: ShopServiceItem[];
   orderMode?: 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC';
   expires_at: string;
 }

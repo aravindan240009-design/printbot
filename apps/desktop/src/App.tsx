@@ -55,6 +55,19 @@ const API_BASE = ((import.meta as any).env?.VITE_API_BASE_URL || 'http://localho
 
 // --- Models & Contracts ---
 
+export interface ShopServiceItem {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  priceDisplay: string;
+  badge?: string;
+  turnaround?: string;
+  features: string[];
+  hasDiscount?: boolean;
+  discountNote?: string;
+}
+
 export interface ShopLicense {
   username: string;
   licenseKey: string;
@@ -72,6 +85,7 @@ export interface ShopLicense {
     hardBoundRate?: number;
     cardRate?: number;
   };
+  services?: ShopServiceItem[];
   orderMode: 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC';
   status: 'ACTIVE' | 'REVOKED';
   expiresAt: string;
@@ -190,7 +204,7 @@ try {
 const INITIAL_LICENSES: Record<string, ShopLicense> = {};
 
 type AppScreen = 'LOCK_SCREEN' | 'SETUP_WIZARD' | 'WORKSTATION' | 'ADMIN_PORTAL';
-type Tab = 'queue' | 'printers' | 'website' | 'settings';
+type Tab = 'queue' | 'printers' | 'services' | 'website' | 'settings';
 
 function Dialog({
   title,
@@ -587,9 +601,11 @@ export default function App() {
         let parsedHard = 150.0;
         let parsedCard = 15.0;
         let parsedOrderMode: 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC' = 'MANUAL_APPROVAL';
+        let parsedServices: ShopServiceItem[] | undefined = undefined;
         if (cloudApp.notes) {
           try {
             const p = typeof cloudApp.notes === 'string' ? JSON.parse(cloudApp.notes) : cloudApp.notes;
+            if (p.services && Array.isArray(p.services)) parsedServices = p.services;
             if (p.bwRate !== undefined) parsedBw = Number(p.bwRate);
             if (p.colorRate !== undefined) parsedColor = Number(p.colorRate);
             if (p.duplexDiscountPercent !== undefined) parsedDuplex = Number(p.duplexDiscountPercent);
@@ -620,6 +636,7 @@ export default function App() {
             hardBoundRate: parsedHard,
             cardRate: parsedCard,
           },
+          services: parsedServices,
           orderMode: parsedOrderMode,
           status: 'ACTIVE',
           expiresAt: expiry.toISOString().split('T')[0],
@@ -664,17 +681,83 @@ export default function App() {
   const [setupShopName, setSetupShopName] = useState(currentShop?.shopName || '');
   const [setupLocation, setSetupLocation] = useState(currentShop?.location || '');
   const [setupPhone, setSetupPhone] = useState(currentShop?.phone || '');
-  const [setupBwRate, setSetupBwRate] = useState(currentShop?.rates?.bwPerSideRupees ?? 1.5);
-  const [setupColorRate, setSetupColorRate] = useState(currentShop?.rates?.colorPerSideRupees ?? 10.0);
-  const [setupDuplexDiscount, setSetupDuplexDiscount] = useState(currentShop?.rates?.duplexDiscountPercent ?? 15);
-  const [setupPhotoRate, setSetupPhotoRate] = useState(currentShop?.rates?.photoRate ?? 30.0);
-  const [setupStapleRate, setSetupStapleRate] = useState(currentShop?.rates?.stapleRate ?? 5.0);
-  const [setupSpiralRate, setSetupSpiralRate] = useState(currentShop?.rates?.spiralRate ?? 40.0);
-  const [setupHardBoundRate, setSetupHardBoundRate] = useState(currentShop?.rates?.hardBoundRate ?? 150.0);
-  const [setupCardRate, setSetupCardRate] = useState(currentShop?.rates?.cardRate ?? 15.0);
   const [setupOrderMode, setSetupOrderMode] = useState<'MANUAL_APPROVAL' | 'FULL_AUTOMATIC'>(
     currentShop?.orderMode || 'MANUAL_APPROVAL'
   );
+
+  // --- Dedicated Services Catalog State ---
+  const DEFAULT_SHOP_SERVICES: ShopServiceItem[] = [
+    {
+      id: 'srv_doc_print',
+      title: 'Document Print & Xerox',
+      description: 'Black & white or vibrant color printing for notes, forms, certificates, and reports.',
+      category: 'docs',
+      priceDisplay: '₹1.50 / page',
+      turnaround: 'Instant Counter Print',
+      badge: 'Most Popular',
+      features: ['A4, A3, Legal, Letter', 'Black & White or Color', 'Single or Double-sided'],
+      hasDiscount: false,
+      discountNote: '',
+    },
+    {
+      id: 'srv_photo_print',
+      title: 'Passport & Photo Prints',
+      description: '8-up passport photos, 4x6 glossy prints, and double-sided ID cards.',
+      category: 'photo',
+      priceDisplay: '₹30.00 / 8-sheet',
+      turnaround: 'High Gloss Finish',
+      badge: 'Studio Quality',
+      features: ['8-Up Passport Photo Grid', 'ID Card Front & Back on 1 page', '220 GSM Premium Glossy Card'],
+      hasDiscount: false,
+      discountNote: '',
+    },
+    {
+      id: 'srv_binding',
+      title: 'Project & Thesis Binding',
+      description: 'Corner stapling, durable spiral binding, or executive gold-embossed hard covers.',
+      category: 'binding',
+      priceDisplay: 'From +₹5.00',
+      turnaround: '5–15 mins',
+      badge: 'Thesis Grade',
+      features: ['Corner Staple (+₹5)', 'Spiral Coil with OHP Sheet (+₹40)', 'Executive Hard Bound (+₹150)'],
+      hasDiscount: false,
+      discountNote: '',
+    },
+    {
+      id: 'srv_heavy_card',
+      title: 'Certificates & Heavy Card',
+      description: 'Crisp printing on 100 GSM Bond and 220 GSM Ivory cardstock for diplomas and official documents.',
+      category: 'docs',
+      priceDisplay: 'From ₹15.00',
+      turnaround: 'Archival Grade',
+      badge: 'Non-Smudge',
+      features: ['220 GSM Heavy Ivory Card', 'High-density pigment toner', 'No ink bleed or smudge'],
+      hasDiscount: false,
+      discountNote: '',
+    },
+  ];
+
+  const [shopServices, setShopServices] = useState<ShopServiceItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('printbot_custom_services');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return DEFAULT_SHOP_SERVICES;
+  });
+
+  const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
+  const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
+  const [serviceFormTitle, setServiceFormTitle] = useState('');
+  const [serviceFormCategory, setServiceFormCategory] = useState('docs');
+  const [serviceFormPrice, setServiceFormPrice] = useState('');
+  const [serviceFormTurnaround, setServiceFormTurnaround] = useState('Instant Counter Print');
+  const [serviceFormBadge, setServiceFormBadge] = useState('');
+  const [serviceFormDesc, setServiceFormDesc] = useState('');
+  const [serviceFormFeatures, setServiceFormFeatures] = useState('');
+  const [serviceFormHasDiscount, setServiceFormHasDiscount] = useState(false);
+  const [serviceFormDiscountNote, setServiceFormDiscountNote] = useState('');
+  const [servicesCategoryFilter, setServicesCategoryFilter] = useState('all');
+  const [isPublishingServices, setIsPublishingServices] = useState(false);
 
   // Automatically pre-fill all configuration details from active License Key
   useEffect(() => {
@@ -682,19 +765,73 @@ export default function App() {
       if (currentShop.shopName) setSetupShopName(currentShop.shopName);
       if (currentShop.location) setSetupLocation(currentShop.location);
       if (currentShop.phone) setSetupPhone(currentShop.phone);
-      if (currentShop.rates) {
-        setSetupBwRate(currentShop.rates.bwPerSideRupees ?? 1.5);
-        setSetupColorRate(currentShop.rates.colorPerSideRupees ?? 10.0);
-        setSetupDuplexDiscount(currentShop.rates.duplexDiscountPercent ?? 15);
-        setSetupPhotoRate(currentShop.rates.photoRate ?? 30.0);
-        setSetupStapleRate(currentShop.rates.stapleRate ?? 5.0);
-        setSetupSpiralRate(currentShop.rates.spiralRate ?? 40.0);
-        setSetupHardBoundRate(currentShop.rates.hardBoundRate ?? 150.0);
-        setSetupCardRate(currentShop.rates.cardRate ?? 15.0);
-      }
       if (currentShop.orderMode) setSetupOrderMode(currentShop.orderMode);
+      if (currentShop.services && currentShop.services.length > 0) {
+        setShopServices(currentShop.services);
+      } else {
+        try {
+          const saved = localStorage.getItem(`printbot_custom_services_${currentShop.username}`);
+          if (saved) setShopServices(JSON.parse(saved));
+        } catch {}
+      }
     }
   }, [currentShop]);
+
+  const handlePublishServices = async (servicesToPublish: ShopServiceItem[]) => {
+    setIsPublishingServices(true);
+    try {
+      const u = activeSession?.username || currentShop?.username || 'shop';
+      setShopServices(servicesToPublish);
+      try {
+        localStorage.setItem('printbot_custom_services', JSON.stringify(servicesToPublish));
+        localStorage.setItem(`printbot_custom_services_${u}`, JSON.stringify(servicesToPublish));
+      } catch {}
+
+      setLicenses((prev) => {
+        const existing = prev[u] || currentShop;
+        if (!existing) return prev;
+        const updated = { ...existing, services: servicesToPublish };
+        return {
+          ...prev,
+          [u]: updated,
+          ...(currentShop?.username ? { [currentShop.username.toLowerCase()]: updated } : {}),
+          ...(currentShop?.shopName ? { [currentShop.shopName.toLowerCase()]: updated } : {}),
+        };
+      });
+
+      const shopName = currentShop?.shopName || u;
+      const notesPayload = JSON.stringify({
+        services: servicesToPublish,
+        orderMode: setupOrderMode,
+        updatedAt: new Date().toISOString(),
+      });
+
+      let updated = false;
+      if (currentShop?.appId) {
+        const { data, error } = await supabase
+          .from('pilot_applications')
+          .update({ notes: notesPayload })
+          .eq('id', currentShop.appId)
+          .select();
+        if (!error && data && data.length > 0) updated = true;
+      }
+
+      if (!updated) {
+        const orFilter = `generated_username.ilike.${u},shop_name.ilike.${shopName}`;
+        await supabase
+          .from('pilot_applications')
+          .update({ notes: notesPayload })
+          .or(orFilter);
+      }
+
+      setNotice('Services published successfully! Live instantly on customer web portal.');
+    } catch (err) {
+      console.warn('Failed to sync services to cloud:', err);
+      setNotice('Services saved locally (cloud sync offline).');
+    } finally {
+      setIsPublishingServices(false);
+    }
+  };
 
   const [platformDomain] = useState<string>(() => {
     return (
@@ -4167,6 +4304,16 @@ export default function App() {
             Printers
           </button>
           <button
+            aria-current={activeTab === 'services' ? 'page' : undefined}
+            onClick={() => setActiveTab('services')}
+          >
+            <Sparkles size={18} />
+            Services
+            <b style={{ marginLeft: 'auto', fontSize: '11px', background: 'var(--pb-raised)', padding: '2px 7px', borderRadius: '4px' }}>
+              {shopServices.length}
+            </b>
+          </button>
+          <button
             aria-current={activeTab === 'website' ? 'page' : undefined}
             onClick={() => setActiveTab('website')}
           >
@@ -4493,6 +4640,229 @@ export default function App() {
             </div>
           )}
 
+          {/* TAB: SERVICES (SHOP CUSTOM SERVICES & PRICING) */}
+          {activeTab === 'services' && (
+            <div className="ws-view">
+              <div className="ws-page-heading">
+                <div>
+                  <span className="ws-eyebrow">COUNTER CATALOG &amp; PRICING</span>
+                  <h1>Your counter services.</h1>
+                  <p>Create, edit, and price the exact services offered at your shop counter. Customers will see these exact services on your web portal.</p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    className="ws-primary"
+                    onClick={() => {
+                      setEditingServiceId(null);
+                      setServiceFormTitle('');
+                      setServiceFormCategory('docs');
+                      setServiceFormPrice('');
+                      setServiceFormTurnaround('Instant Counter Print');
+                      setServiceFormBadge('');
+                      setServiceFormDesc('');
+                      setServiceFormFeatures('');
+                      setServiceFormHasDiscount(false);
+                      setServiceFormDiscountNote('');
+                      setIsServiceModalOpen(true);
+                    }}
+                    style={{ gap: '6px' }}
+                  >
+                    <PlusCircle size={16} /> Add New Service
+                  </button>
+                  <button
+                    onClick={() => handlePublishServices(shopServices)}
+                    disabled={isPublishingServices}
+                    style={{ gap: '6px', background: 'var(--pb-raised)', border: '1px solid var(--pb-accent)' }}
+                  >
+                    <CheckCircle2 size={16} color="var(--pb-accent)" />
+                    {isPublishingServices ? 'Publishing...' : 'Publish to Customer Web'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Category Filter Pills & Search */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {['all', 'docs', 'photo', 'binding', 'other'].map((catId) => {
+                    const count = catId === 'all'
+                      ? shopServices.length
+                      : shopServices.filter((s) => s.category === catId).length;
+                    const labels: Record<string, string> = {
+                      all: 'All Services',
+                      docs: 'Document Xerox',
+                      photo: 'Photo & ID',
+                      binding: 'Binding & Finishing',
+                      other: 'Specialty',
+                    };
+                    return (
+                      <button
+                        key={catId}
+                        type="button"
+                        onClick={() => setServicesCategoryFilter(catId)}
+                        style={{
+                          minHeight: '34px',
+                          padding: '6px 14px',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          borderRadius: '999px',
+                          background: servicesCategoryFilter === catId ? 'var(--pb-accent)' : 'var(--pb-surface)',
+                          color: servicesCategoryFilter === catId ? 'var(--pb-on-accent)' : 'var(--pb-muted)',
+                          borderColor: servicesCategoryFilter === catId ? 'var(--pb-accent)' : 'var(--pb-border)',
+                        }}
+                      >
+                        {labels[catId] || catId} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div style={{ fontSize: '12px', color: 'var(--pb-muted)' }}>
+                  Total: <strong>{shopServices.length}</strong> services configured
+                </div>
+              </div>
+
+              {/* Services Grid */}
+              <div className="ws-printer-grid">
+                {shopServices
+                  .filter((s) => servicesCategoryFilter === 'all' || s.category === servicesCategoryFilter)
+                  .map((service) => (
+                    <div key={service.id} className="ws-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', position: 'relative' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                        <span style={{
+                          fontSize: '10px',
+                          fontWeight: 800,
+                          letterSpacing: '1px',
+                          textTransform: 'uppercase',
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          background: 'var(--pb-raised)',
+                          color: 'var(--pb-muted)',
+                        }}>
+                          {service.category === 'docs' ? 'Document Xerox' : service.category === 'photo' ? 'Photo & ID' : service.category === 'binding' ? 'Binding' : 'Service'}
+                        </span>
+                        {service.badge && (
+                          <span style={{
+                            fontSize: '10px',
+                            fontWeight: 800,
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            background: 'rgba(239, 68, 68, 0.12)',
+                            color: 'var(--pb-accent)',
+                          }}>
+                            {service.badge}
+                          </span>
+                        )}
+                      </div>
+
+                      <div>
+                        <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px' }}>{service.title}</h2>
+                        <div style={{ fontSize: '20px', fontWeight: 850, color: 'var(--pb-accent)', letterSpacing: '-0.5px' }}>
+                          {service.priceDisplay}
+                        </div>
+                      </div>
+
+                      {service.description && (
+                        <p style={{ fontSize: '12px', color: 'var(--pb-muted)', margin: 0, lineHeight: 1.5, minHeight: '36px' }}>
+                          {service.description}
+                        </p>
+                      )}
+
+                      {/* Discount status badge (strictly customized, never hardcoded) */}
+                      {service.hasDiscount && service.discountNote ? (
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          background: 'rgba(34, 197, 94, 0.15)',
+                          color: '#22c55e',
+                          fontSize: '11px',
+                          fontWeight: 750,
+                          width: 'fit-content',
+                        }}>
+                          🏷️ {service.discountNote}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '11px', color: 'var(--pb-muted)', opacity: 0.6 }}>
+                          No discount active
+                        </div>
+                      )}
+
+                      {/* Features bullets */}
+                      {service.features && service.features.length > 0 && (
+                        <ul style={{ listStyle: 'none', padding: 0, margin: '4px 0 0', display: 'grid', gap: '6px', fontSize: '12px' }}>
+                          {service.features.map((feat, i) => (
+                            <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--pb-text)' }}>
+                              <CheckCircle2 size={13} color="var(--pb-accent)" style={{ flexShrink: 0 }} />
+                              <span style={{ overflowWrap: 'anywhere' }}>{feat}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+
+                      <div style={{ marginTop: 'auto', paddingTop: '14px', borderTop: '1px solid var(--pb-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--pb-muted)' }}>
+                          {service.turnaround || 'Instant Counter'}
+                        </span>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingServiceId(service.id);
+                              setServiceFormTitle(service.title);
+                              setServiceFormCategory(service.category || 'docs');
+                              setServiceFormPrice(service.priceDisplay);
+                              setServiceFormTurnaround(service.turnaround || 'Instant Counter Print');
+                              setServiceFormBadge(service.badge || '');
+                              setServiceFormDesc(service.description || '');
+                              setServiceFormFeatures((service.features || []).join('\n'));
+                              setServiceFormHasDiscount(!!service.hasDiscount);
+                              setServiceFormDiscountNote(service.discountNote || '');
+                              setIsServiceModalOpen(true);
+                            }}
+                            style={{ minHeight: '32px', padding: '4px 10px', fontSize: '11px', gap: '4px' }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`Delete service "${service.title}"?`)) {
+                                const remaining = shopServices.filter((s) => s.id !== service.id);
+                                handlePublishServices(remaining);
+                              }
+                            }}
+                            style={{ minHeight: '32px', padding: '4px 8px', fontSize: '11px', color: 'var(--pb-danger)', borderColor: 'var(--pb-border)' }}
+                            title="Delete Service"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                {shopServices.length === 0 && (
+                  <div className="ws-panel ws-empty" style={{ gridColumn: '1 / -1', padding: '48px 24px', textAlign: 'center' }}>
+                    <Sparkles size={48} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
+                    <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px' }}>No Services Configured</h2>
+                    <p style={{ color: 'var(--pb-muted)', fontSize: '13px', margin: '0 0 16px' }}>
+                      Add your shop's Xerox, printout, lamination, or binding services with your own pricing.
+                    </p>
+                    <button
+                      className="ws-primary"
+                      onClick={() => handlePublishServices(DEFAULT_SHOP_SERVICES)}
+                      style={{ margin: '0 auto' }}
+                    >
+                      Load Standard Starter Services
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* TAB: WEBSITE (SHOP DOMAIN & CUSTOMER ACCESS) */}
           {activeTab === 'website' && (() => {
             const shopSlug = (currentShop?.shopName || currentShop?.username || 'shop')
@@ -4622,8 +4992,8 @@ export default function App() {
               <div className="ws-page-heading">
                 <div>
                   <span className="ws-eyebrow">CONFIGURATION</span>
-                  <h1>Shop settings &amp; rates.</h1>
-                  <p>Update your per-page billing rates, order dispatch mode, and shop contact details.</p>
+                  <h1>Shop settings.</h1>
+                  <p>Manage your shop identification, counter contact details, and workstation order dispatch mode.</p>
                 </div>
               </div>
 
@@ -4633,30 +5003,10 @@ export default function App() {
                     e.preventDefault();
                     if (!activeSession) return;
                     const u = activeSession.username;
-                    const bw = Number(setupBwRate) || 1.5;
-                    const color = Number(setupColorRate) || 10.0;
-                    const duplex = Number(setupDuplexDiscount) || 15;
-                    const photo = Number(setupPhotoRate) || 30.0;
-                    const staple = Number(setupStapleRate) || 5.0;
-                    const spiral = Number(setupSpiralRate) || 40.0;
-                    const hardBound = Number(setupHardBoundRate) || 150.0;
-                    const card = Number(setupCardRate) || 15.0;
-
-                    const updatedRates = {
-                      bwPerSideRupees: bw,
-                      colorPerSideRupees: color,
-                      duplexDiscountPercent: duplex,
-                      photoRate: photo,
-                      stapleRate: staple,
-                      spiralRate: spiral,
-                      hardBoundRate: hardBound,
-                      cardRate: card,
-                    };
 
                     setLicenses((prev) => {
                       const updated = {
                         ...prev[u],
-                        rates: updatedRates,
                         orderMode: setupOrderMode,
                       };
                       return {
@@ -4667,24 +5017,16 @@ export default function App() {
                       };
                     });
 
-                    // Sync rates to Supabase for the web portal (matching both generated_username and shop_name)
+                    // Sync dispatch mode to Supabase for the web portal
                     try {
                       const shopName = currentShop?.shopName || setupShopName || u;
                       const username = currentShop?.username || u;
                       const notesPayload = JSON.stringify({
-                        bwRate: bw,
-                        colorRate: color,
-                        duplexDiscountPercent: duplex,
-                        photoRate: photo,
-                        stapleRate: staple,
-                        spiralRate: spiral,
-                        hardBoundRate: hardBound,
-                        cardRate: card,
+                        services: shopServices,
                         orderMode: setupOrderMode,
                         updatedAt: new Date().toISOString(),
                       });
 
-                      // 1. Try updating by direct row id if known
                       let updated = false;
                       if (currentShop?.appId) {
                         const { data, error } = await supabase
@@ -4692,31 +5034,21 @@ export default function App() {
                           .update({ notes: notesPayload })
                           .eq('id', currentShop.appId)
                           .select();
-                        if (!error && data && data.length > 0) {
-                          updated = true;
-                          console.info('Synced pricing rates to cloud via appId:', data);
-                        }
+                        if (!error && data && data.length > 0) updated = true;
                       }
 
-                      // 2. Fallback to matching both generated_username and shop_name
                       if (!updated) {
                         const orFilter = `generated_username.ilike.${username},shop_name.ilike.${shopName},generated_username.ilike.${u},shop_name.ilike.${u}`;
-                        const { data, error } = await supabase
+                        await supabase
                           .from('pilot_applications')
                           .update({ notes: notesPayload })
-                          .or(orFilter)
-                          .select();
-                        if (error) {
-                          console.error('Failed to sync rates to cloud:', error);
-                        } else {
-                          console.info('Synced pricing rates to cloud via OR filter:', data);
-                        }
+                          .or(orFilter);
                       }
                     } catch (err) {
-                      console.warn('Failed to sync rates to cloud:', err);
+                      console.warn('Failed to sync settings to cloud:', err);
                     }
 
-                    setNotice('Shop settings and pricing rates updated successfully & synced to Web Portal.');
+                    setNotice('Shop settings updated successfully.');
                   }}
                   style={{ display: 'grid', gap: '20px' }}
                 >
@@ -4763,132 +5095,8 @@ export default function App() {
                     />
                   </div>
 
-                  {/* Counter Services & Pricing Rates (INR ₹) */}
-                  <div style={{ borderTop: '1px solid var(--pb-border)', paddingTop: '16px' }}>
-                    <h3 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '4px' }}>
-                      Counter Services &amp; Pricing Rates (INR ₹)
-                    </h3>
-                    <p style={{ color: 'var(--pb-muted)', fontSize: '12px', margin: '0 0 14px' }}>
-                      Customize your shop's per-page and service rates. These instantly update your customer web portal.
-                    </p>
-                    
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                          B&amp;W Document Rate (₹)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.5"
-                          min="0.5"
-                          value={setupBwRate}
-                          onChange={(e) => setSetupBwRate(Number(e.target.value))}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                          Color Document Rate (₹)
-                        </label>
-                        <input
-                          type="number"
-                          step="1"
-                          min="1"
-                          value={setupColorRate}
-                          onChange={(e) => setSetupColorRate(Number(e.target.value))}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                          Duplex Discount (%)
-                        </label>
-                        <input
-                          type="number"
-                          step="1"
-                          min="0"
-                          max="50"
-                          value={setupDuplexDiscount}
-                          onChange={(e) => setSetupDuplexDiscount(Number(e.target.value))}
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                          Passport &amp; Photo Print (₹ / 8-sheet)
-                        </label>
-                        <input
-                          type="number"
-                          step="1"
-                          min="5"
-                          value={setupPhotoRate}
-                          onChange={(e) => setSetupPhotoRate(Number(e.target.value))}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                          Certificates &amp; Heavy Card Rate (₹)
-                        </label>
-                        <input
-                          type="number"
-                          step="1"
-                          min="1"
-                          value={setupCardRate}
-                          onChange={(e) => setSetupCardRate(Number(e.target.value))}
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                          Corner Staple (+₹)
-                        </label>
-                        <input
-                          type="number"
-                          step="1"
-                          min="0"
-                          value={setupStapleRate}
-                          onChange={(e) => setSetupStapleRate(Number(e.target.value))}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                          Spiral Binding (+₹)
-                        </label>
-                        <input
-                          type="number"
-                          step="5"
-                          min="0"
-                          value={setupSpiralRate}
-                          onChange={(e) => setSetupSpiralRate(Number(e.target.value))}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
-                          Hard Bound (+₹)
-                        </label>
-                        <input
-                          type="number"
-                          step="10"
-                          min="0"
-                          value={setupHardBoundRate}
-                          onChange={(e) => setSetupHardBoundRate(Number(e.target.value))}
-                          required
-                        />
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Workstation Order Dispatch Mode */}
-                  <div style={{ borderTop: '1px solid var(--pb-border)', paddingTop: '16px' }}>
+                  <div>
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
                       Workstation Order Dispatch Mode
                     </label>
@@ -4907,6 +5115,36 @@ export default function App() {
                     <small style={{ color: 'var(--pb-muted)', fontSize: '11px', display: 'block', marginTop: '6px' }}>
                       Switch anytime based on your counter rush. Manual approval lets you inspect customer files first.
                     </small>
+                  </div>
+
+                  {/* Dedicated Services Callout Box */}
+                  <div style={{
+                    padding: '16px',
+                    borderRadius: '12px',
+                    background: 'var(--pb-raised)',
+                    border: '1px solid var(--pb-border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '16px',
+                    marginTop: '8px'
+                  }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <Sparkles size={16} color="var(--pb-accent)" />
+                        <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 750 }}>Counter Services &amp; Custom Rates</h4>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '12px', color: 'var(--pb-muted)' }}>
+                        Add services, set custom rates, and manage customer discounts on your dedicated Services page.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('services')}
+                      style={{ flexShrink: 0, fontSize: '12px', padding: '8px 14px', gap: '6px' }}
+                    >
+                      Open Services →
+                    </button>
                   </div>
 
                   <button type="submit" className="ws-primary" style={{ marginTop: '10px' }}>
@@ -4939,6 +5177,183 @@ export default function App() {
               Confirm Rejection
             </button>
           </div>
+        </Dialog>
+      )}
+
+      {/* DIALOG: ADD / EDIT COUNTER SERVICE */}
+      {isServiceModalOpen && (
+        <Dialog
+          title={editingServiceId ? 'Edit Counter Service' : 'Add New Counter Service'}
+          onClose={() => setIsServiceModalOpen(false)}
+        >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!serviceFormTitle.trim() || !serviceFormPrice.trim()) return;
+
+              const featuresArray = serviceFormFeatures
+                .split('\n')
+                .map((s) => s.trim())
+                .filter(Boolean);
+
+              const newService: ShopServiceItem = {
+                id: editingServiceId || `srv_${Date.now()}`,
+                title: serviceFormTitle.trim(),
+                category: serviceFormCategory,
+                priceDisplay: serviceFormPrice.trim(),
+                turnaround: serviceFormTurnaround.trim() || 'Instant Counter Print',
+                badge: serviceFormBadge.trim() || undefined,
+                description: serviceFormDesc.trim(),
+                features: featuresArray.length > 0 ? featuresArray : ['High-quality print', 'Instant counter pickup'],
+                hasDiscount: serviceFormHasDiscount,
+                discountNote: serviceFormHasDiscount ? serviceFormDiscountNote.trim() : undefined,
+              };
+
+              let updatedList: ShopServiceItem[];
+              if (editingServiceId) {
+                updatedList = shopServices.map((s) => (s.id === editingServiceId ? newService : s));
+              } else {
+                updatedList = [...shopServices, newService];
+              }
+
+              handlePublishServices(updatedList);
+              setIsServiceModalOpen(false);
+            }}
+            style={{ display: 'grid', gap: '16px' }}
+          >
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                Service Title / Name *
+              </label>
+              <input
+                type="text"
+                value={serviceFormTitle}
+                onChange={(e) => setServiceFormTitle(e.target.value)}
+                placeholder="e.g. Document Print & Xerox, Color Laser Print, Passport Photos..."
+                required
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                  Category
+                </label>
+                <select
+                  value={serviceFormCategory}
+                  onChange={(e) => setServiceFormCategory(e.target.value)}
+                >
+                  <option value="docs">Document Xerox &amp; Print</option>
+                  <option value="photo">Photo &amp; ID Card</option>
+                  <option value="binding">Binding &amp; Finishing</option>
+                  <option value="other">Specialty &amp; Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                  Price / Rate Display *
+                </label>
+                <input
+                  type="text"
+                  value={serviceFormPrice}
+                  onChange={(e) => setServiceFormPrice(e.target.value)}
+                  placeholder="e.g. ₹2.00 / page, ₹50.00 / 8-sheet, From ₹30"
+                  required
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                  Turnaround Speed
+                </label>
+                <input
+                  type="text"
+                  value={serviceFormTurnaround}
+                  onChange={(e) => setServiceFormTurnaround(e.target.value)}
+                  placeholder="e.g. Instant Counter Print, 5–15 mins"
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                  Highlight Badge (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={serviceFormBadge}
+                  onChange={(e) => setServiceFormBadge(e.target.value)}
+                  placeholder="e.g. Most Popular, Studio Quality, Student Favorite"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                Description
+              </label>
+              <textarea
+                value={serviceFormDesc}
+                onChange={(e) => setServiceFormDesc(e.target.value)}
+                placeholder="Briefly describe what this service provides..."
+                rows={2}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                Key Features (One point per line)
+              </label>
+              <textarea
+                value={serviceFormFeatures}
+                onChange={(e) => setServiceFormFeatures(e.target.value)}
+                placeholder="A4, A3, Legal, Letter&#10;B&amp;W or Vibrant Color&#10;Crisp 1200 DPI Laser Finish"
+                rows={3}
+              />
+            </div>
+
+            {/* Discount Option: strictly shop owner customizable */}
+            <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--pb-raised)', border: '1px solid var(--pb-border)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', margin: 0, fontWeight: 700, fontSize: '13px' }}>
+                <input
+                  type="checkbox"
+                  checked={serviceFormHasDiscount}
+                  onChange={(e) => setServiceFormHasDiscount(e.target.checked)}
+                  style={{ width: '18px', height: '18px', minHeight: '18px', accentColor: 'var(--pb-accent)' }}
+                />
+                <span>Offer a discount on this service?</span>
+              </label>
+
+              {serviceFormHasDiscount && (
+                <div style={{ marginTop: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+                    Discount Tag / Details *
+                  </label>
+                  <input
+                    type="text"
+                    value={serviceFormDiscountNote}
+                    onChange={(e) => setServiceFormDiscountNote(e.target.value)}
+                    placeholder="e.g. Save 10% on 50+ copies, or Save 15% on 2-sided, or Student Offer"
+                    required={serviceFormHasDiscount}
+                  />
+                  <small style={{ color: 'var(--pb-muted)', display: 'block', marginTop: '4px' }}>
+                    This discount tag will appear prominently on the customer web portal card.
+                  </small>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+              <button type="button" onClick={() => setIsServiceModalOpen(false)}>
+                Cancel
+              </button>
+              <button type="submit" className="ws-primary">
+                {editingServiceId ? 'Save Changes' : 'Create Service'}
+              </button>
+            </div>
+          </form>
         </Dialog>
       )}
     </div>

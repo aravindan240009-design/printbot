@@ -137,6 +137,7 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
         ...prev,
         ...updated,
         rates: updated.rates ? { ...prev.rates, ...updated.rates } : prev.rates,
+        services: updated.services !== undefined ? updated.services : prev.services,
       }));
     });
 
@@ -340,6 +341,7 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
               <ServiceCatalog
                 t={t}
                 rates={session.rates}
+                services={session.services}
                 onSelectService={(serviceKey, targetView) => {
                   setActiveView(targetView);
                   if (serviceKey === 'photo_print') {
@@ -469,6 +471,7 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
                       onToggleApplyToAll={setApplyAll}
                       onUpdateOptions={handleUpdateOptions}
                       t={t}
+                      rates={session.rates}
                     />
 
                     <LivePriceBreakdown
@@ -489,6 +492,7 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
               <ServiceCatalog
                 t={t}
                 rates={session.rates}
+                services={session.services}
                 onSelectService={(serviceKey, targetView) => {
                   setActiveView(targetView);
                 }}
