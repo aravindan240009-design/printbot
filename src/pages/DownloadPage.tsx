@@ -4,14 +4,6 @@ import {
   Check, 
   Copy, 
   ShieldCheck, 
-  Laptop, 
-  Cpu, 
-  HardDrive, 
-  FileCode, 
-  AlertCircle, 
-  ChevronRight, 
-  ExternalLink,
-  Sparkles,
   Printer
 } from 'lucide-react';
 import { 
@@ -41,7 +33,8 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onOpenDownloadModal 
   };
 
   return (
-    <div className="pt-28 pb-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-20 bg-slate-50 text-slate-900">
+    <div className="w-full bg-slate-50 pt-28 pb-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-20 text-slate-900">
       
       {/* ---------------- 1. PAGE HEADER ---------------- */}
       <div className="text-center max-w-3xl mx-auto space-y-4">
@@ -321,6 +314,7 @@ export const DownloadPage: React.FC<DownloadPageProps> = ({ onOpenDownloadModal 
         </div>
       </div>
 
+      </div>
     </div>
   );
 };

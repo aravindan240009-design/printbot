@@ -118,29 +118,33 @@ export const InteractiveWorkstationDemo: React.FC = () => {
       seq: 1042,
       time: '02:44:18',
       jobId: 'JOB-9039',
-      event: 'COMMITTED_TO_SPOOLER',
-      hash: 'sha256:d8f1e29c...3a',
-      result: 'SUBMITTED (Job #4812)',
+      document: 'Court_Affidavit_Notary_Signed.pdf',
+      event: 'Dispatched to Printer',
+      status: 'Spool Success',
+      badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     },
     {
       seq: 1041,
       time: '02:44:05',
       jobId: 'JOB-9039',
-      event: 'PRICE_QUOTE_VALIDATED',
-      hash: 'sha256:c72a819b...1f',
-      result: '₹24.00 (UPI SIGNED)',
+      document: 'Court_Affidavit_Notary_Signed.pdf',
+      event: 'Price & Pages Verified',
+      status: '₹24.00 (UPI Paid)',
+      badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
     },
     {
       seq: 1040,
       time: '02:42:11',
       jobId: 'JOB-9038',
-      event: 'DUPLICATE_SUPPRESSED',
-      hash: 'sha256:4b9101ff...8e',
-      result: 'REJECTED (Replay Guard)',
+      document: 'Court_Affidavit_Notary_Signed.pdf',
+      event: 'Duplicate Job Blocked',
+      status: 'Replay Guard Triggered',
+      badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',
     },
   ]);
 
   const handleApproveJob = (jobId: string) => {
+    const targetJob = jobs.find((j) => j.id === jobId);
     setJobs((prev) =>
       prev.map((j) => (j.id === jobId ? { ...j, status: 'SPOOLING' } : j))
     );
@@ -157,9 +161,10 @@ export const InteractiveWorkstationDemo: React.FC = () => {
           seq: prev[0].seq + 1,
           time: new Date().toLocaleTimeString(),
           jobId: jobId,
-          event: 'DISPATCHED_TO_PRINTER',
-          hash: `sha256:${Math.random().toString(16).substring(2, 10)}...${Math.random().toString(16).substring(2, 4)}`,
-          result: 'SPOOL_SUCCESS (Win32)',
+          document: targetJob?.filename || 'Document.pdf',
+          event: 'Dispatched to Printer',
+          status: 'Spool Success',
+          badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
         },
         ...prev,
       ]);
@@ -513,7 +518,7 @@ export const InteractiveWorkstationDemo: React.FC = () => {
                   Scan to Print at Counter
                 </span>
                 <span className="text-[10px] text-slate-500 font-mono">
-                  printbotak.vercel.app/case
+                  printbotak.vercel.app/counter
                 </span>
               </div>
             </div>
@@ -526,33 +531,41 @@ export const InteractiveWorkstationDemo: React.FC = () => {
             <div className="flex items-center justify-between text-slate-600 font-sans">
               <span>Automatic duplicate-print protection & audit trail:</span>
               <span className="text-[11px] text-emerald-700 font-semibold font-mono bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                Verified
+                100% Reconciled
               </span>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-900 text-slate-200 space-y-2 overflow-x-auto shadow-sm">
-              <div className="grid grid-cols-12 gap-2 text-[11px] font-semibold text-slate-400 pb-2 border-b border-slate-800">
+            <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
+              <div className="grid grid-cols-12 gap-2 text-[11px] font-bold text-slate-700 p-3 bg-slate-50 border-b border-slate-200">
                 <div className="col-span-1">SEQ</div>
                 <div className="col-span-2">TIME</div>
                 <div className="col-span-2">JOB ID</div>
-                <div className="col-span-3">EVENT</div>
-                <div className="col-span-2">CHECKSUM</div>
-                <div className="col-span-2 text-right">DISPATCH</div>
+                <div className="col-span-3">DOCUMENT</div>
+                <div className="col-span-2">ACTION</div>
+                <div className="col-span-2 text-right">STATUS</div>
               </div>
 
-              {journalEntries.map((entry) => (
-                <div
-                  key={entry.seq}
-                  className="grid grid-cols-12 gap-2 text-[11px] text-slate-300 py-1.5 hover:bg-white/[0.05] rounded px-1 font-mono"
-                >
-                  <div className="col-span-1 text-slate-500">#{entry.seq}</div>
-                  <div className="col-span-2 text-slate-400">{entry.time}</div>
-                  <div className="col-span-2 text-blue-400 font-bold">{entry.jobId}</div>
-                  <div className="col-span-3 text-emerald-400">{entry.event}</div>
-                  <div className="col-span-2 text-slate-500">{entry.hash}</div>
-                  <div className="col-span-2 text-right text-slate-300">{entry.result}</div>
-                </div>
-              ))}
+              <div className="divide-y divide-slate-100">
+                {journalEntries.map((entry) => (
+                  <div
+                    key={entry.seq}
+                    className="grid grid-cols-12 gap-2 text-[11px] text-slate-700 p-3 items-center hover:bg-slate-50/50 transition-colors font-sans"
+                  >
+                    <div className="col-span-1 font-mono text-slate-400">#{entry.seq}</div>
+                    <div className="col-span-2 font-mono text-slate-500">{entry.time}</div>
+                    <div className="col-span-2 font-mono font-bold text-blue-700">{entry.jobId}</div>
+                    <div className="col-span-3 font-medium text-slate-900 truncate" title={entry.document}>
+                      {entry.document}
+                    </div>
+                    <div className="col-span-2 text-slate-600">{entry.event}</div>
+                    <div className="col-span-2 text-right">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${entry.badgeClass}`}>
+                        {entry.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <p className="text-[11px] text-slate-500 leading-relaxed">

@@ -164,28 +164,28 @@ export const DOWNLOAD_CONFIG: DownloadConfiguration = {
     releaseDate: 'October 31, 2026',
     status: 'Latest Stable',
     highlights: [
-      'Production Tauri 2 + Rust native desktop architecture with sub-40MB memory footprint',
-      'Direct Windows Print Spooler integration via Winspool API with automatic paper size and duplex detection',
-      'Cryptographic SQLite print journal providing 100% duplicate job rejection and audit integrity',
+      'High-speed native Windows desktop architecture with sub-40MB memory footprint',
+      'Direct Windows Print Spooler integration with automatic paper size and duplex detection',
+      'Local print audit journal providing 100% duplicate job rejection and shift reconciliation',
       'Integrated touchless QR customer order receiver with instant PDF preview and live rupee pricing',
-      'Sound alerts with high-fidelity counter chimes for incoming print jobs',
+      'Audio alert chime notifications for incoming customer counter print jobs',
     ],
     changes: [
       {
         category: 'Workstation',
-        description: 'Engineered responsive multi-pane counter dashboard with queue management, filter by state, and instant job approval.',
+        description: 'Responsive multi-pane counter dashboard with queue management, filter by state, and instant job approval.',
       },
       {
         category: 'Print Spooler',
-        description: 'Implemented Win32 native EnumPrinters discovery boundary for USB, network, and virtual printers.',
+        description: 'Native automatic printer discovery for USB, network LAN, and Wi-Fi printers.',
       },
       {
         category: 'Security',
-        description: 'Enforced strict tenant boundaries and shop token validation, preventing accidental cross-shop spool requests.',
+        description: 'End-to-end customer document privacy with automatic file purge post-printing.',
       },
       {
         category: 'Customer Flow',
-        description: 'Added mobile-optimized QR document configurator with visual page range selection and live price breakdown.',
+        description: 'Mobile-optimized QR document configurator with visual page range selection and live price breakdown.',
       },
     ],
   },

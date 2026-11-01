@@ -65,14 +65,10 @@ export const App: React.FC = () => {
 
   // Synchronize document title and theme when switching between customer portal and commercial site
   useEffect(() => {
-    if (shouldRenderCustomerWeb) {
-      document.documentElement.classList.remove('dark');
-      document.documentElement.setAttribute('data-theme', 'light');
-      document.documentElement.style.colorScheme = 'light';
-    } else {
-      document.documentElement.classList.add('dark');
-      document.documentElement.setAttribute('data-theme', 'dark');
-      document.documentElement.style.colorScheme = 'dark';
+    document.documentElement.classList.remove('dark');
+    document.documentElement.setAttribute('data-theme', 'light');
+    document.documentElement.style.colorScheme = 'light';
+    if (!shouldRenderCustomerWeb) {
       document.title = 'Print Bot — Desktop Printing and Shop Manager for Windows';
     }
   }, [shouldRenderCustomerWeb]);
@@ -82,8 +78,8 @@ export const App: React.FC = () => {
     return (
       <Suspense
         fallback={
-          <div className="min-h-screen bg-[#090B0F] flex flex-col items-center justify-center gap-3 text-slate-400">
-            <RefreshCw className="w-6 h-6 animate-spin text-brand-400" />
+          <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3 text-slate-500">
+            <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
             <span className="text-sm font-medium">Initializing Customer Upload Portal...</span>
           </div>
         }
@@ -95,7 +91,7 @@ export const App: React.FC = () => {
 
   // Render Official Commercial Website
   return (
-    <div className="min-h-screen bg-[#090B0F] text-slate-100 flex flex-col selection:bg-brand-500 selection:text-white">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col selection:bg-blue-600 selection:text-white">
       {/* Sticky Glass Navbar */}
       <Navbar 
         currentPath={currentPath} 

@@ -2,24 +2,17 @@ import React, { useState } from 'react';
 import { 
   Printer, 
   Download, 
-  Zap, 
   ShieldCheck, 
   Database, 
   Smartphone, 
-  Cpu, 
   Check, 
   ChevronDown, 
   ChevronRight, 
-  ArrowRight, 
-  Sparkles, 
-  FileText, 
-  Layers, 
   DollarSign,
   QrCode,
-  HardDrive,
-  RefreshCw,
+  Layers,
 } from 'lucide-react';
-import { DOWNLOAD_CONFIG, triggerInstallerDownload } from '../config/download';
+import { DOWNLOAD_CONFIG } from '../config/download';
 import { InteractiveWorkstationDemo } from '../components/InteractiveWorkstationDemo';
 
 interface HomePageProps {

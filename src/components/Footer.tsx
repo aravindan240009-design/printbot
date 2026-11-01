@@ -3,11 +3,6 @@ import {
   Printer, 
   Download, 
   ShieldCheck, 
-  ExternalLink, 
-  Laptop, 
-  FileText, 
-  Activity, 
-  Sparkles,
 } from 'lucide-react';
 import { DOWNLOAD_CONFIG, triggerInstallerDownload } from '../config/download';
 

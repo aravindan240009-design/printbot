@@ -17,14 +17,14 @@
   body {
     margin: 0;
     overflow-x: hidden;
-    background-color: #F8FAFC !important;
-    color: #0F172A !important;
+    background-color: #F8FAFC;
+    color: #0F172A;
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Custom scrollbar for clean professional feel */
+  /* Clean scrollbar */
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -66,14 +66,6 @@
     border-color: rgba(37, 99, 235, 0.35);
     background: #FFFFFF;
     box-shadow: 0 12px 30px -10px rgba(15, 23, 42, 0.1), 0 0 20px -5px rgba(37, 99, 235, 0.08);
-  }
-
-  .text-glow {
-    text-shadow: none;
-  }
-
-  .text-glow-brand {
-    text-shadow: none;
   }
 
   .border-glow-focus:focus-visible {

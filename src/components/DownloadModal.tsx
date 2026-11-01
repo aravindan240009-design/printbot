@@ -6,9 +6,6 @@ import {
   Copy, 
   ShieldCheck, 
   AlertCircle, 
-  Laptop, 
-  FileCode, 
-  ExternalLink 
 } from 'lucide-react';
 import { DOWNLOAD_CONFIG, triggerInstallerDownload, type InstallerArtifact } from '../config/download';
 

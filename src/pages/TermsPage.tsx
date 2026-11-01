@@ -1,9 +1,10 @@
 import React from 'react';
-import { FileCheck, ShieldAlert, Award, RefreshCw } from 'lucide-react';
+import { FileCheck } from 'lucide-react';
 
 export const TermsPage: React.FC = () => {
   return (
-    <div className="pt-28 pb-20 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12 bg-slate-50 text-slate-900">
+    <div className="w-full bg-slate-50 pt-28 pb-20">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12 text-slate-900">
       
       {/* Header */}
       <div className="space-y-4">
@@ -112,6 +113,7 @@ export const TermsPage: React.FC = () => {
 
       </div>
 
+      </div>
     </div>
   );
 };
