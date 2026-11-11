@@ -18,8 +18,6 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
     "@tauri-apps/api": "2.12.4",
-    "@xerox/api-client": "workspace:*",
-    "@xerox/contracts": "workspace:*",
     "@xerox/ui": "workspace:*",
     "lucide-react": "^0.378.0",
     "qrcode": "^1.5.4",

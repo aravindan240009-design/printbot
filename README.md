@@ -71,9 +71,8 @@ services/
   print-agent/     Rust Windows service/IPC prototype and journal rules
 
 packages/
-  contracts/       Shared TypeScript contracts
-  printplan-contract/ Canonical PrintPlan contract and schema
-  api-client/      Typed frontend API client
+  contracts/       Shared TypeScript and Python contracts
+  printplan/       Cross-language deterministic print specification
   ui/              Shared React UI, motion, and 3D components
 
 infra/

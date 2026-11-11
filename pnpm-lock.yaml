@@ -11,15 +11,6 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.118.0
         version: 2.118.0
-      '@types/react':
-        specifier: ^18.3.12
-        version: 18.3.31
-      '@types/react-dom':
-        specifier: ^18.3.1
-        version: 18.3.7(@types/react@18.3.31)
-      '@vitejs/plugin-react':
-        specifier: ^4.3.3
-        version: 4.7.0(vite@5.4.21(@types/node@20.19.43))
       lucide-react:
         specifier: ^0.378.0
         version: 0.378.0(react@18.3.1)
@@ -29,13 +20,16 @@ importers:
       react-dom:
         specifier: ^18.3.1
         version: 18.3.1(react@18.3.1)
-      typescript:
-        specifier: ^5.6.3
-        version: 5.9.3
-      vite:
-        specifier: ^5.4.10
-        version: 5.4.21(@types/node@20.19.43)
     devDependencies:
+      '@types/react':
+        specifier: ^18.3.12
+        version: 18.3.31
+      '@types/react-dom':
+        specifier: ^18.3.1
+        version: 18.3.7(@types/react@18.3.31)
+      '@vitejs/plugin-react':
+        specifier: ^4.3.3
+        version: 4.7.0(vite@5.4.21(@types/node@20.19.43))
       autoprefixer:
         specifier: ^10.4.19
         version: 10.6.1(postcss@8.5.31)
@@ -45,18 +39,18 @@ importers:
       tailwindcss:
         specifier: ^3.4.17
         version: 3.4.19
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vite:
+        specifier: ^5.4.10
+        version: 5.4.21(@types/node@20.19.43)
 
   apps/customer-web:
     dependencies:
       '@supabase/supabase-js':
         specifier: ^2.118.0
         version: 2.118.0
-      '@xerox/printplan-contract':
-        specifier: workspace:*
-        version: link:../../packages/printplan-contract
-      '@xerox/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
       lucide-react:
         specifier: ^0.378.0
         version: 0.378.0(react@18.3.1)
@@ -91,12 +85,6 @@ importers:
       '@tauri-apps/api':
         specifier: 2.12.4
         version: 2.12.4
-      '@xerox/api-client':
-        specifier: workspace:*
-        version: link:../../packages/api-client
-      '@xerox/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
       '@xerox/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -144,27 +132,7 @@ importers:
         specifier: ^5.2.11
         version: 5.4.21(@types/node@20.19.43)
 
-  packages/api-client:
-    dependencies:
-      '@xerox/contracts':
-        specifier: workspace:*
-        version: link:../contracts
-    devDependencies:
-      typescript:
-        specifier: ^5.4.5
-        version: 5.9.3
-
   packages/contracts:
-    devDependencies:
-      typescript:
-        specifier: ^5.4.5
-        version: 5.9.3
-
-  packages/printplan-contract:
-    dependencies:
-      '@xerox/contracts':
-        specifier: workspace:*
-        version: link:../contracts
     devDependencies:
       typescript:
         specifier: ^5.4.5

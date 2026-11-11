@@ -17,8 +17,6 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
-    "@xerox/printplan-contract": "workspace:*",
-    "@xerox/ui": "workspace:*",
     "lucide-react": "^0.378.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
