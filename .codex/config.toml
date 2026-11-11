@@ -1,3 +1,0 @@
-[mcp_servers.motion]
-type = "http"
-url = "https://mcp.motion.dev"
