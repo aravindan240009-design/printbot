@@ -29,6 +29,7 @@ interface QueueViewProps {
   onApproveAll: () => void;
   onApproveJob: (jobId: string) => void;
   onRejectJob: (jobId: string) => void;
+  onCompleteJob?: (jobId: string) => void;
   onInspectJob?: (job: PrintJob) => void;
   onRefreshJobs?: () => void;
 }
@@ -47,6 +48,7 @@ export const QueueView: React.FC<QueueViewProps> = ({
   onApproveAll,
   onApproveJob,
   onRejectJob,
+  onCompleteJob,
   onInspectJob,
   onRefreshJobs,
 }) => {
@@ -217,6 +219,21 @@ export const QueueView: React.FC<QueueViewProps> = ({
 
                   <div className="pb-job-meta-row">
                     <span className="pb-job-id">#{job.id}</span>
+                    {job.pickup_pin && (
+                      <span
+                        className="pb-job-pin-badge"
+                        style={{
+                          background: 'rgba(37, 99, 235, 0.1)',
+                          color: '#2563eb',
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          fontWeight: 700,
+                          fontSize: '0.75rem',
+                        }}
+                      >
+                        PIN: {job.pickup_pin}
+                      </span>
+                    )}
                     <span>•</span>
                     <span className="pb-job-customer">{job.customer_email || 'Walk-in Customer'}</span>
                     <span>•</span>
@@ -259,6 +276,42 @@ export const QueueView: React.FC<QueueViewProps> = ({
                       >
                         <XCircle size={13} /> Reject Order
                       </button>
+                      {job.file_data && (
+                        <a
+                          href={job.file_data}
+                          download={job.file_name}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="pb-btn pb-btn-secondary pb-btn-sm"
+                          style={{ textDecoration: 'none' }}
+                        >
+                          <FileText size={13} /> View File
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  {job.status === 'QUEUED' && (
+                    <div className="pb-job-action-row">
+                      <button
+                        type="button"
+                        className="pb-btn pb-btn-primary pb-btn-sm"
+                        onClick={() => onCompleteJob && onCompleteJob(job.id)}
+                      >
+                        <CheckCircle2 size={13} /> Mark Printed &amp; Ready
+                      </button>
+                      {job.file_data && (
+                        <a
+                          href={job.file_data}
+                          download={job.file_name}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="pb-btn pb-btn-secondary pb-btn-sm"
+                          style={{ textDecoration: 'none' }}
+                        >
+                          <FileText size={13} /> View File
+                        </a>
+                      )}
                     </div>
                   )}
                 </div>
@@ -267,7 +320,9 @@ export const QueueView: React.FC<QueueViewProps> = ({
                   <div className="pb-job-price">
                     ₹{job.calculated_price_rupees.toFixed(2)}
                   </div>
-                  <div className="pb-job-price-badge">Instant UPI Paid</div>
+                  <div className="pb-job-price-badge">
+                    {job.payment_method === 'cash' ? 'Cash at Counter' : 'Instant UPI Paid'}
+                  </div>
                 </div>
               </div>
             ))}

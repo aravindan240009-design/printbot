@@ -40,6 +40,7 @@ import {
   updateStoredOrderStatus,
 } from './utils/storage';
 import { openShopSession, scanFile, createOrder, fetchOrderStatus, type CreateOrderPayload } from './api';
+import { supabase } from './supabase';
 import {
   resolveShopSlugFromUrl,
   loadShopProfile,
@@ -229,7 +230,84 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
     const firstFile = files[0];
     const cleanPhone = details.customerPhone ? details.customerPhone.replace(/[^0-9]/g, '') : '';
     const customerEmail = cleanPhone ? `${cleanPhone}@walkin.customer.in` : 'customer@walkin.in';
+    const targetShopId = (session.shop_slug || session.shop_id || 'ashwin').toLowerCase();
 
+    // Safely convert file to base64 if <= 2.5MB so desktop operator can view & print
+    let fileBase64: string | undefined = undefined;
+    if (firstFile.source && firstFile.source.size <= 2.5 * 1024 * 1024) {
+      try {
+        fileBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => resolve('');
+          reader.readAsDataURL(firstFile.source);
+        });
+      } catch {}
+    }
+
+    const orderMeta = {
+      orderId: assignedOrderId,
+      pickupPin: randomPin,
+      shopId: targetShopId,
+      shopName: session.shop_name,
+      shopPhone: session.shop_phone,
+      shopAddress: session.shop_address,
+      customerName: details.customerName || 'Walk-in Customer',
+      customerPhone: details.customerPhone || '',
+      customerEmail: customerEmail,
+      fileName: firstFile.name,
+      fileSize: firstFile.sizeBytes || firstFile.source?.size || 1024,
+      fileData: fileBase64,
+      pageCount: firstFile.pageCount || 1,
+      copies: firstFile.options.copies || 1,
+      colorMode: firstFile.options.colorMode === 'color' ? 'Color' : firstFile.options.colorMode === 'grayscale' ? 'Grayscale' : 'B&W',
+      paperSize: firstFile.options.paperSize || 'A4',
+      duplexMode: firstFile.options.duplex === 'simplex' ? 'simplex' : 'duplex',
+      finishing: firstFile.options.finishing || 'none',
+      paperGsm: parseInt(firstFile.options.paperGsm || '75', 10) || 75,
+      totalRupees: quote.total_rupees,
+      totalSheets: quote.total_physical_sheets,
+      totalLogicalPages: quote.total_logical_pages,
+      paymentMethod: details.paymentMethod,
+      paymentStatus: details.paymentMethod === 'upi' ? 'paid' : 'pending_cash',
+      paymentId: details.paymentId || null,
+      notes: details.notes || '',
+      status: 'PENDING_APPROVAL',
+      placedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      items: files.map((f) => ({
+        name: f.name,
+        copies: f.options.copies,
+        colorMode: f.options.colorMode === 'color' ? 'Color' : f.options.colorMode === 'grayscale' ? 'Grayscale' : 'B&W',
+        sheets: Math.ceil((f.pageCount || 1) / (f.options.duplex === 'simplex' ? 1 : 2)) * f.options.copies,
+        paperSize: f.options.paperSize,
+        finishing: f.options.finishing,
+      })),
+    };
+
+    // 1. Direct Cloud Sync: Write order into Supabase pilot_applications table
+    try {
+      const orderRecord = {
+        id: assignedOrderId,
+        shop_name: targetShopId,
+        city: firstFile.name,
+        contact_number: details.customerPhone || '',
+        plan: 'ORDER',
+        status: 'ORDER_PENDING',
+        generated_username: targetShopId,
+        generated_key: randomPin,
+        applied_at: new Date().toISOString(),
+        approved_at: new Date().toISOString(),
+        notes: JSON.stringify(orderMeta),
+      };
+      const { error: sbInsertErr } = await supabase.from('pilot_applications').insert(orderRecord);
+      if (sbInsertErr) {
+        console.warn('Supabase order insertion warning:', sbInsertErr);
+      }
+    } catch (sbEx) {
+      console.warn('Supabase order submission exception:', sbEx);
+    }
+
+    // 2. Also forward to local backend API if available
     const createPayload: CreateOrderPayload = {
       customer_email: customerEmail,
       customer_phone: details.customerPhone || undefined,
@@ -252,8 +330,8 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
       if (serverJob && serverJob.id) {
         assignedOrderId = serverJob.id;
       }
-    } catch (orderErr) {
-      console.warn('Realtime cloud order submission fallback to local queue:', orderErr);
+    } catch {
+      // Local backend offline
     }
 
     const newOrder: PlacedOrder = {
@@ -290,24 +368,58 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
     setActiveFileId('');
     setPrintStep(1);
 
-    // Poll server order status if order was assigned on server
+    // Live Supabase subscription + fallback polling for order status changes
+    const mapLiveStatusToClient = (rawStatus: string): PlacedOrder['status'] => {
+      const s = rawStatus.toUpperCase();
+      if (s === 'ORDER_QUEUED' || s === 'QUEUED') return 'SPOOLING';
+      if (s === 'ORDER_PRINTING' || s === 'PRINTING') return 'PRINTING';
+      if (s === 'ORDER_COMPLETED' || s === 'COMPLETED' || s === 'READY_FOR_PICKUP' || s === 'COLLECTED') return 'READY_FOR_PICKUP';
+      if (s === 'ORDER_REJECTED' || s === 'REJECTED') return 'CANCELLED';
+      return 'ORDER_RECEIVED';
+    };
+
+    const statusChannel = supabase
+      .channel(`order_track_${assignedOrderId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'pilot_applications', filter: `id=eq.${assignedOrderId}` },
+        (payload: any) => {
+          const newStatus = payload.new?.status;
+          if (newStatus) {
+            const mapped = mapLiveStatusToClient(newStatus);
+            updateStoredOrderStatus(newOrder.shopId, assignedOrderId, mapped);
+            setActiveOrder((curr) => (curr && curr.orderId === assignedOrderId ? { ...curr, status: mapped } : curr));
+          }
+        }
+      )
+      .subscribe();
+
     const pollInterval = setInterval(async () => {
       try {
-        const live = await fetchOrderStatus(newOrder.orderId, session.session_token, newOrder.shopId);
-        if (live && live.status) {
-          updateStoredOrderStatus(newOrder.shopId, newOrder.orderId, live.status);
-          setActiveOrder((curr) => (curr && curr.orderId === newOrder.orderId ? { ...curr, status: live.status } : curr));
-          if (live.status === 'READY_FOR_PICKUP' || live.status === 'COLLECTED' || live.status === 'CANCELLED') {
+        const { data: liveRow } = await supabase
+          .from('pilot_applications')
+          .select('status')
+          .eq('id', assignedOrderId)
+          .maybeSingle();
+
+        if (liveRow && liveRow.status) {
+          const mapped = mapLiveStatusToClient(liveRow.status);
+          updateStoredOrderStatus(newOrder.shopId, assignedOrderId, mapped);
+          setActiveOrder((curr) => (curr && curr.orderId === assignedOrderId ? { ...curr, status: mapped } : curr));
+          if (mapped === 'READY_FOR_PICKUP' || mapped === 'CANCELLED') {
             clearInterval(pollInterval);
+            supabase.removeChannel(statusChannel);
           }
         }
       } catch {
-        // Continue polling or wait
+        // Continue polling
       }
     }, 3000);
 
-    // Timeout safety for poller (after 10 minutes)
-    setTimeout(() => clearInterval(pollInterval), 600000);
+    setTimeout(() => {
+      clearInterval(pollInterval);
+      supabase.removeChannel(statusChannel);
+    }, 600000);
   };
 
   const unlockingFile = files.find((f) => f.id === unlockingFileId);

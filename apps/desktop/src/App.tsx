@@ -188,6 +188,10 @@ export interface PrintJob {
   status: 'PENDING_APPROVAL' | 'QUEUED' | 'PRINTING' | 'COMPLETED' | 'COMPLETION_UNKNOWN' | 'REJECTED';
   rejection_reason?: string;
   created_at: string;
+  pickup_pin?: string;
+  file_data?: string;
+  payment_method?: string;
+  payment_status?: string;
 }
 
 export interface ConnectedPrinter {
@@ -952,8 +956,14 @@ export default function App() {
             .then(() => {});
         }
 
-        // Filter out system administrative records so only shop applications appear in the UI
-        const shopRows = data.filter((r: any) => r.id !== 'APP-ADMIN-MASTER-ROOT');
+        // Filter out system administrative records and customer orders so only shop applications appear in the UI
+        const shopRows = data.filter(
+          (r: any) =>
+            r.id !== 'APP-ADMIN-MASTER-ROOT' &&
+            r.plan !== 'ORDER' &&
+            !r.id?.startsWith('PB-') &&
+            !r.status?.startsWith('ORDER_')
+        );
         const mapped = shopRows.map(mapSupabaseRowToApp);
         setApplications(mapped);
         setCloudSyncStatus('CONNECTED');
@@ -1032,6 +1042,7 @@ export default function App() {
         (payload) => {
           console.info('Realtime Supabase update received:', payload);
           fetchApplicationsFromCloud();
+          fetchServerQueue();
         }
       )
       .subscribe((status) => {
@@ -1656,80 +1667,102 @@ export default function App() {
   }, [currentShop?.username, currentShop?.deviceToken]);
 
   const fetchServerQueue = async () => {
-    const shopId = currentShop?.username;
+    const shopId = (currentShop?.username || activeSession?.username || '').toLowerCase();
     if (!shopId) return;
+
     try {
-      const headers: Record<string, string> = {
-        'X-Tenant-ID': shopId,
-      };
-      if (currentShop.deviceToken) {
-        headers['Authorization'] = `Bearer ${currentShop.deviceToken}`;
-      }
-      const res = await fetch(`${API_BASE}/orders`, { headers });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        const mapped: PrintJob[] = data.map((item: any) => {
-          const isDuplex = item.options?.duplex_mode?.includes('duplex');
-          const sides = item.page_count || 1;
-          const sheets = isDuplex ? Math.ceil(sides / 2) : sides;
-          const copies = item.options?.copies || 1;
-          const statusMap: Record<string, PrintJob['status']> = {
-            'AWAITING_APPROVAL': 'PENDING_APPROVAL',
-            'PENDING_PAYMENT': 'PENDING_APPROVAL',
-            'QUEUED': 'QUEUED',
-            'SPOOLING': 'PRINTING',
-            'PRINTING': 'PRINTING',
-            'COMPLETED': 'COMPLETED',
-            'READY_FOR_PICKUP': 'COMPLETED',
-            'COLLECTED': 'COMPLETED',
-            'REJECTED': 'REJECTED',
-            'COMPLETION_UNKNOWN': 'COMPLETION_UNKNOWN',
-          };
-          const mappedStatus = statusMap[item.status] || 'PENDING_APPROVAL';
-          const paise = item.total_paise || (item.calculated_price_cents ? item.calculated_price_cents * 83 : 2000);
-          return {
-            id: item.id,
-            customer_email: item.customer_email || 'walkin@customer.in',
-            file_name: item.file_name || 'document.pdf',
-            page_count: item.page_count || 1,
-            logical_pages: item.page_count || 1,
-            rendered_sides: sides * copies,
-            physical_sheets: sheets * copies,
-            options: {
-              copies: copies,
-              color_mode: (item.options?.color_mode || 'bw') as any,
-              paper_size: (item.options?.paper_size || 'A4') as any,
-              duplex_mode: (item.options?.duplex_mode || 'simplex') as any,
-              paper_gsm: item.options?.paper_gsm || 75,
-              binding: (item.options?.binding || 'none') as any,
-            },
-            calculated_price_paise: paise,
-            calculated_price_rupees: paise / 100,
-            status: mappedStatus,
-            created_at: item.created_at ? new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now',
-            rejection_reason: item.rejection_reason,
-          };
+      // 1. Fetch live customer orders from Supabase cloud database
+      const { data: cloudOrders, error: sbError } = await supabase
+        .from('pilot_applications')
+        .select('*')
+        .order('applied_at', { ascending: false });
+
+      let cloudMapped: PrintJob[] = [];
+      if (!sbError && Array.isArray(cloudOrders)) {
+        const matchingRows = cloudOrders.filter((row: any) => {
+          const isOrder = row.plan === 'ORDER' || (row.status && row.status.startsWith('ORDER_')) || (row.id && row.id.startsWith('PB-'));
+          if (!isOrder) return false;
+          const rowShop = (row.generated_username || row.shop_name || '').toLowerCase();
+          return rowShop.includes(shopId) || shopId.includes(rowShop);
         });
 
-        setJobs((prev) => {
-          const serverIds = new Set(mapped.map((m) => m.id));
-          const localOnly = prev.filter((p) => !serverIds.has(p.id));
-          return [...mapped, ...localOnly];
-        });
+        cloudMapped = matchingRows
+          .map((row: any) => {
+            try {
+              const meta = row.notes ? JSON.parse(row.notes) : {};
+              const isDuplex = meta.duplexMode?.includes('duplex') || meta.options?.duplex_mode?.includes('duplex');
+              const pageCount = Number(meta.pageCount || meta.options?.page_count || 1);
+              const copies = Number(meta.copies || meta.options?.copies || 1);
+              const sides = pageCount;
+              const sheets = isDuplex ? Math.ceil(sides / 2) : sides;
+              const rupees = Number(meta.totalRupees || meta.calculated_price_rupees || 0);
+              const paise = Math.round(rupees * 100);
+
+              const rawStatus = (row.status || '').toUpperCase();
+              let mappedStatus: PrintJob['status'] = 'PENDING_APPROVAL';
+              if (rawStatus === 'ORDER_QUEUED' || rawStatus === 'QUEUED') {
+                mappedStatus = 'QUEUED';
+              } else if (rawStatus === 'ORDER_PRINTING' || rawStatus === 'PRINTING' || rawStatus === 'SPOOLING') {
+                mappedStatus = 'PRINTING';
+              } else if (rawStatus === 'ORDER_COMPLETED' || rawStatus === 'COMPLETED' || rawStatus === 'READY_FOR_PICKUP' || rawStatus === 'COLLECTED') {
+                mappedStatus = 'COMPLETED';
+              } else if (rawStatus === 'ORDER_REJECTED' || rawStatus === 'REJECTED') {
+                mappedStatus = 'REJECTED';
+              } else if (rawStatus === 'ORDER_PENDING' || rawStatus === 'PENDING' || rawStatus === 'PENDING_APPROVAL') {
+                mappedStatus = 'PENDING_APPROVAL';
+              }
+
+              return {
+                id: row.id,
+                customer_email: meta.customerEmail || (meta.customerPhone ? `${meta.customerPhone}` : 'Walk-in Customer'),
+                file_name: meta.fileName || row.city || 'Document.pdf',
+                page_count: pageCount,
+                logical_pages: pageCount,
+                rendered_sides: sides * copies,
+                physical_sheets: sheets * copies,
+                options: {
+                  copies: copies,
+                  color_mode: (meta.colorMode === 'Color' || meta.options?.color_mode === 'color' ? 'color' : 'bw') as any,
+                  paper_size: (meta.paperSize || meta.options?.paper_size || 'A4') as any,
+                  duplex_mode: (isDuplex ? 'duplex_long' : 'simplex') as any,
+                  paper_gsm: meta.paperGsm || 75,
+                  binding: (meta.finishing || 'none') as any,
+                },
+                calculated_price_paise: paise,
+                calculated_price_rupees: rupees,
+                status: mappedStatus,
+                created_at: meta.placedAt || (row.applied_at ? new Date(row.applied_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'),
+                rejection_reason: meta.rejectionReason || undefined,
+                pickup_pin: row.generated_key || meta.pickupPin || undefined,
+                file_data: meta.fileData || undefined,
+                payment_method: meta.paymentMethod || 'upi',
+                payment_status: meta.paymentStatus || 'paid',
+              } as PrintJob;
+            } catch (err) {
+              console.warn('Error parsing cloud order row:', err);
+              return null;
+            }
+          })
+          .filter((job): job is PrintJob => job !== null);
       }
-    } catch {
-      // Backend offline or unreachable
+
+      setJobs((prev) => {
+        const cloudIds = new Set(cloudMapped.map((c) => c.id));
+        const prevNonCloud = prev.filter((p) => !cloudIds.has(p.id) && !p.id.startsWith('PB-'));
+        return [...cloudMapped, ...prevNonCloud];
+      });
+    } catch (err) {
+      console.warn('Error fetching server queue:', err);
     }
   };
 
   // Poll cloud queue for active counter workstation
   useEffect(() => {
-    if (screen !== 'MAIN_APP' || !currentShop?.username) return;
+    if (screen !== 'WORKSTATION' || (!currentShop?.username && !activeSession?.username)) return;
     fetchServerQueue();
-    const interval = setInterval(fetchServerQueue, 5000);
+    const interval = setInterval(fetchServerQueue, 3000);
     return () => clearInterval(interval);
-  }, [screen, currentShop?.username]);
+  }, [screen, currentShop?.username, activeSession?.username]);
 
   const handleApproveJob = async (jobId: string) => {
     setJobs((prev) =>
@@ -1737,9 +1770,19 @@ export default function App() {
     );
 
     const targetJob = jobs.find((j) => j.id === jobId);
-    const shopId = currentShop?.username || 'shop';
+    const shopId = currentShop?.username || activeSession?.username || 'shop';
 
-    // 1. Submit to Tauri Spool Journal if native printers available
+    // 1. Direct Cloud Sync: Mark as queued in Supabase
+    try {
+      await supabase
+        .from('pilot_applications')
+        .update({ status: 'ORDER_QUEUED' })
+        .eq('id', jobId);
+    } catch (sbErr) {
+      console.warn('Supabase job approval update warning:', sbErr);
+    }
+
+    // 2. Submit to Tauri Spool Journal if native printers available
     if (nativePrinters && nativePrinters.length > 0 && targetJob) {
       try {
         await preparePrintJob({
@@ -1754,7 +1797,7 @@ export default function App() {
       }
     }
 
-    // 2. Report approval to backend API
+    // 3. Report approval to backend API if active
     try {
       const headers: Record<string, string> = { 'X-Tenant-ID': shopId };
       if (currentShop?.deviceToken) headers['Authorization'] = `Bearer ${currentShop.deviceToken}`;
@@ -1762,11 +1805,27 @@ export default function App() {
         method: 'POST',
         headers,
       });
-    } catch {
-      // Backend offline
+    } catch {}
+
+    setNotice(`Job #${jobId} approved and placed into Windows dispatch queue.`);
+  };
+
+  const handleCompleteJob = async (jobId: string) => {
+    setJobs((prev) =>
+      prev.map((j) => (j.id === jobId ? { ...j, status: 'COMPLETED' } : j))
+    );
+
+    // Direct Cloud Sync: Mark as completed in Supabase
+    try {
+      await supabase
+        .from('pilot_applications')
+        .update({ status: 'ORDER_COMPLETED' })
+        .eq('id', jobId);
+    } catch (sbErr) {
+      console.warn('Supabase job completion update warning:', sbErr);
     }
 
-    setNotice(`Job ${jobId} approved and recorded in spool journal.`);
+    setNotice(`Job #${jobId} marked as completed & ready for counter collection.`);
   };
 
   const handleRejectJob = async () => {
@@ -1781,8 +1840,18 @@ export default function App() {
       )
     );
 
+    // Direct Cloud Sync: Mark as rejected in Supabase
     try {
-      const shopId = currentShop?.username || 'shop';
+      await supabase
+        .from('pilot_applications')
+        .update({ status: 'ORDER_REJECTED' })
+        .eq('id', targetId);
+    } catch (sbErr) {
+      console.warn('Supabase job reject update warning:', sbErr);
+    }
+
+    try {
+      const shopId = currentShop?.username || activeSession?.username || 'shop';
       const headers: Record<string, string> = {
         'X-Tenant-ID': shopId,
         'Content-Type': 'application/json',
@@ -1793,11 +1862,9 @@ export default function App() {
         headers,
         body: JSON.stringify({ reason }),
       });
-    } catch {
-      // Backend offline
-    }
+    } catch {}
 
-    setNotice(`Job ${targetId} rejected.`);
+    setNotice(`Job #${targetId} rejected.`);
     setRejectionModalJobId(null);
   };
 
@@ -2048,7 +2115,7 @@ export default function App() {
       deviceName={deviceIdentity?.device_name}
       activeTab={activeTab}
       setActiveTab={setActiveTab}
-      queueCount={jobs.length}
+      queueCount={pendingCount + queuedCount}
       printersCount={nativePrinters?.length || printers.length}
       servicesCount={shopServices.length}
       isAudioEnabled={isAudioEnabled}
@@ -2072,14 +2139,23 @@ export default function App() {
           setSearchQuery={setSearchQuery}
           statusFilter={statusFilter}
           setStatusFilter={setStatusFilter}
-          onApproveAll={() => {
+          onApproveAll={async () => {
+            const pendingIds = jobs.filter((j) => j.status === 'PENDING_APPROVAL').map((j) => j.id);
             setJobs((prev) =>
               prev.map((j) => (j.status === 'PENDING_APPROVAL' ? { ...j, status: 'QUEUED' } : j))
             );
             setNotice(`Approved all ${pendingCount} pending jobs.`);
+            if (pendingIds.length > 0) {
+              try {
+                await supabase.from('pilot_applications').update({ status: 'ORDER_QUEUED' }).in('id', pendingIds);
+              } catch (sbErr) {
+                console.warn('Supabase approve all update error:', sbErr);
+              }
+            }
           }}
           onApproveJob={handleApproveJob}
           onRejectJob={(jobId) => setRejectionModalJobId(jobId)}
+          onCompleteJob={handleCompleteJob}
           onRefreshJobs={() => {
             setNotice('Checking for incoming cloud orders...');
             fetchServerQueue();
