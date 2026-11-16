@@ -47,7 +47,7 @@ import {
   Globe
 } from 'lucide-react';
 import { ThemeProvider, ThemeSwitch, MotionSurface, PaperScene, PrinterScene, useGsapStagger } from '@xerox/ui';
-import { discoverPrinters, bindWorkstation, getWorkstationDeviceIdentity, preparePrintJob, printToHardware, type NativePrinterInfo, type WorkstationDeviceIdentity } from './native';
+import { discoverPrinters, bindWorkstation, getWorkstationDeviceIdentity, printToHardware, readSpoolFile, type NativePrinterInfo, type WorkstationDeviceIdentity } from './native';
 import { supabase } from './supabase';
 import QRCode from 'qrcode';
 import { DesktopShell, type Tab } from './components/DesktopShell';
@@ -1661,14 +1661,15 @@ export default function App() {
         const discovered = await discoverPrinters();
         setNativePrinters(discovered);
         if (discovered && discovered.length > 0 && !selectedPrinterName) {
-          const hp = discovered.find(
+          const onlinePrinters = discovered.filter((printer) => printer.is_online);
+          const hp = onlinePrinters.find(
             (p) =>
               p.name.toLowerCase().includes('hp') ||
               p.name.toLowerCase().includes('laser') ||
               p.name.toLowerCase().includes('4004')
           );
-          const def = discovered.find((p) => p.is_default);
-          setSelectedPrinterName(hp?.name || def?.name || discovered[0].name);
+          const def = onlinePrinters.find((p) => p.is_default);
+          setSelectedPrinterName(hp?.name || def?.name || onlinePrinters[0]?.name || discovered[0].name);
         }
       } catch {
         setNativePrinters(null);
@@ -1775,16 +1776,238 @@ export default function App() {
     return () => clearInterval(interval);
   }, [screen, currentShop?.username, activeSession?.username]);
 
+  const decodePrintableFileData = (fileData?: string): number[] => {
+    if (!fileData) return [];
+    const normalized = fileData.trim();
+    if (!normalized) return [];
+
+    const base64Separator = normalized.indexOf('base64,');
+    const base64 = base64Separator >= 0
+      ? normalized.slice(base64Separator + 'base64,'.length)
+      : normalized;
+    const binary = atob(base64.replace(/\s/g, ''));
+    const bytes = new Array<number>(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  };
+
+  const resolvePrintableFileBytes = async (job: PrintJob): Promise<number[] | null> => {
+    const directBytes = decodePrintableFileData(job.file_data);
+    if (directBytes.length > 0) return directBytes;
+
+    try {
+      const spoolBytes = await readSpoolFile(job.id);
+      if (spoolBytes && spoolBytes.length > 0) return spoolBytes;
+    } catch (err) {
+      console.warn('Unable to read spool file for print job:', err);
+    }
+
+    return null;
+  };
+
+  const renderImagePageForPrinter = async (
+    fileBytes: number[],
+    mimeType: string,
+    monochrome: boolean,
+  ): Promise<number[][]> => {
+    const image = await createImageBitmap(
+      new Blob([Uint8Array.from(fileBytes)], { type: mimeType }),
+    );
+    const canvas = document.createElement('canvas');
+    try {
+      if (image.width === 0 || image.height === 0) {
+        throw new Error('The attached image has invalid dimensions.');
+      }
+
+      const pixelLimit = 20_000_000;
+      const scale = Math.min(1, Math.sqrt(pixelLimit / (image.width * image.height)));
+      canvas.width = Math.max(1, Math.floor(image.width * scale));
+      canvas.height = Math.max(1, Math.floor(image.height * scale));
+      const context = canvas.getContext('2d', { alpha: false });
+      if (!context) {
+        throw new Error('Could not allocate a canvas for the attached image.');
+      }
+
+      context.fillStyle = '#fff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      if (monochrome) {
+        const rendered = context.getImageData(0, 0, canvas.width, canvas.height);
+        for (let offset = 0; offset < rendered.data.length; offset += 4) {
+          const gray = Math.round(
+            rendered.data[offset] * 0.2126
+            + rendered.data[offset + 1] * 0.7152
+            + rendered.data[offset + 2] * 0.0722,
+          );
+          rendered.data[offset] = gray;
+          rendered.data[offset + 1] = gray;
+          rendered.data[offset + 2] = gray;
+        }
+        context.putImageData(rendered, 0, 0);
+      }
+
+      const png = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('Could not encode the attached image for printing.'));
+        }, 'image/png');
+      });
+      if (png.size > 64 * 1024 * 1024) {
+        throw new Error('Rendered print job exceeds the 64 MB workstation limit.');
+      }
+      return [Array.from(new Uint8Array(await png.arrayBuffer()))];
+    } finally {
+      image.close();
+      canvas.width = 0;
+      canvas.height = 0;
+    }
+  };
+
+  const renderDocumentPagesForPrinter = async (
+    fileBytes: number[],
+    monochrome: boolean,
+  ): Promise<number[][]> => {
+    const fileSignature = fileBytes.slice(0, 8);
+    const isPdf = String.fromCharCode(...fileBytes.slice(0, 5)) === '%PDF-';
+    const isPng = fileSignature.join(',') === '137,80,78,71,13,10,26,10';
+    const isJpeg = fileBytes[0] === 0xff && fileBytes[1] === 0xd8 && fileBytes[2] === 0xff;
+    if (!isPdf) {
+      if (isPng) return renderImagePageForPrinter(fileBytes, 'image/png', monochrome);
+      if (isJpeg) return renderImagePageForPrinter(fileBytes, 'image/jpeg', monochrome);
+      throw new Error('The attached file must be a valid PDF, JPG, or PNG document.');
+    }
+
+    const [pdfjs, workerModule] = await Promise.all([
+      import('pdfjs-dist'),
+      import('pdfjs-dist/build/pdf.worker.min.mjs?url'),
+    ]);
+    pdfjs.GlobalWorkerOptions.workerSrc = workerModule.default;
+    const pdf = await pdfjs.getDocument({ data: Uint8Array.from(fileBytes) }).promise;
+    try {
+      if (pdf.numPages > 500) {
+        throw new Error('Documents over 500 pages cannot be printed from the workstation.');
+      }
+
+      const renderedPages: number[][] = [];
+      let totalRenderedBytes = 0;
+      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+        const page = await pdf.getPage(pageNumber);
+        const targetViewport = page.getViewport({ scale: 2 });
+        const pixelLimit = 20_000_000;
+        const pageScale = Math.min(
+          2,
+          Math.sqrt(pixelLimit / (targetViewport.width * targetViewport.height)),
+        );
+        const viewport = page.getViewport({ scale: pageScale });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+        const context = canvas.getContext('2d', { alpha: false });
+        if (!context) {
+          throw new Error(`Could not allocate a canvas for PDF page ${pageNumber}.`);
+        }
+
+        context.fillStyle = '#fff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        await page.render({ canvasContext: context, viewport }).promise;
+        if (monochrome) {
+          const rendered = context.getImageData(0, 0, canvas.width, canvas.height);
+          for (let offset = 0; offset < rendered.data.length; offset += 4) {
+            const gray = Math.round(
+              rendered.data[offset] * 0.2126
+              + rendered.data[offset + 1] * 0.7152
+              + rendered.data[offset + 2] * 0.0722,
+            );
+            rendered.data[offset] = gray;
+            rendered.data[offset + 1] = gray;
+            rendered.data[offset + 2] = gray;
+          }
+          context.putImageData(rendered, 0, 0);
+        }
+        const png = await new Promise<Blob>((resolve, reject) => {
+          canvas.toBlob((blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error(`Could not encode PDF page ${pageNumber} for printing.`));
+          }, 'image/png');
+        });
+        totalRenderedBytes += png.size;
+        if (totalRenderedBytes > 64 * 1024 * 1024) {
+          throw new Error('Rendered print job exceeds the 64 MB workstation limit.');
+        }
+        renderedPages.push(Array.from(new Uint8Array(await png.arrayBuffer())));
+        canvas.width = 0;
+        canvas.height = 0;
+        page.cleanup();
+      }
+
+      return renderedPages;
+    } finally {
+      await pdf.destroy();
+    }
+  };
+
+  const createPrintAttemptId = (jobId: string): string =>
+    `${jobId}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
   const handleApproveJob = async (jobId: string) => {
     setJobs((prev) =>
       prev.map((j) => (j.id === jobId ? { ...j, status: 'QUEUED' } : j))
     );
 
     const targetJob = jobs.find((j) => j.id === jobId);
+    if (!targetJob) {
+      setNotice(`Job #${jobId} was not found in the queue.`);
+      return;
+    }
+
     const shopId = currentShop?.username || activeSession?.username || 'shop';
     const targetPrinter = selectedPrinterName || nativePrinters?.[0]?.name || 'HP758E10 (HP LaserJet Pro 4004)';
 
-    // 1. Direct Cloud Sync: Mark as queued in Supabase
+    let printableBytes: number[] | null = null;
+    try {
+      printableBytes = await resolvePrintableFileBytes(targetJob);
+    } catch (err) {
+      console.warn('Failed to resolve printable bytes:', err);
+    }
+
+    if (!printableBytes || printableBytes.length === 0) {
+      setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, status: 'PENDING_APPROVAL' } : j)));
+      setNotice(`Job #${jobId} cannot print because no supported file is attached or available on disk.`);
+      return;
+    }
+
+    let renderedPages: number[][];
+    try {
+      renderedPages = await renderDocumentPagesForPrinter(
+        printableBytes,
+        targetJob.options.color_mode !== 'color',
+      );
+    } catch (renderErr: any) {
+      setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, status: 'PENDING_APPROVAL' } : j)));
+      setNotice(`Job #${jobId} could not be rendered: ${renderErr?.message || renderErr}`);
+      return;
+    }
+
+    try {
+      const result = await printToHardware({
+        job_id: jobId,
+        attempt_id: createPrintAttemptId(jobId),
+        printer_name: targetPrinter,
+        file_name: targetJob.file_name,
+        file_bytes: printableBytes,
+        rendered_pages: renderedPages,
+        copies: targetJob.options.copies || 1,
+      });
+      setNotice(`Job #${jobId} submitted to ${targetPrinter} (Windows spooler job #${result.spooler_job_id}).`);
+    } catch (printErr: any) {
+      console.warn('Hardware printing dispatch:', printErr);
+      setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, status: 'PENDING_APPROVAL' } : j)));
+      setNotice(`Job #${jobId} could not be printed: ${printErr?.message || printErr}`);
+      return;
+    }
+
     try {
       await supabase
         .from('pilot_applications')
@@ -1794,49 +2017,6 @@ export default function App() {
       console.warn('Supabase job approval update warning:', sbErr);
     }
 
-    // 2. Direct Hardware Dispatch to connected Windows printer!
-    let spoolJobId: number | null = null;
-    if (targetJob) {
-      try {
-        let fileBytes: number[] = [];
-        if (targetJob.file_data) {
-          const cleanB64 = targetJob.file_data.includes('base64,')
-            ? targetJob.file_data.split('base64,')[1]
-            : targetJob.file_data;
-          const binaryStr = atob(cleanB64.trim());
-          fileBytes = new Array(binaryStr.length);
-          for (let i = 0; i < binaryStr.length; i++) {
-            fileBytes[i] = binaryStr.charCodeAt(i);
-          }
-        }
-
-        const res = await printToHardware({
-          job_id: jobId,
-          printer_name: targetPrinter,
-          file_name: targetJob.file_name,
-          file_bytes: fileBytes,
-          copies: targetJob.options.copies || 1,
-        });
-        spoolJobId = res.spooler_job_id;
-        setNotice(`🖨️ Job #${jobId} printed to ${targetPrinter} (Spooler Job #${res.spooler_job_id})`);
-      } catch (printErr: any) {
-        console.warn('Hardware printing dispatch:', printErr);
-        setNotice(`Job #${jobId} approved. Spooler status: ${printErr?.message || printErr}`);
-      }
-    }
-
-    // 3. Spool Journal record
-    try {
-      await preparePrintJob({
-        job_id: jobId,
-        shop_id: shopId,
-        printer_name: targetPrinter,
-        document_path: `${jobId}.pdf`,
-        copies: targetJob?.options.copies || 1,
-      });
-    } catch {}
-
-    // 4. Report approval to backend API if active
     try {
       const headers: Record<string, string> = { 'X-Tenant-ID': shopId };
       if (currentShop?.deviceToken) headers['Authorization'] = `Bearer ${currentShop.deviceToken}`;
@@ -1845,10 +2025,6 @@ export default function App() {
         headers,
       });
     } catch {}
-
-    if (!spoolJobId) {
-      setNotice(`Job #${jobId} approved and placed into Windows dispatch queue.`);
-    }
   };
 
   const handleDirectPrint = async (jobId: string) => {
@@ -1857,27 +2033,27 @@ export default function App() {
     const targetPrinter = selectedPrinterName || nativePrinters?.[0]?.name || 'HP758E10 (HP LaserJet Pro 4004)';
 
     try {
-      let fileBytes: number[] = [];
-      if (targetJob.file_data) {
-        const cleanB64 = targetJob.file_data.includes('base64,')
-          ? targetJob.file_data.split('base64,')[1]
-          : targetJob.file_data;
-        const binaryStr = atob(cleanB64.trim());
-        fileBytes = new Array(binaryStr.length);
-        for (let i = 0; i < binaryStr.length; i++) {
-          fileBytes[i] = binaryStr.charCodeAt(i);
-        }
+      const fileBytes = await resolvePrintableFileBytes(targetJob);
+      if (!fileBytes || fileBytes.length === 0) {
+        alert(`No printable file is attached for ${targetJob.file_name}. Re-download or re-upload the document before printing.`);
+        return;
       }
 
-      const res = await printToHardware({
+      const renderedPages = await renderDocumentPagesForPrinter(
+        fileBytes,
+        targetJob.options.color_mode !== 'color',
+      );
+      const result = await printToHardware({
         job_id: jobId,
+        attempt_id: createPrintAttemptId(jobId),
         printer_name: targetPrinter,
         file_name: targetJob.file_name,
         file_bytes: fileBytes,
+        rendered_pages: renderedPages,
         copies: targetJob.options.copies || 1,
       });
 
-      setNotice(`🖨️ Sent #${jobId} to ${targetPrinter} (Win32 Spooler Job #${res.spooler_job_id})`);
+      setNotice(`Job #${jobId} submitted to ${targetPrinter} (Windows spooler job #${result.spooler_job_id}).`);
     } catch (err: any) {
       alert(`Hardware print error for ${targetPrinter}: ${err?.message || err}`);
     }

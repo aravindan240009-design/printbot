@@ -34,7 +34,7 @@ interface QueueViewProps {
   onRefreshJobs?: () => void;
   selectedPrinterName?: string;
   setSelectedPrinterName?: (val: string) => void;
-  nativePrinters?: Array<{ name: string; is_default?: boolean }>;
+  nativePrinters?: Array<{ name: string; is_default?: boolean; is_online?: boolean }>;
   onDirectPrint?: (jobId: string) => void;
 }
 
@@ -82,6 +82,19 @@ export const QueueView: React.FC<QueueViewProps> = ({
   const getFileExtension = (filename: string) => {
     const ext = filename.split('.').pop()?.toUpperCase() || 'FILE';
     return ext.slice(0, 4);
+  };
+
+  const getFileViewUrl = (fileData: string, fileName: string) => {
+    if (fileData.startsWith('data:')) return fileData;
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    const mimeType = extension === 'pdf'
+      ? 'application/pdf'
+      : extension === 'png'
+        ? 'image/png'
+        : extension === 'jpg' || extension === 'jpeg'
+          ? 'image/jpeg'
+          : 'application/octet-stream';
+    return `data:${mimeType};base64,${fileData}`;
   };
 
   return (
@@ -207,6 +220,7 @@ export const QueueView: React.FC<QueueViewProps> = ({
                 {nativePrinters.map((p) => (
                   <option key={p.name} value={p.name}>
                     {p.name.includes('4004') || p.name.includes('LaserJet') ? `🖨️ ${p.name} (Laser Hardware)` : `🖨️ ${p.name}`}
+                    {p.is_online === false ? ' (Offline)' : ''}
                   </option>
                 ))}
               </select>
@@ -306,8 +320,7 @@ export const QueueView: React.FC<QueueViewProps> = ({
                       </button>
                       {job.file_data && (
                         <a
-                          href={job.file_data}
-                          download={job.file_name}
+                          href={getFileViewUrl(job.file_data, job.file_name)}
                           target="_blank"
                           rel="noreferrer"
                           className="pb-btn pb-btn-secondary pb-btn-sm"
@@ -338,8 +351,7 @@ export const QueueView: React.FC<QueueViewProps> = ({
                       </button>
                       {job.file_data && (
                         <a
-                          href={job.file_data}
-                          download={job.file_name}
+                          href={getFileViewUrl(job.file_data, job.file_name)}
                           target="_blank"
                           rel="noreferrer"
                           className="pb-btn pb-btn-secondary pb-btn-sm"
@@ -363,8 +375,7 @@ export const QueueView: React.FC<QueueViewProps> = ({
                       </button>
                       {job.file_data && (
                         <a
-                          href={job.file_data}
-                          download={job.file_name}
+                          href={getFileViewUrl(job.file_data, job.file_name)}
                           target="_blank"
                           rel="noreferrer"
                           className="pb-btn pb-btn-secondary pb-btn-sm"

@@ -37,14 +37,38 @@ pub fn validate_document_path(spool_root: &Path, document_path: &Path) -> Result
     let root = spool_root
         .canonicalize()
         .map_err(|_| "spool root is unavailable".to_string())?;
+
     let target = if document_path.is_relative() {
         spool_root.join(document_path)
     } else {
         document_path.to_path_buf()
     };
+
+    let parent = target
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."));
+    let validated_parent = if parent.exists() {
+        parent
+            .canonicalize()
+            .map_err(|_| "document parent directory is unavailable".to_string())?
+    } else {
+        let _ = std::fs::create_dir_all(parent);
+        parent
+            .canonicalize()
+            .map_err(|_| "document parent directory is unavailable".to_string())?
+    };
+
+    if !validated_parent.starts_with(&root) {
+        return Err(
+            "document path must stay inside the application spool directory".into(),
+        );
+    }
+
     if !target.exists() {
+        let _ = std::fs::create_dir_all(parent);
         let _ = std::fs::write(&target, b"%PDF-1.4\n%PrintBot spool entry\n");
     }
+
     let document = target
         .canonicalize()
         .map_err(|_| "document path is unavailable".to_string())?;
@@ -72,134 +96,245 @@ pub fn prepare_spool_job(
 }
 
 #[cfg(windows)]
-pub fn submit_to_windows_spooler(
+pub fn submit_rendered_pages_to_windows_printer(
     printer_name: &str,
     doc_title: &str,
-    bytes: &[u8],
+    pages: &[Vec<u8>],
+    copies: u32,
 ) -> Result<u32, String> {
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
 
     #[repr(C)]
-    struct DOC_INFO_1W {
-        p_doc_name: *const u16,
-        p_output_file: *const u16,
-        p_datatype: *const u16,
+    struct DOCINFOW {
+        cb_size: i32,
+        document_name: *const u16,
+        output: *const u16,
+        datatype: *const u16,
+        type_flags: u32,
     }
 
-    #[link(name = "winspool")]
+    #[repr(C)]
+    struct BITMAPINFOHEADER {
+        size: u32,
+        width: i32,
+        height: i32,
+        planes: u16,
+        bit_count: u16,
+        compression: u32,
+        image_size: u32,
+        x_pixels_per_meter: i32,
+        y_pixels_per_meter: i32,
+        colors_used: u32,
+        important_colors: u32,
+    }
+
+    #[repr(C)]
+    struct BITMAPINFO {
+        header: BITMAPINFOHEADER,
+    }
+
+    #[link(name = "gdi32")]
     extern "system" {
-        fn OpenPrinterW(
-            p_printer_name: *const u16,
-            ph_printer: *mut isize,
-            p_default: *const std::ffi::c_void,
+        fn CreateDCW(
+            driver: *const u16,
+            device: *const u16,
+            output: *const u16,
+            init_data: *const std::ffi::c_void,
+        ) -> isize;
+        fn DeleteDC(dc: isize) -> i32;
+        fn StartDocW(dc: isize, doc_info: *const DOCINFOW) -> i32;
+        fn StartPage(dc: isize) -> i32;
+        fn EndPage(dc: isize) -> i32;
+        fn EndDoc(dc: isize) -> i32;
+        fn AbortDoc(dc: isize) -> i32;
+        fn GetDeviceCaps(dc: isize, index: i32) -> i32;
+        fn StretchDIBits(
+            dc: isize,
+            x_dest: i32,
+            y_dest: i32,
+            width_dest: i32,
+            height_dest: i32,
+            x_source: i32,
+            y_source: i32,
+            width_source: i32,
+            height_source: i32,
+            bits: *const std::ffi::c_void,
+            bitmap_info: *const BITMAPINFO,
+            usage: u32,
+            raster_operation: u32,
         ) -> i32;
-
-        fn StartDocPrinterW(
-            h_printer: isize,
-            level: u32,
-            p_doc_info: *const DOC_INFO_1W,
-        ) -> u32;
-
-        fn StartPagePrinter(h_printer: isize) -> i32;
-
-        fn WritePrinter(
-            h_printer: isize,
-            p_buf: *const u8,
-            cb_buf: u32,
-            pc_written: *mut u32,
-        ) -> i32;
-
-        fn EndPagePrinter(h_printer: isize) -> i32;
-
-        fn EndDocPrinter(h_printer: isize) -> i32;
-
-        fn ClosePrinter(h_printer: isize) -> i32;
     }
 
     let to_wide = |s: &str| -> Vec<u16> {
         OsStr::new(s).encode_wide().chain(Some(0)).collect()
     };
 
+    if pages.is_empty() {
+        return Err("The PDF contains no printable pages".into());
+    }
+    if copies == 0 || copies > 100 {
+        return Err("copies must be between 1 and 100".into());
+    }
+    if pages.len() > 500 {
+        return Err("documents over 500 pages cannot be printed from the workstation".into());
+    }
+
+    let wide_driver = to_wide("WINSPOOL");
     let wide_printer = to_wide(printer_name);
     let wide_title = to_wide(doc_title);
-    let wide_datatype = to_wide("RAW");
-
-    let mut h_printer: isize = 0;
-    let open_res = unsafe {
-        OpenPrinterW(wide_printer.as_ptr(), &mut h_printer, std::ptr::null())
+    let dc = unsafe {
+        CreateDCW(
+            wide_driver.as_ptr(),
+            wide_printer.as_ptr(),
+            std::ptr::null(),
+            std::ptr::null(),
+        )
     };
-
-    if open_res == 0 || h_printer == 0 {
+    if dc == 0 {
         return Err(format!(
-            "Could not open Windows printer '{}': {}",
+            "Could not create a print context for '{}': {}",
             printer_name,
             std::io::Error::last_os_error()
         ));
     }
 
-    // If PDF virtual printer, output to temp file so it doesn't hang on save prompt
-    let clean_title = doc_title.chars().filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_').collect::<String>();
-    let temp_out = if printer_name.to_lowercase().contains("pdf") {
-        let p = std::env::temp_dir().join(format!("{}.pdf", clean_title));
-        Some(to_wide(&p.to_string_lossy()))
-    } else {
-        None
+    let doc_info = DOCINFOW {
+        cb_size: std::mem::size_of::<DOCINFOW>() as i32,
+        document_name: wide_title.as_ptr(),
+        output: std::ptr::null(),
+        datatype: std::ptr::null(),
+        type_flags: 0,
     };
 
-    let doc_info = DOC_INFO_1W {
-        p_doc_name: wide_title.as_ptr(),
-        p_output_file: temp_out.as_ref().map(|v| v.as_ptr()).unwrap_or(std::ptr::null()),
-        p_datatype: wide_datatype.as_ptr(),
-    };
-
-    let job_id = unsafe { StartDocPrinterW(h_printer, 1, &doc_info) };
-    if job_id == 0 {
+    let job_id = unsafe { StartDocW(dc, &doc_info) };
+    if job_id <= 0 {
         let err = std::io::Error::last_os_error();
-        unsafe { ClosePrinter(h_printer); }
-        return Err(format!("StartDocPrinter failed for '{}': {}", printer_name, err));
+        unsafe { DeleteDC(dc); }
+        return Err(format!("StartDoc failed for '{}': {}", printer_name, err));
     }
 
-    let start_page = unsafe { StartPagePrinter(h_printer) };
-    if start_page == 0 {
-        let err = std::io::Error::last_os_error();
+    let printable_width = unsafe { GetDeviceCaps(dc, 8) };
+    let printable_height = unsafe { GetDeviceCaps(dc, 10) };
+    if printable_width <= 0 || printable_height <= 0 {
         unsafe {
-            EndDocPrinter(h_printer);
-            ClosePrinter(h_printer);
+            AbortDoc(dc);
+            DeleteDC(dc);
         }
-        return Err(format!("StartPagePrinter failed: {}", err));
+        return Err("The selected printer reported invalid printable dimensions".into());
     }
 
-    let mut written = 0u32;
-    let write_res = unsafe {
-        WritePrinter(
-            h_printer,
-            bytes.as_ptr(),
-            bytes.len() as u32,
-            &mut written,
-        )
-    };
+    for _ in 0..copies {
+        for (page_index, encoded_page) in pages.iter().enumerate() {
+            let image = image::load_from_memory_with_format(encoded_page, image::ImageFormat::Png)
+                .map_err(|error| {
+                    unsafe {
+                        AbortDoc(dc);
+                        DeleteDC(dc);
+                    }
+                    format!("failed to decode rendered PDF page {}: {error}", page_index + 1)
+                })?
+                .to_rgba8();
+            let (width, height) = image.dimensions();
+            if width == 0 || height == 0 || width > i32::MAX as u32 || height > i32::MAX as u32 {
+                unsafe {
+                    AbortDoc(dc);
+                    DeleteDC(dc);
+                }
+                return Err(format!("rendered PDF page {} has invalid dimensions", page_index + 1));
+            }
 
-    unsafe {
-        EndPagePrinter(h_printer);
-        EndDocPrinter(h_printer);
-        ClosePrinter(h_printer);
+            let scale = (printable_width as f64 / width as f64)
+                .min(printable_height as f64 / height as f64);
+            let dest_width = (width as f64 * scale).round() as i32;
+            let dest_height = (height as f64 * scale).round() as i32;
+            let dest_x = (printable_width - dest_width) / 2;
+            let dest_y = (printable_height - dest_height) / 2;
+
+            let mut bgra = Vec::with_capacity(image.as_raw().len());
+            for rgba in image.as_raw().chunks_exact(4) {
+                bgra.extend_from_slice(&[rgba[2], rgba[1], rgba[0], 255]);
+            }
+
+            let bitmap_info = BITMAPINFO {
+                header: BITMAPINFOHEADER {
+                    size: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                    width: width as i32,
+                    height: -(height as i32),
+                    planes: 1,
+                    bit_count: 32,
+                    compression: 0,
+                    image_size: bgra.len() as u32,
+                    x_pixels_per_meter: 0,
+                    y_pixels_per_meter: 0,
+                    colors_used: 0,
+                    important_colors: 0,
+                },
+            };
+
+            if unsafe { StartPage(dc) } <= 0 {
+                let err = std::io::Error::last_os_error();
+                unsafe {
+                    AbortDoc(dc);
+                    DeleteDC(dc);
+                }
+                return Err(format!("failed to start printer page {}: {err}", page_index + 1));
+            }
+
+            let copied_lines = unsafe {
+                StretchDIBits(
+                    dc,
+                    dest_x,
+                    dest_y,
+                    dest_width,
+                    dest_height,
+                    0,
+                    0,
+                    width as i32,
+                    height as i32,
+                    bgra.as_ptr() as *const std::ffi::c_void,
+                    &bitmap_info,
+                    0,
+                    0x00CC0020,
+                )
+            };
+            if copied_lines <= 0 {
+                let err = std::io::Error::last_os_error();
+                unsafe {
+                    AbortDoc(dc);
+                    DeleteDC(dc);
+                }
+                return Err(format!("failed to render printer page {}: {err}", page_index + 1));
+            }
+
+            if unsafe { EndPage(dc) } <= 0 {
+                let err = std::io::Error::last_os_error();
+                unsafe {
+                    AbortDoc(dc);
+                    DeleteDC(dc);
+                }
+                return Err(format!("failed to finish printer page {}: {err}", page_index + 1));
+            }
+        }
     }
 
-    if write_res == 0 {
-        return Err(format!("WritePrinter failed: {}", std::io::Error::last_os_error()));
+    if unsafe { EndDoc(dc) } <= 0 {
+        let err = std::io::Error::last_os_error();
+        unsafe { DeleteDC(dc); }
+        return Err(format!("Windows failed to submit the print document: {err}"));
     }
-
-    Ok(job_id)
+    unsafe { DeleteDC(dc); }
+    Ok(job_id as u32)
 }
 
 #[cfg(not(windows))]
-pub fn submit_to_windows_spooler(
+pub fn submit_rendered_pages_to_windows_printer(
     _printer_name: &str,
     _doc_title: &str,
-    _bytes: &[u8],
+    _pages: &[Vec<u8>],
+    _copies: u32,
 ) -> Result<u32, String> {
-    Ok(1)
+    Err("Native printer output is only supported on Windows".into())
 }
 
 #[cfg(windows)]

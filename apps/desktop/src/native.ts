@@ -94,11 +94,22 @@ export async function readSpoolJob(jobId: string) {
   }
 }
 
+export async function readSpoolFile(jobId: string): Promise<number[] | null> {
+  try {
+    const result = await invoke<number[] | null>('read_spool_file', { jobId });
+    return result;
+  } catch (error) {
+    throw new NativeWorkstationError(String(error));
+  }
+}
+
 export interface PrintToHardwarePayload {
   job_id: string;
+  attempt_id: string;
   printer_name: string;
   file_name: string;
   file_bytes: number[];
+  rendered_pages: number[][];
   copies?: number;
 }
 
