@@ -39,7 +39,7 @@ import {
   saveOrderToStorage,
   updateStoredOrderStatus,
 } from './utils/storage';
-import { openShopSession, scanFile, createOrder, fetchOrderStatus, type CreateOrderPayload } from './api';
+import { openShopSession, scanFile, createOrder, fetchOrderStatus, isApiConfigured, type CreateOrderPayload } from './api';
 import { supabase } from './supabase';
 import {
   resolveShopSlugFromUrl,
@@ -325,13 +325,15 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
       },
     };
 
-    try {
-      const serverJob = await createOrder(createPayload, session.session_token, session.shop_id);
-      if (serverJob && serverJob.id) {
-        assignedOrderId = serverJob.id;
+    if (isApiConfigured) {
+      try {
+        const serverJob = await createOrder(createPayload, session.session_token, session.shop_id);
+        if (serverJob && serverJob.id) {
+          assignedOrderId = serverJob.id;
+        }
+      } catch (apiError) {
+        console.error('Configured Print Bot API order sync failed; the Supabase order record remains available.', apiError);
       }
-    } catch {
-      // Local backend offline
     }
 
     const newOrder: PlacedOrder = {

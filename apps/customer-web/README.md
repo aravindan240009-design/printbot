@@ -32,6 +32,12 @@ pnpm --filter @xerox/customer-web build
 pnpm --filter @xerox/customer-web type-check
 ```
 
+For production API forwarding, set `VITE_API_BASE_URL` to the public API URL
+including `/api/v1` in the deployment environment. Without it, production builds
+do not send requests to a visitor's `localhost`; the Supabase order flow remains
+available. Configured production URLs must use HTTPS and cannot target loopback
+addresses.
+
 ---
 
 ## ✨ Features

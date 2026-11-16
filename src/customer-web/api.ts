@@ -23,9 +23,31 @@ export interface ServerQuote {
   quote_hash: string;
 }
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '');
+const configuredApiBase = import.meta.env.VITE_API_BASE_URL?.trim();
+const developmentApiBase = import.meta.env.DEV ? 'http://localhost:8000/api/v1' : '';
+
+function isSecurePublicApiBase(base: string): boolean {
+  try {
+    const url = new URL(base);
+    const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    const isLoopback = hostname === 'localhost' || hostname.endsWith('.localhost') ||
+      hostname === '::1' || /^127(?:\.|$)/.test(hostname);
+    return url.protocol === 'https:' && !isLoopback;
+  } catch {
+    return false;
+  }
+}
+
+// Never let a production build send customer traffic to the visitor's machine.
+const productionApiBase = configuredApiBase && isSecurePublicApiBase(configuredApiBase) ? configuredApiBase : '';
+const API_BASE = (import.meta.env.DEV ? configuredApiBase || developmentApiBase : productionApiBase).replace(/\/$/, '');
+export const isApiConfigured = API_BASE.length > 0;
 
 async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
+  if (!API_BASE) {
+    throw new Error('The Print Bot API is not configured. Set VITE_API_BASE_URL for this deployment.');
+  }
+
   const headers = new Headers(init.headers);
   if (init.body && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json');
   if (token) headers.set('Authorization', `Bearer ${token}`);
