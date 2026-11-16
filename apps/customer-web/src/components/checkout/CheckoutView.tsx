@@ -1,19 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
-  QrCode,
+  CreditCard,
   Printer,
-  Check,
-  Copy,
-  Clock,
   ShieldCheck,
   ArrowRight,
   User,
   Phone,
   MessageSquare,
-  ExternalLink,
   MapPin,
-  CreditCard,
   RefreshCw,
+  Lock,
 } from 'lucide-react';
 import { DocumentItem, ServerQuote, ShopSession } from '../../types';
 import { TranslationKeys } from '../../locales';
@@ -60,35 +56,10 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [notes, setNotes] = useState('');
-  const [copiedVpa, setCopiedVpa] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(15 * 60); // 15 mins
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const amount = quote ? quote.total_rupees.toFixed(2) : '0.00';
-  const vpa = (session as any).upi_id || `${session.shop_slug || session.shop_id || 'printbot'}@okaxis`;
-  const upiIntentUrl = `upi://pay?pa=${vpa}&pn=${encodeURIComponent(session.shop_name || 'PrintBot')}&am=${amount}&cu=INR&tn=${encodeURIComponent('Print order at ' + session.shop_name)}`;
   const razorpayKeyId = (import.meta as any).env?.VITE_RAZORPAY_KEY_ID || 'rzp_test_Ts9MJsdti9RG2c';
-
-  // Countdown timer for UPI session
-  useEffect(() => {
-    if (paymentMethod !== 'upi') return;
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [paymentMethod]);
-
-  const formatTimer = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  };
-
-  const handleCopyVpa = () => {
-    navigator.clipboard?.writeText(vpa);
-    setCopiedVpa(true);
-    setTimeout(() => setCopiedVpa(false), 2000);
-  };
 
   const handleRazorpayCheckout = async () => {
     setIsProcessingPayment(true);
@@ -145,7 +116,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
       rzp.open();
     } catch (err) {
       console.error('Razorpay launch error:', err);
-      alert('Unable to launch Razorpay gateway. Please pay at counter or scan UPI.');
+      alert('Unable to launch Razorpay gateway. Please try again.');
       setIsProcessingPayment(false);
     }
   };
@@ -303,11 +274,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
             style={{ textAlign: 'left', alignItems: 'flex-start', padding: '18px' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 750 }}>
-              <QrCode size={20} color="var(--pb-brand)" />
-              <span>{t.payUpiTitle}</span>
+              <CreditCard size={20} color="var(--pb-brand)" />
+              <span>Razorpay Payment Gateway</span>
             </div>
             <span className="pb-pill-subtext" style={{ textAlign: 'left', marginTop: '4px' }}>
-              {t.payUpiSubtitle}
+              UPI (GPay, PhonePe, Paytm), Cards, NetBanking
             </span>
           </button>
 
@@ -327,80 +298,79 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           </button>
         </div>
 
-        {/* UPI QR Display Container */}
+        {/* Razorpay Online Gateway Card (QR Completely Removed) */}
         {paymentMethod === 'upi' && (
-          <div style={{ marginTop: '28px', textAlign: 'center' }}>
-            <div className="pb-upi-countdown-timer">
-              <Clock size={14} />
-              <span>
-                {t.upiCountdown} {formatTimer(timeLeft)}
-              </span>
+          <div
+            style={{
+              marginTop: '24px',
+              padding: '28px 24px',
+              borderRadius: 'var(--pb-radius-xl)',
+              background: 'linear-gradient(180deg, rgba(2, 132, 199, 0.04) 0%, rgba(37, 99, 235, 0.08) 100%)',
+              border: '1.5px solid rgba(37, 99, 235, 0.25)',
+              textAlign: 'center',
+            }}
+          >
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 14px',
+                borderRadius: '999px',
+                background: 'rgba(37, 99, 235, 0.1)',
+                color: '#2563eb',
+                fontSize: '0.82rem',
+                fontWeight: 750,
+                marginBottom: '16px',
+              }}
+            >
+              <ShieldCheck size={16} />
+              <span>Razorpay Official Payment Gateway • 256-bit SSL Secured</span>
             </div>
 
-            {/* Simulated UPI QR Code SVG */}
-            <div className="pb-qr-canvas-holder" style={{ display: 'inline-block', margin: '0 auto 16px' }}>
-              <svg width="180" height="180" viewBox="0 0 180 180" style={{ display: 'block' }}>
-                <rect width="180" height="180" fill="#ffffff" />
-                {/* 3 Position Detection Patterns */}
-                <rect x="15" y="15" width="45" height="45" fill="#0f172a" rx="4" />
-                <rect x="23" y="23" width="29" height="29" fill="#ffffff" rx="2" />
-                <rect x="29" y="29" width="17" height="17" fill="#2563eb" rx="2" />
-
-                <rect x="120" y="15" width="45" height="45" fill="#0f172a" rx="4" />
-                <rect x="128" y="23" width="29" height="29" fill="#ffffff" rx="2" />
-                <rect x="134" y="29" width="17" height="17" fill="#2563eb" rx="2" />
-
-                <rect x="15" y="120" width="45" height="45" fill="#0f172a" rx="4" />
-                <rect x="23" y="128" width="29" height="29" fill="#ffffff" rx="2" />
-                <rect x="29" y="134" width="17" height="17" fill="#2563eb" rx="2" />
-
-                {/* Simulated Data Dots */}
-                <circle cx="90" cy="90" r="14" fill="#2563eb" />
-                <rect x="70" y="25" width="10" height="10" fill="#0f172a" />
-                <rect x="85" y="35" width="10" height="10" fill="#0f172a" />
-                <rect x="75" y="60" width="10" height="10" fill="#0f172a" />
-                <rect x="95" y="65" width="10" height="10" fill="#0f172a" />
-                <rect x="30" y="75" width="10" height="10" fill="#0f172a" />
-                <rect x="50" y="85" width="10" height="10" fill="#0f172a" />
-                <rect x="125" y="75" width="10" height="10" fill="#0f172a" />
-                <rect x="140" y="90" width="10" height="10" fill="#0f172a" />
-                <rect x="75" y="125" width="10" height="10" fill="#0f172a" />
-                <rect x="90" y="140" width="10" height="10" fill="#0f172a" />
-                <rect x="125" y="130" width="10" height="10" fill="#0f172a" />
-                <rect x="145" y="145" width="10" height="10" fill="#0f172a" />
-              </svg>
+            <div
+              style={{
+                fontSize: '1.5rem',
+                fontWeight: 800,
+                marginBottom: '8px',
+                fontFamily: 'Outfit, sans-serif',
+                color: 'var(--pb-text)',
+              }}
+            >
+              Pay ₹{amount} Online
             </div>
-
-            <div style={{ fontSize: '1.35rem', fontWeight: 800, marginBottom: '6px', fontFamily: 'Outfit, sans-serif' }}>
-              Pay ₹{amount} via UPI
-            </div>
-            <p style={{ fontSize: '0.88rem', color: 'var(--pb-muted)', marginBottom: '16px' }}>
-              {t.upiScanHeadline}
+            <p
+              style={{
+                fontSize: '0.92rem',
+                color: 'var(--pb-muted)',
+                marginBottom: '20px',
+                maxWidth: '460px',
+                margin: '0 auto 20px',
+                lineHeight: 1.5,
+              }}
+            >
+              Fast and automated verification. Instant dispatch to workstation queue with live progress tracking.
             </p>
 
-            <div className="pb-upi-vpa-row" style={{ display: 'inline-flex' }}>
-              <span>{vpa}</span>
-              <button
-                type="button"
-                onClick={handleCopyVpa}
-                style={{
-                  border: 0,
-                  background: 'transparent',
-                  color: 'var(--pb-brand)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  fontWeight: 700,
-                  fontSize: '0.82rem',
-                }}
-              >
-                {copiedVpa ? <Check size={14} color="var(--pb-success)" /> : <Copy size={14} />}
-                <span>{copiedVpa ? t.upiCopied : t.upiCopy}</span>
-              </button>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: '8px',
+                flexWrap: 'wrap',
+                marginBottom: '24px',
+              }}
+            >
+              <span className="pb-upi-app-pill">Google Pay</span>
+              <span className="pb-upi-app-pill">PhonePe</span>
+              <span className="pb-upi-app-pill">Paytm</span>
+              <span className="pb-upi-app-pill">CRED / Any UPI</span>
+              <span className="pb-upi-app-pill">Debit / Credit Card</span>
+              <span className="pb-upi-app-pill">NetBanking</span>
             </div>
 
-            <div style={{ margin: '16px 0 10px' }}>
+            <div>
               <button
                 type="button"
                 onClick={handleRazorpayCheckout}
@@ -409,61 +379,32 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '8px',
+                  gap: '10px',
                   width: '100%',
                   maxWidth: '380px',
-                  padding: '14px 22px',
+                  padding: '16px 24px',
                   borderRadius: 'var(--pb-radius-lg)',
                   background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
                   color: '#ffffff',
                   border: 'none',
-                  fontSize: '0.98rem',
+                  fontSize: '1.05rem',
                   fontWeight: 800,
                   cursor: isProcessingPayment ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
+                  boxShadow: '0 6px 20px rgba(37, 99, 235, 0.35)',
                 }}
               >
                 {isProcessingPayment ? (
                   <>
-                    <RefreshCw size={18} className="pb-spin" />
-                    <span>Opening Razorpay...</span>
+                    <RefreshCw size={20} className="pb-spin" />
+                    <span>Opening Razorpay Secure Gateway...</span>
                   </>
                 ) : (
                   <>
-                    <CreditCard size={18} />
-                    <span>Pay ₹{amount} with Razorpay (UPI / Cards)</span>
+                    <CreditCard size={20} />
+                    <span>Pay ₹{amount} with Razorpay</span>
                   </>
                 )}
               </button>
-            </div>
-
-            <div style={{ margin: '14px 0' }}>
-              <a
-                href={upiIntentUrl}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '10px 18px',
-                  borderRadius: 'var(--pb-radius-full)',
-                  background: 'var(--pb-brand-soft)',
-                  color: 'var(--pb-brand)',
-                  textDecoration: 'none',
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  border: '1px solid var(--pb-brand-border)',
-                }}
-              >
-                <span>Open UPI App on Phone</span>
-                <ExternalLink size={14} />
-              </a>
-            </div>
-
-            <div className="pb-upi-apps-grid">
-              <span className="pb-upi-app-pill">Google Pay</span>
-              <span className="pb-upi-app-pill">PhonePe</span>
-              <span className="pb-upi-app-pill">Paytm</span>
-              <span className="pb-upi-app-pill">BHIM UPI</span>
             </div>
           </div>
         )}
