@@ -111,6 +111,7 @@ export interface PrintToHardwarePayload {
   file_bytes: number[];
   rendered_pages: number[][];
   copies?: number;
+  duplex_mode: 'simplex' | 'duplex_long' | 'duplex_short';
 }
 
 export interface PrintToHardwareResult {

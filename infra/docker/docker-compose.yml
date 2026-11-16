@@ -59,6 +59,11 @@ services:
     environment:
       - ENVIRONMENT=development
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres_dev_secret_change_me@postgres:5432/printbot_db
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}
+      - SUPERADMIN_PASSWORD=${SUPERADMIN_PASSWORD:-}
+      - SUPERADMIN_MFA_ENABLED=${SUPERADMIN_MFA_ENABLED:-false}
+      - SUPERADMIN_MFA_SECRET=${SUPERADMIN_MFA_SECRET:-}
       - REDIS_URL=redis://valkey:6379/0
       - S3_ENDPOINT_URL=http://object-store:8333
       - S3_BUCKET_NAME=printbot-assets

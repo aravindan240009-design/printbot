@@ -15,6 +15,7 @@ import { type ShopLicense } from '../App';
 
 interface SettingsViewProps {
   currentShop?: ShopLicense;
+  systemNameFallback?: string;
   setupShopName: string;
   setupLocation: string;
   setupPhone: string;
@@ -26,6 +27,7 @@ interface SettingsViewProps {
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   currentShop,
+  systemNameFallback,
   setupShopName,
   setupLocation,
   setupPhone,
@@ -167,11 +169,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
             <div>
               <h3 className="pb-panel-title">Hardware Station Identity</h3>
-              <p className="pb-panel-subtitle">Windows Win32 Device Node</p>
+              <p className="pb-panel-subtitle">Licensed Workstation</p>
             </div>
           </div>
 
           <div className="pb-settings-identity-rows">
+            <div className="pb-identity-row">
+              <span className="pb-identity-label">Username</span>
+              <code className="pb-identity-code">{currentShop?.username || 'Not signed in'}</code>
+            </div>
+
+            <div className="pb-identity-row">
+              <span className="pb-identity-label">System Name</span>
+              <code className="pb-identity-code">{currentShop?.deviceName || systemNameFallback || 'Not paired'}</code>
+            </div>
+
             <div className="pb-identity-row">
               <span className="pb-identity-label">Hardware Device ID</span>
               <code className="pb-identity-code">{currentShop?.deviceId || 'Win32-SPOOLER-DEV01'}</code>

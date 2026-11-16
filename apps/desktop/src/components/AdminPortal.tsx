@@ -23,7 +23,6 @@ import {
   Key,
   CheckCircle2,
   X,
-  AlertTriangle,
 } from 'lucide-react';
 
 export interface PilotApplication {
@@ -108,11 +107,11 @@ interface AdminPortalProps {
   setNewUsername: (v: string) => void;
   newDuration: '1 Month' | '1 Year' | 'Lifetime Commercial';
   setNewDuration: (v: '1 Month' | '1 Year' | 'Lifetime Commercial') => void;
-  handleGenerateKey: (e: React.FormEvent) => void;
+  handleGenerateKey: (e: React.FormEvent) => Promise<void>;
   generatedKey: string;
   handleRevokeKey: (username: string) => void;
   handleExtendLicense: (username: string, duration: '1 Month' | '1 Year') => void;
-  handleResetDevice: (username: string) => void;
+  handleResetDevice: (username: string) => Promise<void>;
   handleDeleteKey: (username: string) => void;
   globalBroadcast: { active: boolean; message: string; type: 'info' | 'warning' | 'urgent'; timestamp: string };
   broadcastDraft: string;
@@ -192,7 +191,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [appStatusFilter, setAppStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
   const [licenseSearchQuery, setLicenseSearchQuery] = useState('');
   const [licenseStatusFilter, setLicenseStatusFilter] = useState<'ALL' | 'ACTIVE' | 'REVOKED'>('ALL');
-
   const shopList = Object.values(licenses).filter((l) => l.username.toLowerCase() !== 'admin');
   const activeCount = shopList.filter((l) => l.status === 'ACTIVE').length;
   const revokedCount = shopList.filter((l) => l.status === 'REVOKED').length;

@@ -630,6 +630,10 @@ class AuthService:
         return session
 
 
+    def revoke_session(self, session_token: str) -> None:
+        self._active_sessions.pop(session_token, None)
+
+
 
     def check_permission(self, session: Dict[str, Any], required_permission: str) -> bool:
 

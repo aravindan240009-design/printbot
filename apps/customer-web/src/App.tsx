@@ -262,7 +262,7 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
       copies: firstFile.options.copies || 1,
       colorMode: firstFile.options.colorMode === 'color' ? 'Color' : firstFile.options.colorMode === 'grayscale' ? 'Grayscale' : 'B&W',
       paperSize: firstFile.options.paperSize || 'A4',
-      duplexMode: firstFile.options.duplex === 'simplex' ? 'simplex' : 'duplex',
+      duplexMode: firstFile.options.duplex,
       finishing: firstFile.options.finishing || 'none',
       paperGsm: parseInt(firstFile.options.paperGsm || '75', 10) || 75,
       totalRupees: quote.total_rupees,

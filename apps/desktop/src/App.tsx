@@ -102,11 +102,42 @@ export interface ShopLicense {
   isConfigured: boolean;
   duration?: '1 Month' | '1 Year' | 'Lifetime Commercial';
   deviceId?: string | null;
+  deviceName?: string | null;
   deviceToken?: string | null;
   appId?: string;
   totalOrdersCount?: number;
   totalPagesCount?: number;
   lastActive?: string;
+}
+
+interface StationLicenseValidationResult {
+  success: boolean;
+  error?: string;
+  code?: string;
+  slug?: string;
+  shop_id?: string;
+  shop_name?: string;
+  city?: string;
+  contact_phone?: string;
+  rates?: {
+    bwRate?: number | string;
+    colorRate?: number | string;
+  };
+  order_mode?: 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC';
+  is_lifetime?: boolean;
+  expires_at?: string | null;
+  plan?: ShopLicense['duration'];
+  device_id?: string;
+  device_name?: string;
+  device_token?: string;
+}
+
+interface StationLicenseMutationResult {
+  success: boolean;
+  error?: string;
+  shop_id: string;
+  is_lifetime: boolean;
+  expires_at: string | null;
 }
 
 export interface PilotApplication {
@@ -177,7 +208,7 @@ export interface PrintJob {
     copies: number;
     color_mode: 'color' | 'bw' | 'grayscale';
     paper_size: string;
-    duplex_mode: string;
+    duplex_mode: 'simplex' | 'duplex_long' | 'duplex_short';
     paper_gsm: number;
     binding: string;
     page_range?: string;
@@ -471,209 +502,102 @@ export default function App() {
       return;
     }
 
-    // 2. Local Workstation Shop License Check (Licenses issued on this machine by the Super Admin)
-    const localLicense = licenses[u] || Object.values(licenses).find((l) => l.username.toLowerCase() === u);
-    if (localLicense && localLicense.licenseKey.trim().toUpperCase() === k.toUpperCase()) {
-      if (localLicense.status === 'REVOKED') {
-        setLoginError('This license key has been revoked by the Admin.');
-        return;
-      }
-      if (localLicense.expiresAt && localLicense.expiresAt !== 'LIFETIME') {
-        const exp = new Date(localLicense.expiresAt);
-        if (!isNaN(exp.getTime()) && exp < new Date()) {
-          setLoginError('This license key has expired. Please contact the Admin to renew.');
-          return;
-        }
-      }
-
-      try {
-        const devIdentity = await getWorkstationDeviceIdentity();
-        const devToken = localLicense.deviceToken || `devtoken:${u}:${devIdentity.device_id}:${Math.floor(Date.now() / 1000) + 86400 * 365}:station_local_auth`;
-        await bindWorkstation(devToken);
-        setLicenses((prev) => ({
-          ...prev,
-          [u]: {
-            ...prev[u],
-            deviceId: devIdentity.device_id,
-            deviceToken: devToken,
-          },
-        }));
-      } catch (bindErr) {
-        console.warn('Local workstation pairing note:', bindErr);
-      }
-
-      setFailedAttempts(0);
-      setLockoutUntil(null);
-      setActiveSession({ role: 'SHOP_OWNER', username: u });
-      return;
-    }
-
-    // 3. Authoritative Server-Side Licence Validation Flow against Canonical Database
+    // Shop access must be checked centrally so another workstation cannot use a local fallback.
+    const devIdentity = await getWorkstationDeviceIdentity();
+    let authRes: StationLicenseValidationResult | null = null;
     try {
-      const devIdentity = await getWorkstationDeviceIdentity();
-
-      const { data: authRes, error: rpcErr } = await supabase.rpc('validate_shop_license', {
+      const { data, error } = await supabase.rpc('validate_shop_license', {
         p_username: u,
         p_license_key: k.trim().toUpperCase(),
         p_device_id: devIdentity.device_id,
         p_hardware_hash: devIdentity.hardware_hash,
+        p_device_name: devIdentity.device_name,
       });
 
-      if (!rpcErr && authRes && authRes.success) {
-        const canonicalUsername = authRes.slug || u;
-        const newLic: ShopLicense = {
-          username: canonicalUsername,
-          appId: authRes.shop_id,
-          licenseKey: k.toUpperCase(),
-          shopName: authRes.shop_name || 'Print Shop',
-          location: authRes.city || '',
-          phone: authRes.contact_phone || '',
-          upiId: `${canonicalUsername}@upi`,
-          rates: {
-            bwPerSideRupees: (authRes.rates && authRes.rates.bwRate) ? Number(authRes.rates.bwRate) : 1.5,
-            colorPerSideRupees: (authRes.rates && authRes.rates.colorRate) ? Number(authRes.rates.colorRate) : 10.0,
-            duplexDiscountPercent: 15,
-          },
-          orderMode: authRes.order_mode || 'MANUAL_APPROVAL',
-          status: 'ACTIVE',
-          expiresAt: authRes.is_lifetime ? 'LIFETIME' : (authRes.expires_at ? authRes.expires_at.split('T')[0] : 'EXPIRED'),
-          isConfigured: true,
-          duration: authRes.is_lifetime ? 'Lifetime Commercial' : (authRes.plan || '1 Year'),
-          deviceId: devIdentity.device_id,
-          deviceToken: authRes.device_token || null,
-          totalOrdersCount: 0,
-          totalPagesCount: 0,
-          lastActive: 'Authenticated via Canonical Server RPC',
-        };
-
-        setLicenses((prev) => ({
-          ...prev,
-          [u]: newLic,
-          [canonicalUsername]: newLic,
-        }));
-        setFailedAttempts(0);
-        setLockoutUntil(null);
-
-        if (authRes.device_token) {
-          try {
-            await bindWorkstation(authRes.device_token);
-          } catch (bindErr) {
-            console.warn('Workstation pairing warning:', bindErr);
-          }
-        }
-
-        setActiveSession({ role: 'SHOP_OWNER', username: canonicalUsername });
+      if (error) {
+        console.warn('Station license validation failed:', error.message);
+        setLoginError('Could not verify the station license. Check your internet connection and try again.');
         return;
       }
+      authRes = data;
     } catch (err) {
-      console.warn('Server-side RPC authentication check error:', err);
+      console.warn('Station license validation request failed:', err);
+      setLoginError('Could not verify the station license. Check your internet connection and try again.');
+      return;
     }
 
-    // 4. Cloud Database Fallback (pilot_applications table)
-    try {
-      const { data: cloudApp, error } = await supabase
-        .from('pilot_applications')
-        .select('*')
-        .or(`generated_username.ilike.${u},shop_name.ilike.${u}`)
-        .eq('status', 'APPROVED')
-        .maybeSingle();
-
-      if (!error && cloudApp && cloudApp.generated_key?.trim().toUpperCase() === k.toUpperCase()) {
-        const app = mapSupabaseRowToApp(cloudApp);
-        let duration: '1 Month' | '1 Year' | 'Lifetime Commercial' = '1 Year';
-        if (typeof app.plan === 'string') {
-          if (app.plan.includes('Month') || app.plan === '1 Month') duration = '1 Month';
-          else if (app.plan.includes('Lifetime') || app.plan === 'Lifetime Commercial') duration = 'Lifetime Commercial';
-        }
-        const expiry = new Date();
-        if (duration === '1 Month') expiry.setDate(expiry.getDate() + 30);
-        else if (duration === '1 Year') expiry.setFullYear(expiry.getFullYear() + 1);
-        else expiry.setFullYear(expiry.getFullYear() + 50);
-
-        const devIdentity = await getWorkstationDeviceIdentity();
-        const devToken = `devtoken:${u}:${devIdentity.device_id}:${Math.floor(Date.now() / 1000) + 86400 * 365}:cloud_auth`;
-        try {
-          await bindWorkstation(devToken);
-        } catch {}
-
-        let parsedBw = 1.5;
-        let parsedColor = 10.0;
-        let parsedDuplex = 15;
-        let parsedPhoto = 30.0;
-        let parsedStaple = 5.0;
-        let parsedSpiral = 40.0;
-        let parsedHard = 150.0;
-        let parsedCard = 15.0;
-        let parsedOrderMode: 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC' = 'MANUAL_APPROVAL';
-        let parsedServices: ShopServiceItem[] | undefined = undefined;
-        if (cloudApp.notes) {
-          try {
-            const p = typeof cloudApp.notes === 'string' ? JSON.parse(cloudApp.notes) : cloudApp.notes;
-            if (p.services && Array.isArray(p.services)) parsedServices = p.services;
-            if (p.bwRate !== undefined) parsedBw = Number(p.bwRate);
-            if (p.colorRate !== undefined) parsedColor = Number(p.colorRate);
-            if (p.duplexDiscountPercent !== undefined) parsedDuplex = Number(p.duplexDiscountPercent);
-            if (p.photoRate !== undefined) parsedPhoto = Number(p.photoRate);
-            if (p.stapleRate !== undefined) parsedStaple = Number(p.stapleRate);
-            if (p.spiralRate !== undefined) parsedSpiral = Number(p.spiralRate);
-            if (p.hardBoundRate !== undefined) parsedHard = Number(p.hardBoundRate);
-            if (p.cardRate !== undefined) parsedCard = Number(p.cardRate);
-            if (p.orderMode) parsedOrderMode = p.orderMode;
-          } catch {}
-        }
-
-        const newLic: ShopLicense = {
-          username: u,
-          appId: app.id,
-          licenseKey: k.toUpperCase(),
-          shopName: app.shopName,
-          location: app.city || 'Counter 01',
-          phone: app.contactNumber.startsWith('+91') ? app.contactNumber : `+91 ${app.contactNumber}`,
-          upiId: `${u}@upi`,
-          rates: {
-            bwPerSideRupees: parsedBw,
-            colorPerSideRupees: parsedColor,
-            duplexDiscountPercent: parsedDuplex,
-            photoRate: parsedPhoto,
-            stapleRate: parsedStaple,
-            spiralRate: parsedSpiral,
-            hardBoundRate: parsedHard,
-            cardRate: parsedCard,
-          },
-          services: parsedServices,
-          orderMode: parsedOrderMode,
-          status: 'ACTIVE',
-          expiresAt: expiry.toISOString().split('T')[0],
-          isConfigured: true,
-          duration: duration,
-          deviceId: devIdentity.device_id,
-          deviceToken: devToken,
-          totalOrdersCount: 0,
-          totalPagesCount: 0,
-          lastActive: 'Authenticated via Cloud Application',
-        };
-
-        setLicenses((prev) => ({ ...prev, [u]: newLic }));
-        setFailedAttempts(0);
-        setLockoutUntil(null);
-        setActiveSession({ role: 'SHOP_OWNER', username: u });
+    if (!authRes?.success) {
+      const authMessage = authRes?.error || 'Invalid Username or Key.';
+      if (authRes?.code) {
+        setLoginError(authMessage);
         return;
       }
-    } catch (cloudErr) {
-      console.warn('Cloud application check error:', cloudErr);
+
+      if (authMessage.toLowerCase().includes('invalid shop username or licence key')) {
+        const nextAttempts = failedAttempts + 1;
+        setFailedAttempts(nextAttempts);
+        if (nextAttempts >= 5) {
+          setLockoutUntil(new Date(Date.now() + 60000));
+          logAdminAction('LOGIN_LOCKOUT', `Brute-force lockout triggered for "${u || 'unknown'}" after 5 failed attempts`);
+          setLoginError('Too many failed attempts. Login locked for 60 seconds.');
+        } else {
+          setLoginError(`Invalid Username or Key. (${5 - nextAttempts} attempts remaining before temporary lockout)`);
+        }
+        return;
+      }
+
+      setLoginError(authMessage);
+      return;
     }
 
-    // Increment failed attempts and lockout if needed
-    const nextAttempts = failedAttempts + 1;
-    setFailedAttempts(nextAttempts);
-    if (nextAttempts >= 5) {
-      const lockUntil = new Date(Date.now() + 60000);
-      setLockoutUntil(lockUntil);
-      logAdminAction('LOGIN_LOCKOUT', `Brute-force lockout triggered for "${u || 'unknown'}" after 5 failed attempts`);
-      setLoginError('Too many failed attempts. Login locked for 60 seconds.');
-    } else {
-      setLoginError(`Invalid Username or Key. (${5 - nextAttempts} attempts remaining before temporary lockout)`);
+    if (!authRes.device_token) {
+      setLoginError('Station license was verified, but workstation authorization could not be created.');
+      return;
     }
+
+    try {
+      await bindWorkstation(authRes.device_token);
+    } catch (bindErr) {
+      console.warn('Workstation pairing failed:', bindErr);
+      setLoginError('Station license was verified, but this workstation could not be activated. Please retry.');
+      return;
+    }
+
+    const canonicalUsername = authRes.slug || u;
+    const newLic: ShopLicense = {
+      username: canonicalUsername,
+      appId: authRes.shop_id,
+      licenseKey: k.toUpperCase(),
+      shopName: authRes.shop_name || 'Print Shop',
+      location: authRes.city || '',
+      phone: authRes.contact_phone || '',
+      upiId: `${canonicalUsername}@upi`,
+      rates: {
+        bwPerSideRupees: (authRes.rates && authRes.rates.bwRate) ? Number(authRes.rates.bwRate) : 1.5,
+        colorPerSideRupees: (authRes.rates && authRes.rates.colorRate) ? Number(authRes.rates.colorRate) : 10.0,
+        duplexDiscountPercent: 15,
+      },
+      orderMode: authRes.order_mode || 'MANUAL_APPROVAL',
+      status: 'ACTIVE',
+      expiresAt: authRes.is_lifetime ? 'LIFETIME' : (authRes.expires_at ? authRes.expires_at.split('T')[0] : 'EXPIRED'),
+      isConfigured: true,
+      duration: authRes.is_lifetime ? 'Lifetime Commercial' : (authRes.plan || '1 Year'),
+      deviceId: authRes.device_id || devIdentity.device_id,
+      deviceName: authRes.device_name || devIdentity.device_name,
+      deviceToken: authRes.device_token,
+      totalOrdersCount: 0,
+      totalPagesCount: 0,
+      lastActive: 'Authenticated via Canonical Server RPC',
+    };
+
+    setLicenses((prev) => ({
+      ...prev,
+      [u]: newLic,
+      [canonicalUsername]: newLic,
+    }));
+    setFailedAttempts(0);
+    setLockoutUntil(null);
+    setActiveSession({ role: 'SHOP_OWNER', username: canonicalUsername });
   };
 
   const handleLogout = () => {
@@ -1153,9 +1077,36 @@ export default function App() {
     else expiry.setFullYear(expiry.getFullYear() + 50);
     const expiryStr = expiry.toISOString().split('T')[0];
     const nowIso = new Date().toISOString();
+    const adminKey = localStorage.getItem('printbot_admin_master_password');
+    if (activeSession?.role !== 'ADMIN' || !adminKey) {
+      setAdminNotice('Super Admin verification is required to activate this license.');
+      return;
+    }
+
+    let activationData: StationLicenseMutationResult;
+    try {
+      const { data, error } = await supabase.rpc('activate_shop_license', {
+        p_shop_id: app.id,
+        p_username: u,
+        p_license_key: key,
+        p_plan: duration,
+        p_admin_username: activeSession.username,
+        p_admin_key: adminKey,
+      });
+      if (error) throw new Error(error.message);
+      if (!data?.success) {
+        throw new Error(data?.error || 'The license could not be activated in the central database.');
+      }
+      activationData = data as StationLicenseMutationResult;
+    } catch (error) {
+      console.error('Unable to activate central shop license:', error);
+      setAdminNotice(error instanceof Error ? error.message : 'Unable to activate this license. Please retry.');
+      return;
+    }
 
     const newLicense: ShopLicense = {
       username: u,
+      appId: activationData.shop_id,
       licenseKey: key,
       shopName: app.shopName,
       location: app.city || 'Counter 01',
@@ -1168,7 +1119,7 @@ export default function App() {
       },
       orderMode: 'MANUAL_APPROVAL',
       status: 'ACTIVE',
-      expiresAt: expiryStr,
+      expiresAt: activationData.expires_at ? activationData.expires_at.split('T')[0] : expiryStr,
       isConfigured: true,
       duration: duration,
       deviceId: null,
@@ -1193,46 +1144,9 @@ export default function App() {
       )
     );
 
-    // Sync generated credentials directly to Supabase cloud database
-    try {
-      const { error: sbErr } = await supabase
-        .from('pilot_applications')
-        .update({
-          status: 'APPROVED',
-          generated_username: u,
-          generated_key: key,
-          plan: duration,
-          approved_at: nowIso,
-        })
-        .eq('id', app.id);
-      if (sbErr) console.error('Supabase credentials approval error:', sbErr.message);
-    } catch (sbEx) {
-      console.warn('Failed to sync approval to Supabase:', sbEx);
-    }
-
-    // Also sync generated credentials with authenticated backend if online
-    if (activeSession?.token) {
-      try {
-        await fetch(`${API_BASE}/superadmin/applications/${app.id}/approve`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${activeSession.token}`,
-          },
-          body: JSON.stringify({
-            generated_username: u,
-            generated_key: key,
-            plan: duration,
-          }),
-        });
-      } catch (err) {
-        console.warn('Failed to update generated credentials on server:', err);
-      }
-    }
-
     logAdminAction(
       'KEY_ISSUED',
-      `Generated login credentials (${key}) for applicant ${app.shopName} (@${u}) with ${duration} subscription`
+      `Generated login credentials for applicant ${app.shopName} (@${u}) with ${duration} subscription`
     );
     setIssuedCredsModal({
       shopName: app.shopName,
@@ -1375,16 +1289,26 @@ export default function App() {
   const [licenseSearchQuery, setLicenseSearchQuery] = useState('');
   const [licenseStatusFilter, setLicenseStatusFilter] = useState<'ALL' | 'ACTIVE' | 'REVOKED'>('ALL');
 
-  const handleGenerateKey = (e: React.FormEvent) => {
+  const handleGenerateKey = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (!newShopName.trim() || !newUsername.trim()) return;
 
     const shopNameVal = newShopName.trim();
     const usernameVal = newUsername.trim().toLowerCase();
-    const generatedId = `APP-PILOT-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
     const randomHex = Math.random().toString(36).substring(2, 6).toUpperCase();
     const randomHex2 = Math.random().toString(36).substring(2, 6).toUpperCase();
     const key = `PB-KEY-${randomHex}-${randomHex2}`;
+
+    if (activeSession?.role !== 'ADMIN') {
+      setAdminNotice('Only a signed-in Super Admin can issue a license.');
+      return;
+    }
+
+    const adminKey = localStorage.getItem('printbot_admin_master_password');
+    if (!adminKey) {
+      setAdminNotice('Super Admin verification is required. Sign in again and retry.');
+      return;
+    }
 
     // Calculate expiry date
     const expiry = new Date();
@@ -1397,9 +1321,32 @@ export default function App() {
     }
     const expiryStr = expiry.toISOString().split('T')[0];
 
+    let issueData: StationLicenseMutationResult;
+    try {
+      const { data, error } = await supabase.rpc('issue_shop_license', {
+        p_shop_name: shopNameVal,
+        p_username: usernameVal,
+        p_license_key: key,
+        p_plan: newDuration,
+        p_city: 'Main Counter',
+        p_contact_phone: '',
+        p_admin_username: activeSession.username,
+        p_admin_key: adminKey,
+      });
+      if (error) throw new Error(error.message);
+      if (!data?.success) {
+        throw new Error(data?.error || 'The license could not be saved in the central database.');
+      }
+      issueData = data as StationLicenseMutationResult;
+    } catch (error) {
+      console.error('Unable to issue central shop license:', error);
+      setAdminNotice(error instanceof Error ? error.message : 'Unable to issue this license. Please retry.');
+      return;
+    }
+
     const newLicense: ShopLicense = {
       username: usernameVal,
-      appId: generatedId,
+      appId: issueData.shop_id,
       licenseKey: key,
       shopName: shopNameVal,
       location: 'Main Counter',
@@ -1412,7 +1359,7 @@ export default function App() {
       },
       orderMode: 'MANUAL_APPROVAL',
       status: 'ACTIVE',
-      expiresAt: expiryStr,
+      expiresAt: issueData.expires_at ? issueData.expires_at.split('T')[0] : expiryStr,
       isConfigured: true,
       duration: newDuration,
       deviceId: null,
@@ -1423,56 +1370,11 @@ export default function App() {
 
     setLicenses((prev) => ({ ...prev, [usernameVal]: newLicense }));
     setGeneratedKey(key);
-    logAdminAction('KEY_ISSUED', `Issued ${newDuration} license (${key}) to ${shopNameVal} (${usernameVal})`);
+    logAdminAction('KEY_ISSUED', `Issued ${newDuration} license to ${shopNameVal} (${usernameVal})`);
     setAdminNotice(`Generated new license key for ${shopNameVal}!`);
     setNewShopName('');
     setNewUsername('');
 
-    // Directly store approved license into Supabase cloud database
-    try {
-      supabase
-        .from('pilot_applications')
-        .insert({
-          id: generatedId,
-          shop_name: shopNameVal,
-          city: 'Main Counter',
-          contact_number: '',
-          plan: newDuration,
-          status: 'APPROVED',
-          generated_username: usernameVal,
-          generated_key: key,
-          applied_at: new Date().toISOString(),
-          approved_at: new Date().toISOString(),
-        })
-        .then(({ error: sbErr }) => {
-          if (sbErr) console.error('Supabase issue license error:', sbErr.message);
-          else fetchApplicationsFromCloud();
-        });
-    } catch (sbEx) {
-      console.warn('Failed to insert new license into Supabase:', sbEx);
-    }
-
-    // Also asynchronously sync to Authenticated Backend if available
-    if (activeSession?.token) {
-      try {
-        fetch(`${API_BASE}/superadmin/licenses/issue`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${activeSession.token}`,
-          },
-          body: JSON.stringify({
-            id: generatedId,
-            shop_name: shopNameVal,
-            username: usernameVal,
-            license_key: key,
-            plan: newDuration,
-            city: 'Main Counter',
-            phone: '',
-          }),
-        });
-      } catch {}
-    }
   };
 
   const handleRevokeKey = (username: string) => {
@@ -1552,15 +1454,51 @@ export default function App() {
     setAdminNotice(`Extended license for ${lic.shopName} until ${newExpiryStr}!`);
   };
 
-  const handleResetDevice = (username: string) => {
+  const handleResetDevice = async (username: string): Promise<void> => {
     const lic = licenses[username];
     if (!lic) return;
-    setLicenses((prev) => ({
-      ...prev,
-      [username]: { ...prev[username], deviceId: null },
-    }));
-    logAdminAction('DEVICE_RESET', `Cleared authorized PC hardware binding for ${lic.shopName} (${username})`);
-    setAdminNotice(`Hardware pairing cleared for ${lic.shopName}. The shop owner can now pair their new PC.`);
+
+    if (activeSession?.role !== 'ADMIN') {
+      setAdminNotice('Only a signed-in Super Admin can reset a workstation binding.');
+      return;
+    }
+
+    const adminKey = localStorage.getItem('printbot_admin_master_password');
+    if (!adminKey) {
+      setAdminNotice('Super Admin verification is required. Sign in again and retry.');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('reset_shop_device_binding', {
+        p_username: lic.username,
+        p_license_key: lic.licenseKey,
+        p_admin_username: activeSession.username,
+        p_admin_key: adminKey,
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+      if (!data?.success) {
+        throw new Error(data?.error || 'The workstation binding was not reset.');
+      }
+
+      setLicenses((prev) => ({
+        ...prev,
+        [username]: {
+          ...prev[username],
+          deviceId: null,
+          deviceName: null,
+          deviceToken: null,
+        },
+      }));
+      logAdminAction('DEVICE_RESET', `Cleared authorized PC hardware binding for ${lic.shopName} (${username})`);
+      setAdminNotice(`Hardware binding for ${lic.shopName} was reset. The old PC will be blocked before its next print.`);
+    } catch (error) {
+      console.error('Unable to reset workstation binding:', error);
+      setAdminNotice(error instanceof Error ? error.message : 'Unable to reset workstation binding. Please retry.');
+    }
   };
 
   // --- Admin Password Change State ---
@@ -1702,7 +1640,14 @@ export default function App() {
           .map((row: any) => {
             try {
               const meta = row.notes ? JSON.parse(row.notes) : {};
-              const isDuplex = meta.duplexMode?.includes('duplex') || meta.options?.duplex_mode?.includes('duplex');
+              const rawDuplexMode = meta.options?.duplex_mode || meta.duplexMode;
+              const duplexMode: PrintJob['options']['duplex_mode'] =
+                rawDuplexMode === 'duplex_short'
+                  ? 'duplex_short'
+                  : rawDuplexMode === 'duplex_long' || rawDuplexMode === 'duplex'
+                    ? 'duplex_long'
+                    : 'simplex';
+              const isDuplex = duplexMode !== 'simplex';
               const pageCount = Number(meta.pageCount || meta.options?.page_count || 1);
               const copies = Number(meta.copies || meta.options?.copies || 1);
               const sides = pageCount;
@@ -1736,7 +1681,7 @@ export default function App() {
                   copies: copies,
                   color_mode: (meta.colorMode === 'Color' || meta.options?.color_mode === 'color' ? 'color' : 'bw') as any,
                   paper_size: (meta.paperSize || meta.options?.paper_size || 'A4') as any,
-                  duplex_mode: (isDuplex ? 'duplex_long' : 'simplex') as any,
+                  duplex_mode: duplexMode,
                   paper_gsm: meta.paperGsm || 75,
                   binding: (meta.finishing || 'none') as any,
                 },
@@ -1766,6 +1711,32 @@ export default function App() {
     } catch (err) {
       console.warn('Error fetching server queue:', err);
     }
+  };
+
+  const handleClearAllDispatch = async (): Promise<number> => {
+    const shopId = (currentShop?.username || activeSession?.username || '').trim().toLowerCase();
+    if (!shopId) {
+      throw new Error('A logged-in shop session is required to clear dispatch orders.');
+    }
+
+    const headers: Record<string, string> = { 'X-Tenant-ID': shopId };
+    if (currentShop?.deviceToken) {
+      headers.Authorization = `Bearer ${currentShop.deviceToken}`;
+    }
+    const response = await fetch(`${API_BASE}/superadmin/dispatch/clear`, {
+      method: 'POST',
+      headers,
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(result?.detail || 'Could not clear dispatch orders.');
+    }
+    if (!Number.isSafeInteger(result?.deleted_count) || result.deleted_count < 0) {
+      throw new Error('The server returned an invalid dispatch deletion count.');
+    }
+    setNotice(`Permanently cleared ${result.deleted_count} dispatch order${result.deleted_count === 1 ? '' : 's'} across all shops.`);
+    await fetchServerQueue();
+    return result.deleted_count;
   };
 
   // Poll cloud queue for active counter workstation
@@ -1951,6 +1922,57 @@ export default function App() {
   const createPrintAttemptId = (jobId: string): string =>
     `${jobId}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
+  const ensureCurrentWorkstationBinding = async (): Promise<void> => {
+    if (activeSession?.role !== 'SHOP_OWNER' || !currentShop) {
+      throw new Error('Sign in with a valid station license before printing.');
+    }
+
+    const identity = await getWorkstationDeviceIdentity();
+    let response;
+    try {
+      response = await supabase.rpc('validate_shop_license', {
+        p_username: currentShop.username,
+        p_license_key: currentShop.licenseKey,
+        p_device_id: identity.device_id,
+        p_hardware_hash: identity.hardware_hash,
+        p_device_name: identity.device_name,
+      });
+    } catch (error) {
+      console.warn('Workstation authorization check failed:', error);
+      throw new Error('Could not verify this workstation. Connect to the internet and retry.');
+    }
+
+    if (response.error) {
+      console.warn('Workstation authorization check failed:', response.error.message);
+      throw new Error('Could not verify this workstation. Connect to the internet and retry.');
+    }
+
+    const authRes = response.data as StationLicenseValidationResult | null;
+    if (!authRes?.success) {
+      setActiveSession(null);
+      throw new Error(authRes?.error || 'This workstation is no longer authorized to print.');
+    }
+    if (!authRes.device_token) {
+      throw new Error('The license service did not return workstation authorization.');
+    }
+
+    await bindWorkstation(authRes.device_token);
+
+    const canonicalUsername = authRes.slug || currentShop.username;
+    const updatedShop: ShopLicense = {
+      ...currentShop,
+      username: canonicalUsername,
+      deviceId: authRes.device_id || identity.device_id,
+      deviceName: authRes.device_name || identity.device_name,
+      deviceToken: authRes.device_token,
+    };
+    setLicenses((prev) => ({
+      ...prev,
+      [currentShop.username]: updatedShop,
+      [canonicalUsername]: updatedShop,
+    }));
+  };
+
   const handleApproveJob = async (jobId: string) => {
     setJobs((prev) =>
       prev.map((j) => (j.id === jobId ? { ...j, status: 'QUEUED' } : j))
@@ -1991,6 +2013,7 @@ export default function App() {
     }
 
     try {
+      await ensureCurrentWorkstationBinding();
       const result = await printToHardware({
         job_id: jobId,
         attempt_id: createPrintAttemptId(jobId),
@@ -1999,6 +2022,7 @@ export default function App() {
         file_bytes: printableBytes,
         rendered_pages: renderedPages,
         copies: targetJob.options.copies || 1,
+        duplex_mode: targetJob.options.duplex_mode,
       });
       setNotice(`Job #${jobId} submitted to ${targetPrinter} (Windows spooler job #${result.spooler_job_id}).`);
     } catch (printErr: any) {
@@ -2043,6 +2067,7 @@ export default function App() {
         fileBytes,
         targetJob.options.color_mode !== 'color',
       );
+      await ensureCurrentWorkstationBinding();
       const result = await printToHardware({
         job_id: jobId,
         attempt_id: createPrintAttemptId(jobId),
@@ -2051,6 +2076,7 @@ export default function App() {
         file_bytes: fileBytes,
         rendered_pages: renderedPages,
         copies: targetJob.options.copies || 1,
+        duplex_mode: targetJob.options.duplex_mode,
       });
 
       setNotice(`Job #${jobId} submitted to ${targetPrinter} (Windows spooler job #${result.spooler_job_id}).`);
@@ -2406,6 +2432,7 @@ export default function App() {
           onRejectJob={(jobId) => setRejectionModalJobId(jobId)}
           onCompleteJob={handleCompleteJob}
           onDirectPrint={handleDirectPrint}
+          onClearAllDispatch={handleClearAllDispatch}
           selectedPrinterName={selectedPrinterName}
           setSelectedPrinterName={setSelectedPrinterName}
           nativePrinters={nativePrinters || []}
@@ -2491,6 +2518,7 @@ export default function App() {
       {activeTab === 'settings' && (
         <SettingsView
           currentShop={currentShop}
+          systemNameFallback={deviceIdentity?.device_name}
           setupShopName={setupShopName}
           setupLocation={setupLocation}
           setupPhone={setupPhone}

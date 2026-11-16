@@ -12,7 +12,8 @@ mod workstation;
 
 use journal::SpoolJournal;
 use printers::{
-    discover_printers, prepare_spool_job, submit_rendered_pages_to_windows_printer, SpoolReceipt,
+    discover_printers, prepare_spool_job, submit_rendered_pages_to_windows_printer, DuplexMode,
+    SpoolReceipt,
 };
 use workstation::{JournalEntry, PrintRequest, PrinterInfo};
 
@@ -245,6 +246,8 @@ pub struct NativePrintPayload {
     pub file_bytes: Vec<u8>,
     pub rendered_pages: Vec<Vec<u8>>,
     pub copies: Option<u32>,
+    #[serde(default)]
+    pub duplex_mode: DuplexMode,
 }
 
 #[derive(serde::Serialize)]
@@ -293,6 +296,16 @@ fn validate_native_print_payload(
     Ok(())
 }
 
+fn validate_duplex_support(duplex_mode: DuplexMode, supports_duplex: bool) -> Result<(), String> {
+    if duplex_mode != DuplexMode::Simplex && !supports_duplex {
+        return Err(
+            "This printer does not support double-sided printing. Choose a duplex-capable printer or select One Side."
+                .into(),
+        );
+    }
+    Ok(())
+}
+
 #[tauri::command]
 fn print_to_native_hardware(
     payload: NativePrintPayload,
@@ -316,11 +329,8 @@ fn print_to_native_hardware(
     }
 
     let copies = payload.copies.unwrap_or(1);
-    validate_native_print_payload(
-        &payload.file_bytes,
-        &payload.rendered_pages,
-        copies,
-    )?;
+    validate_native_print_payload(&payload.file_bytes, &payload.rendered_pages, copies)?;
+    validate_duplex_support(payload.duplex_mode, printer.supports_duplex)?;
 
     std::fs::create_dir_all(&state.spool_root)
         .map_err(|e| format!("failed to create spool directory: {e}"))?;
@@ -340,6 +350,7 @@ fn print_to_native_hardware(
         &format!("PrintBot - {}", payload.file_name),
         &payload.rendered_pages,
         copies,
+        payload.duplex_mode,
     )?;
 
     state
@@ -391,7 +402,8 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{document_file_extension, validate_native_print_payload};
+    use super::{document_file_extension, validate_duplex_support, validate_native_print_payload};
+    use crate::printers::DuplexMode;
 
     #[test]
     fn recognizes_supported_document_signatures() {
@@ -427,5 +439,29 @@ mod tests {
     fn enforces_copy_limit_before_spooling() {
         assert!(validate_native_print_payload(b"%PDF-1.7", &[b"\x89PNG\r\n\x1a\n".to_vec()], 0).is_err());
         assert!(validate_native_print_payload(b"%PDF-1.7", &[b"\x89PNG\r\n\x1a\n".to_vec()], 101).is_err());
+    }
+
+    #[test]
+    fn refuses_duplex_jobs_on_printers_without_duplex_support() {
+        let error = validate_duplex_support(DuplexMode::DuplexLong, false)
+            .expect_err("a simplex-only printer must not silently print a duplex job");
+
+        assert!(error.contains("does not support double-sided printing"));
+    }
+
+    #[test]
+    fn accepts_duplex_payload_modes_and_legacy_duplex_alias() {
+        assert_eq!(
+            serde_json::from_str::<DuplexMode>("\"duplex_long\"").unwrap(),
+            DuplexMode::DuplexLong
+        );
+        assert_eq!(
+            serde_json::from_str::<DuplexMode>("\"duplex_short\"").unwrap(),
+            DuplexMode::DuplexShort
+        );
+        assert_eq!(
+            serde_json::from_str::<DuplexMode>("\"duplex\"").unwrap(),
+            DuplexMode::DuplexLong
+        );
     }
 }

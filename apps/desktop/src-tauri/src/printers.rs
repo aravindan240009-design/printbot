@@ -5,6 +5,34 @@ use crate::{
     workstation::{PrintRequest, PrinterInfo},
 };
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DuplexMode {
+    #[default]
+    Simplex,
+    #[serde(alias = "duplex")]
+    DuplexLong,
+    DuplexShort,
+}
+
+fn devmode_duplex_value(mode: DuplexMode) -> i16 {
+    match mode {
+        DuplexMode::Simplex => 1,
+        DuplexMode::DuplexLong => 2,
+        DuplexMode::DuplexShort => 3,
+    }
+}
+
+#[cfg(windows)]
+struct OpenPrinterHandle(windows::Win32::Foundation::HANDLE);
+
+#[cfg(windows)]
+impl Drop for OpenPrinterHandle {
+    fn drop(&mut self) {
+        let _ = unsafe { windows::Win32::Graphics::Printing::ClosePrinter(self.0) };
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub struct SpoolReceipt {
     pub job_id: String,
@@ -101,9 +129,21 @@ pub fn submit_rendered_pages_to_windows_printer(
     doc_title: &str,
     pages: &[Vec<u8>],
     copies: u32,
+    duplex_mode: DuplexMode,
 ) -> Result<u32, String> {
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
+    use windows::{
+        core::PCWSTR,
+        Win32::{
+            Foundation::{HANDLE, HWND},
+            Graphics::Gdi::{
+                DEVMODEW, DEVMODE_DUPLEX, DMDUP_HORIZONTAL, DMDUP_SIMPLEX, DMDUP_VERTICAL,
+                DM_DUPLEX, DM_IN_BUFFER, DM_OUT_BUFFER,
+            },
+            Graphics::Printing::{DocumentPropertiesW, OpenPrinterW},
+        },
+    };
 
     #[repr(C)]
     struct DOCINFOW {
@@ -183,12 +223,119 @@ pub fn submit_rendered_pages_to_windows_printer(
     let wide_driver = to_wide("WINSPOOL");
     let wide_printer = to_wide(printer_name);
     let wide_title = to_wide(doc_title);
+    let mut raw_printer_handle = HANDLE(0);
+    unsafe { OpenPrinterW(PCWSTR(wide_printer.as_ptr()), &mut raw_printer_handle, None) }
+        .map_err(|error| format!("Could not open printer '{}': {error}", printer_name))?;
+    let printer_handle = OpenPrinterHandle(raw_printer_handle);
+
+    let mode_size = unsafe {
+        DocumentPropertiesW(
+            HWND(0),
+            printer_handle.0,
+            PCWSTR(wide_printer.as_ptr()),
+            None,
+            None,
+            0,
+        )
+    };
+    if mode_size < std::mem::size_of::<DEVMODEW>() as i32 || mode_size > 16 * 1024 * 1024 {
+        return Err(format!(
+            "The printer driver returned an invalid settings size for '{}'.",
+            printer_name
+        ));
+    }
+
+    let word_count =
+        (mode_size as usize + std::mem::size_of::<usize>() - 1) / std::mem::size_of::<usize>();
+    let mut default_mode_words = vec![0usize; word_count];
+    let default_mode = default_mode_words.as_mut_ptr() as *mut DEVMODEW;
+    if unsafe {
+        DocumentPropertiesW(
+            HWND(0),
+            printer_handle.0,
+            PCWSTR(wide_printer.as_ptr()),
+            Some(default_mode),
+            None,
+            DM_OUT_BUFFER.0,
+        )
+    } != 1
+    {
+        return Err(format!(
+            "Could not read the printer settings for '{}': {}",
+            printer_name,
+            std::io::Error::last_os_error()
+        ));
+    }
+
+    // Windows uses vertical for long-edge binding and horizontal for short-edge binding.
+    let requested_duplex = match duplex_mode {
+        DuplexMode::Simplex => DMDUP_SIMPLEX,
+        DuplexMode::DuplexLong => DMDUP_VERTICAL,
+        DuplexMode::DuplexShort => DMDUP_HORIZONTAL,
+    };
+    let default_settings = unsafe { &mut *default_mode };
+    if default_settings.dmSize < std::mem::size_of::<DEVMODEW>() as u16
+        || usize::from(default_settings.dmSize) + usize::from(default_settings.dmDriverExtra)
+            > mode_size as usize
+    {
+        return Err(format!(
+            "The printer driver returned invalid settings for '{}'.",
+            printer_name
+        ));
+    }
+    default_settings.dmFields |= DM_DUPLEX;
+    default_settings.dmDuplex = DEVMODE_DUPLEX(devmode_duplex_value(duplex_mode));
+
+    let mut effective_mode_words = vec![0usize; word_count];
+    let effective_mode = effective_mode_words.as_mut_ptr() as *mut DEVMODEW;
+    if unsafe {
+        DocumentPropertiesW(
+            HWND(0),
+            printer_handle.0,
+            PCWSTR(wide_printer.as_ptr()),
+            Some(effective_mode),
+            Some(default_mode),
+            (DM_IN_BUFFER | DM_OUT_BUFFER).0,
+        )
+    } != 1
+    {
+        return Err(format!(
+            "The printer driver rejected the requested print sides for '{}'.",
+            printer_name
+        ));
+    }
+
+    let effective_settings = unsafe { &*effective_mode };
+    if effective_settings.dmSize < std::mem::size_of::<DEVMODEW>() as u16
+        || usize::from(effective_settings.dmSize) + usize::from(effective_settings.dmDriverExtra)
+            > mode_size as usize
+    {
+        return Err(format!(
+            "The printer driver returned invalid effective settings for '{}'.",
+            printer_name
+        ));
+    }
+    let driver_duplex_enabled = effective_settings.dmFields.0 & DM_DUPLEX.0 != 0;
+    if (duplex_mode != DuplexMode::Simplex && !driver_duplex_enabled)
+        || (driver_duplex_enabled && effective_settings.dmDuplex != requested_duplex)
+    {
+        let requested_setting = match duplex_mode {
+            DuplexMode::Simplex => "single-sided",
+            DuplexMode::DuplexLong => "double-sided book-style",
+            DuplexMode::DuplexShort => "double-sided calendar-style",
+        };
+        return Err(format!(
+            "The printer driver did not apply the requested {requested_setting} setting for '{}'. Check the printer driver or choose a compatible printer.",
+            printer_name,
+        ));
+    }
+
     let dc = unsafe {
         CreateDCW(
             wide_driver.as_ptr(),
             wide_printer.as_ptr(),
             std::ptr::null(),
-            std::ptr::null(),
+            effective_mode as *const std::ffi::c_void,
         )
     };
     if dc == 0 {
@@ -333,6 +480,7 @@ pub fn submit_rendered_pages_to_windows_printer(
     _doc_title: &str,
     _pages: &[Vec<u8>],
     _copies: u32,
+    _duplex_mode: DuplexMode,
 ) -> Result<u32, String> {
     Err("Native printer output is only supported on Windows".into())
 }
@@ -515,7 +663,7 @@ pub fn discover_printers(_bound_shop_id: &str) -> Result<Vec<PrinterInfo>, Strin
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{devmode_duplex_value, DuplexMode, *};
     use crate::workstation::PrintRequest;
     use std::fs;
     use tempfile::tempdir;
@@ -593,5 +741,12 @@ mod tests {
                 .state,
             crate::workstation::SpoolState::Intent
         );
+    }
+
+    #[test]
+    fn duplex_modes_map_to_windows_driver_values() {
+        assert_eq!(devmode_duplex_value(DuplexMode::Simplex), 1);
+        assert_eq!(devmode_duplex_value(DuplexMode::DuplexLong), 2);
+        assert_eq!(devmode_duplex_value(DuplexMode::DuplexShort), 3);
     }
 }

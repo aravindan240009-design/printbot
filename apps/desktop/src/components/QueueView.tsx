@@ -12,6 +12,8 @@ import {
   SlidersHorizontal,
   ChevronRight,
   Sparkles,
+  Trash2,
+  X,
 } from 'lucide-react';
 import { type PrintJob } from '../App';
 
@@ -32,6 +34,7 @@ interface QueueViewProps {
   onCompleteJob?: (jobId: string) => void;
   onInspectJob?: (job: PrintJob) => void;
   onRefreshJobs?: () => void;
+  onClearAllDispatch: () => Promise<number>;
   selectedPrinterName?: string;
   setSelectedPrinterName?: (val: string) => void;
   nativePrinters?: Array<{ name: string; is_default?: boolean; is_online?: boolean }>;
@@ -55,11 +58,37 @@ export const QueueView: React.FC<QueueViewProps> = ({
   onCompleteJob,
   onInspectJob,
   onRefreshJobs,
+  onClearAllDispatch,
   selectedPrinterName,
   setSelectedPrinterName,
   nativePrinters,
   onDirectPrint,
 }) => {
+  const [isClearDialogOpen, setIsClearDialogOpen] = React.useState(false);
+  const [clearError, setClearError] = React.useState<string | null>(null);
+  const [isClearingDispatch, setIsClearingDispatch] = React.useState(false);
+
+  const closeClearDialog = () => {
+    if (isClearingDispatch) return;
+    setIsClearDialogOpen(false);
+    setClearError(null);
+  };
+
+  const handleClearAllDispatch = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    setClearError(null);
+    setIsClearingDispatch(true);
+    try {
+      await onClearAllDispatch();
+      setIsClearDialogOpen(false);
+    } catch (error) {
+      setClearError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsClearingDispatch(false);
+    }
+  };
+
   const getStatusBadge = (status: PrintJob['status']) => {
     switch (status) {
       case 'PENDING_APPROVAL':
@@ -120,6 +149,18 @@ export const QueueView: React.FC<QueueViewProps> = ({
               <RefreshCw size={14} /> Refresh
             </button>
           )}
+
+          <button
+            type="button"
+            className="pb-btn pb-btn-danger"
+            onClick={() => {
+              setClearError(null);
+              setIsClearDialogOpen(true);
+            }}
+            title="Permanently clear dispatch orders across all shops"
+          >
+            <Trash2 size={14} /> Clear All
+          </button>
 
           <button
             type="button"
@@ -292,7 +333,7 @@ export const QueueView: React.FC<QueueViewProps> = ({
                       {job.physical_sheets} {job.physical_sheets === 1 ? 'sheet' : 'sheets'} ({job.rendered_sides} sides)
                     </span>
                     <span className="pb-chip">
-                      {job.options.duplex_mode === 'duplex_long' ? 'Double Sided' : 'Single Sided'}
+                      {job.options.duplex_mode === 'simplex' ? 'Single Sided' : 'Double Sided'}
                     </span>
                     {job.options.binding && job.options.binding !== 'none' && (
                       <span className="pb-chip" style={{ borderColor: 'var(--pb-desk-accent-border)' }}>
@@ -401,6 +442,68 @@ export const QueueView: React.FC<QueueViewProps> = ({
           </div>
         )}
       </div>
+
+      {isClearDialogOpen && (
+        <div className="pb-modal-backdrop" onClick={closeClearDialog}>
+          <div
+            className="pb-modal pb-modal-md"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="clear-dispatch-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="pb-modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertTriangle size={17} color="var(--pb-desk-danger)" />
+                <h2 className="pb-modal-title" id="clear-dispatch-title">Clear all dispatch orders</h2>
+              </div>
+              <button
+                type="button"
+                className="pb-modal-close"
+                onClick={closeClearDialog}
+                aria-label="Close clear dispatch dialog"
+                disabled={isClearingDispatch}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleClearAllDispatch}>
+              <div className="pb-modal-body">
+                <p style={{ margin: 0, color: 'var(--pb-desk-text-dim)', fontSize: '13px', lineHeight: 1.5 }}>
+                  Are you sure you want to permanently delete every dispatch order across all shops and statuses?
+                  This cannot be undone. Shop licenses, audit records, and local spool files will remain.
+                </p>
+
+                {clearError && (
+                  <div role="alert" style={{ color: 'var(--pb-desk-danger)', fontSize: '12px', fontWeight: 650 }}>
+                    {clearError}
+                  </div>
+                )}
+              </div>
+
+              <div className="pb-modal-footer">
+                <button
+                  type="button"
+                  className="pb-btn pb-btn-secondary"
+                  onClick={closeClearDialog}
+                  disabled={isClearingDispatch}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="pb-btn pb-btn-danger"
+                  disabled={isClearingDispatch}
+                >
+                  <Trash2 size={14} />
+                  {isClearingDispatch ? 'Clearing…' : 'Yes, Permanently Clear All'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

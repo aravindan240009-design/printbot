@@ -10,6 +10,8 @@ class Settings(BaseModel):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1 day
     WEBHOOK_SIGNING_SECRET: str = os.getenv("WEBHOOK_SIGNING_SECRET", "whsec_test_secret_9981248912")
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./xerox.db")
+    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
+    SUPABASE_SERVICE_ROLE_KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     STORAGE_BUCKET: str = os.getenv("STORAGE_BUCKET", "xerox-documents")
     R2_ACCOUNT_ID: str = os.getenv("R2_ACCOUNT_ID", "local-r2-account")

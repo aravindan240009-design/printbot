@@ -32,6 +32,8 @@ EXEMPT_EXACT_PATHS = {
     "/api/v1/health/live",
     "/api/v1/health/ready",
     "/api/v1/auth/login",
+    # This route validates its own shop-device token before global deletion.
+    "/api/v1/superadmin/dispatch/clear",
     "/api/v1/licenses/validate",
     "/api/v1/devices/pair",
     "/api/v1/devices/challenge-response",

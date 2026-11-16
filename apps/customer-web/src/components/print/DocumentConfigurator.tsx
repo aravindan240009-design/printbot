@@ -207,7 +207,7 @@ export const DocumentConfigurator: React.FC<DocumentConfiguratorProps> = ({
             onClick={() => onUpdateOptions({ duplex: 'simplex' })}
           >
             <span>{t.duplexSimplex}</span>
-            <span className="pb-pill-subtext">1 side / sheet</span>
+            <span className="pb-pill-subtext">Print on front only</span>
           </button>
           <button
             type="button"
@@ -215,7 +215,7 @@ export const DocumentConfigurator: React.FC<DocumentConfiguratorProps> = ({
             onClick={() => onUpdateOptions({ duplex: 'duplex_long' })}
           >
             <span>{t.duplexLong}</span>
-            <span className="pb-pill-subtext">Book style (Long)</span>
+            <span className="pb-pill-subtext">Open like a book</span>
           </button>
           <button
             type="button"
@@ -223,7 +223,7 @@ export const DocumentConfigurator: React.FC<DocumentConfiguratorProps> = ({
             onClick={() => onUpdateOptions({ duplex: 'duplex_short' })}
           >
             <span>{t.duplexShort}</span>
-            <span className="pb-pill-subtext">Flip style (Short)</span>
+            <span className="pb-pill-subtext">Flip like a calendar</span>
           </button>
         </div>
       </div>
