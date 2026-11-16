@@ -26,7 +26,6 @@ from packages.contracts.models import (
 )
 from services.api.services.audit_service import audit_service, AuditEvent
 from services.api.services.auth_service import verify_password, verify_totp
-from services.api.core.config import settings
 
 
 STEP_UP_CHALLENGE_TTL_SECONDS = 300  # 5 minutes
@@ -140,10 +139,6 @@ class SecurityAdminService:
             account = auth_service._users.get(user.get("email", "").lower())
             if account and verify_password(req.password, account.password_hash):
                 verified = True
-            elif settings.ENVIRONMENT.lower() not in {"production", "prod"}:
-                # Development-only compatibility for the existing simulator
-                # fixtures. These credentials are never accepted in production.
-                verified = req.password in ("SuperAdminSecurePassword2026!", "OwnerSecurePass123!")
         elif req.totp_code:
             from services.api.services.auth_service import auth_service
             email = user.get("email")

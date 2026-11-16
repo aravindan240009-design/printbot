@@ -143,9 +143,6 @@ importers:
 
   packages/ui:
     dependencies:
-      '@types/gsap':
-        specifier: ^3.0.0
-        version: 3.0.0
       '@xerox/contracts':
         specifier: workspace:*
         version: link:../contracts
@@ -760,10 +757,6 @@ packages:
 
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
-
-  '@types/gsap@3.0.0':
-    resolution: {integrity: sha512-BbWLi4WRHGze4C8NV7U7yRevuBFiPkPZZyGa0rryanvh/9HPUFXTNBXsGQxJZJq7Ix7j4RXMYodP3s+OsqCErg==}
-    deprecated: This is a stub types definition. gsap provides its own type definitions, so you do not need this installed.
 
   '@types/node@20.19.43':
     resolution: {integrity: sha512-6oYBAi5ikg4Pl+kGsoYtawUMBT2zZMCvPNF7pVLnHZfd1zf38DRiWn/gT01RYCdUqkv7Fhr+C9ot4/tb+2sVvA==}
@@ -1838,10 +1831,6 @@ snapshots:
       '@babel/types': 7.29.8
 
   '@types/estree@1.0.9': {}
-
-  '@types/gsap@3.0.0':
-    dependencies:
-      gsap: 3.15.0
 
   '@types/node@20.19.43':
     dependencies:

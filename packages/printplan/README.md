@@ -1,9 +1,9 @@
 # PrintPlan v1 executable contract
 
 `schema.v1.json` is Draft 2020-12, strict at every object level. Python uses
-jsonschema 4.26.0; TypeScript and Rust implement exactly its used structural
-keywords and are checked against the same corpus. No application API is changed.
-All fields are required; optional operations use explicit null/false values.
+jsonschema 4.26.0; TypeScript and Rust mirror its executable structural checks.
+No application API is changed. All fields are required; optional operations use
+explicit null/false values.
 
 `validate(plan, expected_shop)` returns the same normalized JSON in all adapters.
 The caller supplies independently authenticated tenant context. This function
@@ -45,22 +45,7 @@ production signatures and plan identity must bind those independently. v1 keys
 are ASCII; strings use unescaped Unicode with JSON string escaping. Source
 digests, all settings and actual ordered side recipes are bound by the hash.
 
-Python's private `_normalize(plan, expected_shop)` is a fixture-builder seam that
-performs all checks except final recipe hash comparison. Builders may supply a
-64-hex placeholder, call `_normalize`, set `render_hash` from `render_hash(...)`,
-then call `validate` on the final plan. Consumers must always call `validate`;
-the builder helper does not accept a plan or establish authorization.
-
-Run from repository root:
-
-```powershell
-python -m pytest tests/phase0/test_printplan.py -q
-node packages/printplan/typescript/printplan.ts
-cargo test -p printplan
-```
-
-`fixtures/printplan/cases.json` contains positive expected selections, side order
-and accounting, plus malformed/range/capability/tenant/hash/limit rejections.
-`valid-duplex.json` is a synthetic plan whose source digest is a placeholder,
-so a native byte verifier must reject it with an unrelated PDF. No fixture
-represents real customer content or physical printer certification.
+The internal Python `_normalize(plan, expected_shop)` helper performs structural
+and accounting checks. Consumers must call `validate`, which also verifies the
+render recipe hash. Neither function authenticates a caller or establishes
+payment authorization.

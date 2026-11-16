@@ -47,59 +47,6 @@ class HardwareBridgeService:
         self._scanner_tasks: Dict[str, ScannerTaskResponse] = {}
         # Maps session_id -> TimedCopierSessionResponse
         self._copier_sessions: Dict[str, TimedCopierSessionResponse] = {}
-        self._init_defaults()
-
-    def _init_defaults(self):
-        shop_a = "11111111-1111-1111-1111-111111111111"
-        shop_b = "22222222-2222-2222-2222-222222222222"
-
-        # Shop A: High-speed Mono Workhorse + Color Photo Tank + Heavy Duty A3
-        self._printers[(shop_a, "ptr-mono-1")] = SimulatedPrinterRecord(
-            id="ptr-mono-1",
-            shop_id=shop_a,
-            name="HP LaserJet Pro M404dn (Mono)",
-            is_online=True,
-            supports_color=False,
-            supports_duplex=True,
-            supported_papers=[PaperSize.A4, PaperSize.LEGAL, PaperSize.LETTER],
-            current_queue_depth=0,
-            pages_per_minute=40,
-        )
-        self._printers[(shop_a, "ptr-color-1")] = SimulatedPrinterRecord(
-            id="ptr-color-1",
-            shop_id=shop_a,
-            name="Epson EcoTank L805 (Color Photo)",
-            is_online=True,
-            supports_color=True,
-            supports_duplex=False,
-            supported_papers=[PaperSize.A4, PaperSize.A5],
-            current_queue_depth=0,
-            pages_per_minute=15,
-        )
-        self._printers[(shop_a, "ptr-a3-1")] = SimulatedPrinterRecord(
-            id="ptr-a3-1",
-            shop_id=shop_a,
-            name="Canon imageRUNNER 2525 (Heavy Duty A3)",
-            is_online=True,
-            supports_color=False,
-            supports_duplex=True,
-            supported_papers=[PaperSize.A4, PaperSize.A3, PaperSize.LEGAL],
-            current_queue_depth=0,
-            pages_per_minute=25,
-        )
-
-        # Shop B: Multi-function Copier
-        self._printers[(shop_b, "ptr-b-mono-1")] = SimulatedPrinterRecord(
-            id="ptr-b-mono-1",
-            shop_id=shop_b,
-            name="Brother HL-L2321D (Shop B Workhorse)",
-            is_online=True,
-            supports_color=False,
-            supports_duplex=True,
-            supported_papers=[PaperSize.A4],
-            current_queue_depth=0,
-            pages_per_minute=30,
-        )
 
     # --------------------------------------------------------------------------
     # 1. Intelligent Multi-Printer Routing & Load Balancing
@@ -279,7 +226,6 @@ class HardwareBridgeService:
         self._printers.clear()
         self._scanner_tasks.clear()
         self._copier_sessions.clear()
-        self._init_defaults()
 
 
 hardware_bridge_service = HardwareBridgeService()

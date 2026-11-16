@@ -95,61 +95,6 @@ class SuperAdminService:
         # Pilot applications & direct licenses
         self._applications: Dict[str, Dict[str, Any]] = {}
         self._direct_licenses: Dict[str, Dict[str, Any]] = {}
-        self._init_defaults()
-
-    def _init_defaults(self):
-        self._applications = {
-            "APP-PILOT-8492": {
-                "id": "APP-PILOT-8492",
-                "shop_name": "Raghavendra Xerox Center",
-                "city": "Bengaluru",
-                "contact_number": "+91-98450-84920",
-                "plan": "1 Year",
-                "status": "PENDING",
-                "created_at": datetime.utcnow().isoformat(),
-            },
-            "APP-PILOT-5120": {
-                "id": "APP-PILOT-5120",
-                "shop_name": "Kavitha Print Point",
-                "city": "Coimbatore",
-                "contact_number": "+91-98420-51200",
-                "plan": "1 Month",
-                "status": "PENDING",
-                "created_at": datetime.utcnow().isoformat(),
-            },
-        }
-        shop_a = "11111111-1111-1111-1111-111111111111"
-        shop_b = "22222222-2222-2222-2222-222222222222"
-
-        self._shops[shop_a] = ManagedShop(
-            id=shop_a,
-            name="Anna Xerox & Digital Works",
-            slug="anna-chennai",
-            owner_email="owner@annaxerox.in",
-            owner_name="Murugan P",
-            phone="+91-98400-11111",
-            city="Chennai",
-            state_code="33",
-            status=ShopLifecycleStatus.ACTIVE,
-            order_mode=OrderMode.FULL_AUTOMATIC,
-        )
-
-        self._shops[shop_b] = ManagedShop(
-            id=shop_b,
-            name="Bharat Copy Center",
-            slug="bharat-madurai",
-            owner_email="contact@bharatcopy.in",
-            owner_name="Senthil K",
-            phone="+91-98400-22222",
-            city="Madurai",
-            state_code="33",
-            status=ShopLifecycleStatus.ACTIVE,
-            order_mode=OrderMode.FULL_AUTOMATIC,
-        )
-
-        # Generate seed tax invoices
-        self.generate_gst_invoice(shop_a, BillingInterval.MONTHLY)
-        self.generate_gst_invoice(shop_b, BillingInterval.ANNUAL)
 
     def onboard_shop(self, req: ShopOnboardRequest, actor_id: str = "superadmin@printbot.in") -> ShopOnboardResponse:
         """Onboards a new independent print shop or branch with a 14-day full-feature trial."""
@@ -648,7 +593,6 @@ class SuperAdminService:
         self._manual_credits.clear()
         self._applications.clear()
         self._direct_licenses.clear()
-        self._init_defaults()
 
 
 superadmin_service = SuperAdminService()

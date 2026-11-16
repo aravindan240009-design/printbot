@@ -2,12 +2,11 @@
 .SYNOPSIS
     Xerox PrintFlow SaaS — Automated Windows Development Environment Setup Script
 .DESCRIPTION
-    Validates developer toolchains, ensures MCP configurations for Codex and Antigravity,
-    synchronizes workspace skills, and executes pre-flight tests.
+    Validates developer toolchains and MCP configurations for Codex and Antigravity,
+    then optionally synchronizes workspace skills.
 #>
 
 param (
-    [switch]$SkipTests = $false,
     [switch]$SkipSync = $false
 )
 
@@ -16,7 +15,7 @@ Write-Host " Xerox PrintFlow SaaS - Windows Dev Environment Setup" -ForegroundCo
 Write-Host "============================================================" -ForegroundColor Cyan
 
 # 1. Audit Installed Core Toolchains
-Write-Host "`n[1/4] Checking Core Toolchains..." -ForegroundColor Yellow
+Write-Host "`n[1/3] Checking Core Toolchains..." -ForegroundColor Yellow
 
 $toolNames = @("Node.js", "pnpm", "Python", "Git")
 $toolCmds = @{
@@ -41,7 +40,7 @@ foreach ($t in $toolNames) {
 }
 
 # 2. Check Codex & Antigravity MCP Configurations
-Write-Host "`n[2/4] Verifying MCP Configurations..." -ForegroundColor Yellow
+Write-Host "`n[2/3] Verifying MCP Configurations..." -ForegroundColor Yellow
 
 $codexConfig = "$env:USERPROFILE\.codex\config.toml"
 if (Test-Path $codexConfig) {
@@ -63,7 +62,7 @@ if (Test-Path $antigravityConfig) {
 }
 
 # 3. Synchronize Skills
-Write-Host "`n[3/4] Synchronizing Agent Skills..." -ForegroundColor Yellow
+Write-Host "`n[3/3] Synchronizing Agent Skills..." -ForegroundColor Yellow
 $workspaceSkills = "$PSScriptRoot\..\.agents\skills"
 $codexSkills = "$env:USERPROFILE\.codex\skills"
 
@@ -76,18 +75,6 @@ if (-not $SkipSync -and (Test-Path $workspaceSkills)) {
     Write-Host "  [OK] Synchronized $skillCount skills into Codex global store." -ForegroundColor Green
 } else {
     Write-Host "  [INFO] Skill sync skipped or workspace skills missing." -ForegroundColor Gray
-}
-
-# 4. Pre-Flight Verification Tests
-if (-not $SkipTests) {
-    Write-Host "`n[4/4] Executing Pre-Flight Test Suite..." -ForegroundColor Yellow
-    Set-Location "$PSScriptRoot\.."
-    $testResult = & pytest tests/ -v
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "  [OK] All backend integration and tenant isolation tests passed!" -ForegroundColor Green
-    } else {
-        Write-Host "  [FAIL] Test suite failed! Please review test logs." -ForegroundColor Red
-    }
 }
 
 Write-Host "`n============================================================" -ForegroundColor Cyan

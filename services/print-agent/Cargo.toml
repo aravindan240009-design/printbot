@@ -8,7 +8,6 @@ description = "Print Bot Phase 3 Windows print service and local IPC agent"
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
-sha2 = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "=0.61.2", features = [

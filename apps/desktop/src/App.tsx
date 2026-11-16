@@ -859,27 +859,6 @@ export default function App() {
         console.warn('Supabase fetch error, maintaining local cache:', error.message);
         setCloudSyncStatus('OFFLINE');
       } else if (data) {
-        // Ensure the Super Admin credentials exist in Supabase
-        const adminExists = data.some((r: any) => r.id === 'APP-ADMIN-MASTER-ROOT');
-        if (!adminExists) {
-          supabase
-            .from('pilot_applications')
-            .upsert({
-              id: 'APP-ADMIN-MASTER-ROOT',
-              shop_name: 'Print Bot Super Admin',
-              city: 'Platform Headquarters',
-              contact_number: '+91 99999 99999',
-              plan: 'Super Admin Master',
-              status: 'APPROVED',
-              generated_username: 'admin',
-              generated_key: 'admin@123',
-              applied_at: new Date().toISOString(),
-              approved_at: new Date().toISOString(),
-              notes: JSON.stringify({ role: 'SUPER_ADMIN', master_password: 'admin@123' }),
-            })
-            .then(() => {});
-        }
-
         // Filter out system administrative records and customer orders so only shop applications appear in the UI
         const shopRows = data.filter(
           (r: any) =>

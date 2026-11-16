@@ -28,39 +28,6 @@ class SubscriptionService:
     def __init__(self):
         # Maps shop_id -> SubscriptionDetails
         self._subscriptions: Dict[str, SubscriptionDetails] = {}
-        self._init_defaults()
-
-    def _init_defaults(self):
-        # Seed default subscriptions for adversarial shops A and B
-        now = datetime.utcnow()
-        self.set_subscription(
-            shop_id="11111111-1111-1111-1111-111111111111",
-            details=SubscriptionDetails(
-                id=str(uuid.uuid4()),
-                shop_id="11111111-1111-1111-1111-111111111111",
-                plan_id="ALL_INCLUSIVE",
-                billing_interval=BillingInterval.MONTHLY,
-                status=SubscriptionStatus.ACTIVE,
-                current_period_start=now - timedelta(days=5),
-                current_period_end=now + timedelta(days=25),
-                features=PlanFeatures(),
-                quota_limits=SafetyQuotas(),
-            )
-        )
-        self.set_subscription(
-            shop_id="22222222-2222-2222-2222-222222222222",
-            details=SubscriptionDetails(
-                id=str(uuid.uuid4()),
-                shop_id="22222222-2222-2222-2222-222222222222",
-                plan_id="ALL_INCLUSIVE",
-                billing_interval=BillingInterval.ANNUAL,
-                status=SubscriptionStatus.ACTIVE,
-                current_period_start=now - timedelta(days=10),
-                current_period_end=now + timedelta(days=355),
-                features=PlanFeatures(),
-                quota_limits=SafetyQuotas(),
-            )
-        )
 
     def set_subscription(self, shop_id: str, details: SubscriptionDetails):
         self._subscriptions[shop_id] = details
@@ -197,7 +164,6 @@ class SubscriptionService:
 
     def clear(self):
         self._subscriptions.clear()
-        self._init_defaults()
 
 
 subscription_service = SubscriptionService()

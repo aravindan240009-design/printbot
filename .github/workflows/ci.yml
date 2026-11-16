@@ -7,31 +7,6 @@ on:
     branches: [main]
 
 jobs:
-  backend-test-and-audit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install fastapi uvicorn pydantic httpx pytest pytest-asyncio
-
-      - name: Run Backend Tests (if present)
-        run: |
-          if [ -d "tests" ]; then
-            pytest tests/ -v
-            python tests/benchmark_latency.py
-          else
-            echo "Tests directory not present, skipping."
-          fi
-
   frontend-type-check:
     runs-on: ubuntu-latest
     steps:

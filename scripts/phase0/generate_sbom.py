@@ -110,8 +110,8 @@ def generate(refresh=False):
                 dep = dependency.split()[0]
                 if dep in ids:
                     relationships.append({'spdxElementId': ids[name], 'relationshipType': 'DEPENDS_ON', 'relatedSpdxElement': ids[dep]})
-    # Environment inventory only. Fixture generator itself uses Python stdlib.
-    pending = ['jsonschema', 'pytest', 'pypdf', 'Pillow', 'packaging']
+    # Environment inventory only. The SBOM generator itself uses Python stdlib.
+    pending = ['jsonschema', 'pypdf', 'Pillow', 'packaging']
     visited = set()
     while pending:
         name = pending.pop(0)
@@ -134,7 +134,7 @@ def generate(refresh=False):
         add(package(name.lower(), version, 'pypi', license, artifact['url'], artifact['digests']['sha256'],
                     'Installed environment version; checksum identifies official source archive, NOT installed files or runtime bundle. Optional pypdf/Pillow are not required by corpus tooling.'))
         for requirement in distribution.requires or []:
-            # Exclude optional extras and platform-inactive dependencies; packaging is already installed with pytest.
+            # Exclude optional extras and platform-inactive dependencies.
             from packaging.requirements import Requirement
             req = Requirement(requirement)
             if req.marker and not req.marker.evaluate({'extra': ''}):

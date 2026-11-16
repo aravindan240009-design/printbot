@@ -119,13 +119,6 @@ class LicenseService:
         self._failed_attempts: Dict[str, List[datetime]] = {}
         self._canonical_licenses: Dict[str, CanonicalLicense] = {}
         self._registered_devices: Dict[str, Dict[str, Any]] = {}
-        self._init_defaults()
-
-    def _init_defaults(self):
-        dev_a_id = "d1111111-0000-0000-0000-000000000001"
-        self._hardware_assurance[dev_a_id] = HardwareAssurance.TPM_2_0
-        self._agent_versions[dev_a_id] = "1.2.0"
-        self._device_ips[dev_a_id] = [("192.168.1.100", datetime.utcnow())]
 
     def set_device_metadata(
         self,
@@ -487,7 +480,6 @@ class LicenseService:
         self._failed_attempts.clear()
         self._canonical_licenses.clear()
         self._registered_devices.clear()
-        self._init_defaults()
 
 
 license_service = LicenseService()

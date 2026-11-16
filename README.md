@@ -60,29 +60,114 @@ complete.
 
 ## Repository structure
 
+The repository root is a pnpm + Rust workspace. Application code lives under
+`apps/`, shared code under `packages/`, backend processes under `services/`,
+and deployment/database support under `infra/`.
+
 ```text
-apps/
-  customer-web/    QR customer upload and checkout flow (Vite, port 3000)
-  desktop/         Tauri 2 + React + Rust Windows workstation
-
-services/
-  api/             FastAPI modular monolith and REST API
-  worker/          Background document and queue processing
-  print-agent/     Rust Windows service/IPC prototype and journal rules
-
-packages/
-  contracts/       Shared TypeScript and Python contracts
-  printplan/       Cross-language deterministic print specification
-  ui/              Shared React UI, motion, and 3D components
-
-infra/
-  migrations/      Database migrations and RLS-related schema
-  docker/          Local/deployment container definitions
-
-tests/             Python API, isolation, idempotency, payment, and print tests
-docs/              Architecture, security, operations, and license documents
-fixtures/          Test documents and shared test data
+.
+|-- .github/workflows/       CI and desktop release workflows
+|-- apps/
+|   |-- customer-web/        Standalone customer upload and checkout web app
+|   |   |-- public/           Customer app static assets
+|   |   `-- src/
+|   |       |-- components/  Cart, checkout, common, dashboard, print,
+|   |       |                services, and order-tracking UI
+|   |       |-- design/      Customer app design tokens
+|   |       |-- locales/     English, Hindi, and Tamil translations
+|   |       |-- types/       Customer app TypeScript types
+|   |       `-- utils/       Pricing, storage, and tenant helpers
+|   `-- desktop/              Windows workstation app (React + Tauri)
+|       |-- public/           Desktop-specific static assets
+|       |-- src/
+|       |   `-- components/   Workstation, queue, printer, and settings UI
+|       `-- src-tauri/
+|           |-- gen/schemas/  Generated Tauri schema snapshots
+|           |-- icons/        App and installer icons
+|           `-- src/          Native Rust commands and workstation logic
+|-- infra/
+|   |-- docker/               API container and local service definitions
+|   `-- migrations/           Database schema migrations and migration runner
+|-- packages/
+|   |-- contracts/src/        Shared TypeScript and Python contracts
+|   |-- printplan/
+|   |   |-- python/           Python PrintPlan implementation
+|   |   |-- rust/src/         Rust PrintPlan implementation
+|   |   `-- typescript/       TypeScript PrintPlan implementation
+|   `-- ui/src/
+|       |-- components/       Shared React UI components
+|       |-- fonts/            Bundled fonts and their licenses
+|       |-- motion/            Shared animation helpers
+|       `-- three/             Shared 3D scene components
+|-- public/
+|   |-- assets/                Images used by the website
+|   `-- downloads/             Installer files served as customer downloads
+|-- scripts/
+|   `-- phase0/                Bootstrap, inventory, verification, and SBOM tools
+|-- services/
+|   |-- api/
+|   |   |-- core/              API settings, security, and shared primitives
+|   |   |-- middleware/        Request middleware, including tenant context
+|   |   |-- routers/           FastAPI route modules
+|   |   `-- services/          API business logic and integrations
+|   |-- print-agent/src/       Rust print-agent service and IPC code
+|   `-- worker/                Background document-processing worker
+|-- src/                       Root marketing website and embedded customer UI
+|   |-- components/            Website navigation, footer, and shared UI
+|   |-- config/                Website configuration
+|   |-- customer-web/          Customer portal embedded in the root website
+|   |   |-- components/        Embedded cart, checkout, print, and order UI
+|   |   |-- design/            Embedded portal design tokens
+|   |   |-- locales/           Embedded portal translations
+|   |   |-- types/             Embedded portal TypeScript types
+|   |   `-- utils/             Embedded portal pricing, storage, and tenant helpers
+|   |-- hooks/                 Website React hooks
+|   `-- pages/                 Marketing, download, and policy pages
+`-- tools/printer-proof/src/   Rust printer-proofing and simulation utility
 ```
+
+### Why there are two customer-web folders
+
+`src/customer-web/` is loaded by the root website when a customer opens a shop
+or QR link. `apps/customer-web/` is a separate pnpm app with its own Vite
+configuration and deployment settings. They are separate entry points; do not
+assume one folder is simply nested inside or built from the other.
+
+### Important files at the root
+
+- `package.json`, `pnpm-workspace.yaml`, and `pnpm-lock.yaml` define the
+  JavaScript workspace, commands, and locked dependencies.
+- `Cargo.toml` and `Cargo.lock` define the Rust workspace. The Tauri desktop
+  crate has its own manifest and lockfile in `apps/desktop/src-tauri/`.
+- `requirements.txt` lists Python dependencies; `.env.example` is the safe
+  environment-variable template. Real `.env` files are local and must not be
+  committed or shared.
+- `index.html`, `src/main.tsx`, and `vite.config.ts` are the root website
+  entry and build configuration. `tsconfig*.json`, `tailwind.config.js`, and
+  `postcss.config.js` configure its frontend toolchain.
+- `vercel.json` and `.vercelignore` configure root website deployment;
+  `Launch-PrintBot-Workstation.bat` is a Windows workstation launch helper.
+
+### App entry points and configuration
+
+- `apps/customer-web/package.json`, `index.html`, `vite.config.ts`, and
+  `vercel.json` configure and deploy the standalone customer app.
+- `apps/desktop/package.json` and `vite.config.ts` configure the desktop UI;
+  `apps/desktop/src-tauri/tauri.conf.json` and `Cargo.toml` configure its
+  native Tauri application.
+- `services/api/main.py` starts the FastAPI application,
+  `services/worker/worker.py` starts the background worker, and
+  `services/print-agent/Cargo.toml` defines the Rust print agent.
+- `packages/printplan/schema.v1.json` is the shared PrintPlan schema used by
+  its Python, Rust, and TypeScript implementations.
+
+### Generated and local-only folders
+
+`node_modules/` contains installed dependencies; `dist/` and `apps/*/dist/`
+contain built web assets; `target/` and `apps/desktop/src-tauri/target/`
+contain Rust build output; and `.vercel/` contains deployment output. These are
+generated artifacts, not source folders. `public/downloads/` is different:
+those are the installer files intentionally served by the website.
 
 ## Technology stack
 
@@ -180,6 +265,17 @@ In development, API documentation is available at `http://localhost:8000/docs`.
 Production disables interactive API documentation and other development-only
 diagnostic endpoints.
 
+Set `SUPERADMIN_PASSWORD` explicitly to provision the API's Super Admin login.
+The API no longer creates built-in demo users, shops, devices, QR links, or
+software releases.
+
+For customer-web deployments, set `VITE_API_BASE_URL` to the public API URL
+including `/api/v1` when API forwarding is required. Production builds no
+longer fall back to a visitor's `localhost`; without this setting, the app
+continues using its configured Supabase order flow without attempting API
+forwarding. A configured API URL must use HTTPS and cannot target a loopback
+address.
+
 ### Worker
 
 ```powershell
@@ -220,43 +316,18 @@ certificate, signing configuration, update strategy, and verification on the
 target shop hardware. If Tauri reports that `cargo` cannot be found, add
 `%USERPROFILE%\.cargo\bin` to `PATH` and reopen PowerShell.
 
-## Testing and verification
-
-### Python API tests
+## Build checks
 
 ```powershell
-python -m pytest tests/ -q
-```
-
-These tests cover API behavior including tenant isolation, authorization,
-payment webhook replay protection, pricing, malformed input, and print-job
-reconciliation.
-
-### Rust tests
-
-```powershell
-cargo test --workspace --no-fail-fast
-cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --no-fail-fast
-```
-
-### Rust quality checks
-
-```powershell
+pnpm --filter @xerox/customer-web build
+pnpm --filter @xerox/desktop build
 cargo fmt --all -- --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
 ```
 
-### TypeScript and production builds
-
-```powershell
-pnpm -r build
-git diff --check
-```
-
-Real printer tests must be executed on a dedicated Windows machine with the
-target printer and driver installed. A simulator or a successful spooler API
-call is not evidence that paper was physically delivered.
+Standalone API/conformance test suites and shared fixture datasets are not
+included; a few self-contained Rust unit tests remain in source files.
+Real printer behavior must be validated on dedicated Windows hardware before a
+production release.
 
 ## Security model
 
@@ -281,10 +352,6 @@ Important rules:
 - device IDs and shop IDs are identifiers, not secrets;
 - ambiguous spooler outcomes require supervised reconciliation and never
   trigger automatic reprinting.
-
-Read [AGENTS.md](AGENTS.md), [docs/OPERATIONS_RUNBOOK.md](docs/OPERATIONS_RUNBOOK.md),
-and [docs/SOFTWARE_BILL_OF_MATERIALS.md](docs/SOFTWARE_BILL_OF_MATERIALS.md)
-before changing security, deployment, or native-printing behavior.
 
 ## Production readiness gates
 
@@ -314,7 +381,6 @@ tests pass:
 - [docs/OPERATIONS_RUNBOOK.md](docs/OPERATIONS_RUNBOOK.md): local operation and incident procedures
 - [docs/SOFTWARE_BILL_OF_MATERIALS.md](docs/SOFTWARE_BILL_OF_MATERIALS.md): dependency/license record
 - [docs/superpowers/specs/2026-10-25-tauri-rust-workstation-design.md](docs/superpowers/specs/2026-10-25-tauri-rust-workstation-design.md): Tauri workstation design
-- [docs/superpowers/plans/2026-10-25-tauri-rust-workstation-plan.md](docs/superpowers/plans/2026-10-25-tauri-rust-workstation-plan.md): implementation plan and verification ledger
 
 ## Contributing
 

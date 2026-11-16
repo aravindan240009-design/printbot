@@ -59,8 +59,8 @@ async def update_shop_customization(shop_id: str, req: UpdateCustomizationReques
 @router.get("/{shop_id}/microsite-preview", response_model=ShopMicrositePreview)
 async def get_shop_microsite_preview(
     shop_id: str,
-    shop_name: str = Query(default="Anna Xerox & Digital Works"),
-    slug: str = Query(default="anna-chennai")
+    shop_name: str = Query(...),
+    slug: str = Query(...)
 ):
     """
     Renders an instant customer-view preview of the shop's mobile QR microsite,

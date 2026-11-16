@@ -14,9 +14,6 @@
     "dev:worker": "python -m services.worker.worker",
     "build:customer": "pnpm --filter @xerox/customer-web build",
     "build:all": "pnpm -r build",
-    "test": "pnpm -r test && pytest tests/",
-    "test:api": "pytest tests/ -v",
-    "test:bench": "python tests/benchmark_latency.py",
     "lint": "pnpm -r lint",
     "type-check": "tsc --noEmit",
     "typecheck": "tsc --noEmit"

@@ -71,24 +71,6 @@ class ShopCustomizationService:
     def __init__(self):
         # Maps shop_id -> ShopCustomizationConfig
         self._configs: Dict[str, ShopCustomizationConfig] = {}
-        self._init_defaults()
-
-    def _init_defaults(self):
-        shop_a = "11111111-1111-1111-1111-111111111111"
-        shop_b = "22222222-2222-2222-2222-222222222222"
-
-        self._configs[shop_a] = ShopCustomizationConfig(
-            shop_id=shop_a,
-            order_mode=OrderMode.FULL_AUTOMATIC,
-            brand_primary_color="#1E40AF",
-            supported_languages=["en", "ta"],
-        )
-        self._configs[shop_b] = ShopCustomizationConfig(
-            shop_id=shop_b,
-            order_mode=OrderMode.FULL_AUTOMATIC,
-            brand_primary_color="#047857",
-            supported_languages=["en", "ta", "hi"],
-        )
 
     def get_config(self, shop_id: str) -> ShopCustomizationConfig:
         if shop_id not in self._configs:
@@ -154,7 +136,7 @@ class ShopCustomizationService:
         )
         return config
 
-    def render_microsite_preview(self, shop_id: str, shop_name: str = "Print Bot Xerox", slug: str = "demo-shop") -> ShopMicrositePreview:
+    def render_microsite_preview(self, shop_id: str, shop_name: str, slug: str) -> ShopMicrositePreview:
         """Renders instantaneous customer-facing configuration preview for the mobile QR microsite."""
         cfg = self.get_config(shop_id)
         settings = shop_service.get_settings(shop_id)
@@ -187,7 +169,6 @@ class ShopCustomizationService:
 
     def clear(self):
         self._configs.clear()
-        self._init_defaults()
 
 
 shop_customization_service = ShopCustomizationService()

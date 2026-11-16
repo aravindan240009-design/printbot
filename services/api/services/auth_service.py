@@ -244,69 +244,21 @@ class AuthService:
 
     def _init_default_users(self):
 
-        # 1. Superadmin User
+        superadmin_password = os.getenv("SUPERADMIN_PASSWORD")
+        if superadmin_password:
+            super_totp = os.getenv("SUPERADMIN_MFA_SECRET") or generate_totp_secret()
+            mfa_enabled = os.getenv("SUPERADMIN_MFA_ENABLED", "false").lower() in ("true", "1", "yes")
+            self.register_user(
+                email="superadmin@printbot.in",
+                password=superadmin_password,
+                full_name="Platform Superadmin",
+                is_superadmin=True,
+                mfa_enabled=mfa_enabled,
+                mfa_secret=super_totp,
+                role="SUPERADMIN",
+            )
 
-        super_totp = os.getenv("SUPERADMIN_MFA_SECRET") or generate_totp_secret()
-
-        mfa_enabled = os.getenv("SUPERADMIN_MFA_ENABLED", "false").lower() in ("true", "1", "yes")
-
-        self.register_user(
-
-            email="superadmin@printbot.in",
-
-            password=os.getenv("SUPERADMIN_PASSWORD", "SuperAdminSecurePassword2026!"),
-
-            full_name="Platform Superadmin",
-
-            is_superadmin=True,
-
-            mfa_enabled=mfa_enabled,
-
-            mfa_secret=super_totp,
-
-            role="SUPERADMIN"
-
-        )
-
-
-
-        # 2. Shop A Owner (Anna University Quick Xerox)
-
-        self.register_user(
-
-            email="owner@annaxerox.com",
-
-            password="AnnaShopPassword2026!",
-
-            full_name="Anna Shop Owner",
-
-            shop_id="11111111-1111-1111-1111-111111111111",
-
-            role="OWNER"
-
-        )
-
-
-
-        # 3. Shop B Owner (Bharat Fast Prints)
-
-        self.register_user(
-
-            email="owner@bharatprints.com",
-
-            password="BharatShopPassword2026!",
-
-            full_name="Bharat Shop Owner",
-
-            shop_id="22222222-2222-2222-2222-222222222222",
-
-            role="OWNER"
-
-        )
-
-
-
-            # Hydrate any persisted password hashes across API restarts
+        # Hydrate any persisted password hashes across API restarts.
         if os.path.exists(AUTH_STORE_FILE):
             try:
                 with open(AUTH_STORE_FILE, "r", encoding="utf-8") as f:

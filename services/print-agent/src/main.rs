@@ -3,7 +3,6 @@ pub mod journal;
 pub mod printer_adapter;
 pub mod service;
 
-use sha2::{Digest, Sha256};
 use std::env;
 
 use crate::ipc::{IpcHandler, IpcRequest};
@@ -25,7 +24,6 @@ fn print_usage() {
         "  print-agent printers          - Enumerates connected Windows printers & capabilities"
     );
     println!("  print-agent test-ipc          - Runs local named pipe IPC self-check");
-    println!("  print-agent enroll --code <C> - Enrolls device with server using TPM-backed asymmetric key");
 }
 
 fn main() {
@@ -100,15 +98,6 @@ fn main() {
             println!("[AGENT] IPC GetPrinters: {:?}", printers_res);
 
             println!("[AGENT] IPC verification complete. Named pipe communication validated.");
-        }
-        "enroll" => {
-            println!("[AGENT] Generating device asymmetric keypair (Ed25519 / TPM backed)...");
-            let mock_seed = b"windows_workstation_tpm_backed_seed_chennai_01";
-            let mut hasher = Sha256::new();
-            hasher.update(mock_seed);
-            let pubkey = format!("ED25519_PUB_{:x}", hasher.finalize());
-            println!("[AGENT] Public Key: {}", pubkey);
-            println!("[AGENT] Ready for server pairing handshake.");
         }
         _ => {
             print_usage();

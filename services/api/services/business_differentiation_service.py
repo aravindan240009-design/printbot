@@ -76,65 +76,6 @@ class BusinessDifferentiationService:
         self._consumables: Dict[Tuple[str, str], PrinterConsumableStatus] = {}
         # Maps staff_id -> StaffPerformanceMetric
         self._staff_metrics: Dict[str, StaffPerformanceMetric] = {}
-        self._init_defaults()
-
-    def _init_defaults(self):
-        shop_a = "11111111-1111-1111-1111-111111111111"
-        shop_b = "22222222-2222-2222-2222-222222222222"
-
-        # 1. Seed Presets for Shop A
-        self._presets[shop_a] = [
-            ShopPreset(
-                shop_id=shop_a,
-                name="College Lab Record",
-                description="Double-sided B&W on 80 GSM paper with staple binding",
-                options=PrintOptions(
-                    copies=1,
-                    color_mode="bw",
-                    paper_size=PaperSize.A4,
-                    duplex_mode=DuplexMode.DUPLEX_LONG,
-                    paper_gsm=80,
-                    binding="staple",
-                ),
-                is_default=True,
-            ),
-            ShopPreset(
-                shop_id=shop_a,
-                name="Official Passport 8-Up Photo",
-                description="8 photos on single glossy A4 sheet with cutting guides",
-                options=PrintOptions(
-                    copies=1,
-                    color_mode="color",
-                    paper_size=PaperSize.A4,
-                    duplex_mode=DuplexMode.SIMPLEX,
-                    photo_layout="passport_8up",
-                ),
-                is_default=False,
-            ),
-        ]
-
-        # 2. Seed College Prepaid Account for Shop A
-        code_a = "ANNA_ENGG_DEPT"
-        self._prepaid_accounts[(shop_a, code_a)] = PrepaidAccount(
-            shop_id=shop_a,
-            account_name="Anna University Mech Engg Dept",
-            account_code=code_a,
-            balance_paise=250000,  # ₹2,500.00
-            contact_email="hod_mech@annauniv.edu",
-            authorized_domains=["annauniv.edu"],
-            is_active=True,
-        )
-
-        # 3. Seed Printer Consumable Status
-        self._consumables[(shop_a, "ptr-guindy-hp-1")] = PrinterConsumableStatus(
-            printer_id="ptr-guindy-hp-1",
-            shop_id=shop_a,
-            printer_name="HP LaserJet Pro M404dn",
-            toner_black_percent=68,
-            drum_life_percent=85,
-            maintenance_box_percent=95,
-            alerts=[],
-        )
 
     # --------------------------------------------------------------------------
     # 1. Saved Shop Presets
@@ -383,7 +324,6 @@ class BusinessDifferentiationService:
         self._resumable_sessions.clear()
         self._consumables.clear()
         self._staff_metrics.clear()
-        self._init_defaults()
 
 
 business_differentiation_service = BusinessDifferentiationService()

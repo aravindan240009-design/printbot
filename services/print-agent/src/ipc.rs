@@ -71,7 +71,6 @@ pub struct IpcHandler {
     device_id: Option<String>,
     journal: Journal,
     printers: Vec<PrinterCapabilitySnapshot>,
-    simulator: bool,
 }
 
 impl IpcHandler {
@@ -81,21 +80,8 @@ impl IpcHandler {
             device_id: None,
             journal,
             printers: PrinterAdapter::enumerate_printers(),
-            simulator: false,
         }
     }
-
-    #[cfg(test)]
-    fn new_simulator(journal: Journal) -> Self {
-        Self {
-            paired_shop_id: Some("shop-test".into()),
-            device_id: Some("device-test".into()),
-            journal,
-            printers: PrinterAdapter::mock_printers(),
-            simulator: true,
-        }
-    }
-
     pub fn handle_request(&mut self, request: IpcRequest) -> IpcResponse {
         match request {
             IpcRequest::GetStatus => IpcResponse::Ok(IpcResponseData::Status(ServiceStatus {
@@ -174,36 +160,13 @@ impl IpcHandler {
                 // 4. Physical submission is intentionally unavailable until the
                 // server-authorized native adapter is connected. The journal is
                 // left in an auditable submitting state for reconciliation.
-                if !self.simulator {
-                    let _ = self.journal.transition(
-                        &job_id,
-                        JobState::Submitting,
-                        "Native submission unavailable",
-                        None,
-                    );
-                    return IpcResponse::Error("Native spool submission is not connected; job requires supervised reconciliation.".into());
-                }
-
-                // Explicit test-only simulator path.
-                let mock_spool_id = 1042;
                 let _ = self.journal.transition(
                     &job_id,
                     JobState::Submitting,
-                    "Dispatched to spooler",
+                    "Native submission unavailable",
                     None,
                 );
-                let _ = self.journal.transition(
-                    &job_id,
-                    JobState::SubmittedToSpooler,
-                    "Spool complete",
-                    Some(mock_spool_id),
-                );
-
-                IpcResponse::Ok(IpcResponseData::JobSubmitted {
-                    job_id,
-                    state: "SUBMITTED_TO_SPOOLER".into(),
-                    spooler_job_id: mock_spool_id,
-                })
+                IpcResponse::Error("Native spool submission is not connected; job requires supervised reconciliation.".into())
             }
             IpcRequest::MarkUnknown { job_id, reason } => {
                 match self.journal.mark_unknown(&job_id, &reason) {
@@ -217,71 +180,6 @@ impl IpcHandler {
             IpcRequest::Reconcile => IpcResponse::Ok(IpcResponseData::Message(
                 "Local journal reconciled with cloud state.".into(),
             )),
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_ipc_cross_shop_job_rejected() {
-        let journal = Journal::new_in_memory();
-        let mut handler = IpcHandler::new_simulator(journal);
-
-        // Service is paired to the simulator's Shop A fixture.
-        let cross_shop_req = IpcRequest::SubmitPrintJob {
-            job_id: "job-evil-cross-shop".into(),
-            shop_id: "shop-other".into(), // Shop B!
-            printer_id: "prn_canon_ir3530".into(),
-            plan_hash: "hash123".into(),
-            requirements: PrintJobRequirement {
-                color_mode: "bw".into(),
-                paper_size: "A4".into(),
-                duplex_mode: "simplex".into(),
-            },
-        };
-
-        let response = handler.handle_request(cross_shop_req);
-        match response {
-            IpcResponse::Error(msg) => {
-                assert!(msg.contains("Cross-tenant job execution rejected"));
-                assert!(msg.contains("Device is paired to shop 'shop-test'"));
-            }
-            _ => panic!("Cross-shop job MUST be rejected with IpcResponse::Error"),
-        }
-    }
-
-    #[test]
-    fn test_ipc_valid_job_submission_lifecycle() {
-        let journal = Journal::new_in_memory();
-        let mut handler = IpcHandler::new_simulator(journal);
-
-        let valid_req = IpcRequest::SubmitPrintJob {
-            job_id: "job-legit-101".into(),
-            shop_id: "shop-test".into(),
-            printer_id: "prn_canon_ir3530".into(),
-            plan_hash: "hash_ok_123".into(),
-            requirements: PrintJobRequirement {
-                color_mode: "color".into(),
-                paper_size: "A4".into(),
-                duplex_mode: "simplex".into(),
-            },
-        };
-
-        let res = handler.handle_request(valid_req);
-        match res {
-            IpcResponse::Ok(IpcResponseData::JobSubmitted {
-                job_id,
-                state,
-                spooler_job_id,
-            }) => {
-                assert_eq!(job_id, "job-legit-101");
-                assert_eq!(state, "SUBMITTED_TO_SPOOLER");
-                assert_eq!(spooler_job_id, 1042);
-            }
-            _ => panic!("Expected Ok(JobSubmitted)"),
         }
     }
 }

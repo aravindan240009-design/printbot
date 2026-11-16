@@ -81,36 +81,6 @@ class DeviceService:
         self._challenges: Dict[str, ActiveChallenge] = {}
         # Maps token -> device_id
         self._device_tokens: Dict[str, Dict[str, Any]] = {}
-        self._init_defaults()
-
-    def _init_defaults(self):
-        # Seed paired device for Shop A
-        dev_a_id = "d1111111-0000-0000-0000-000000000001"
-        shop_a = "11111111-1111-1111-1111-111111111111"
-        self._devices[dev_a_id] = DeviceRecord(
-            id=dev_a_id,
-            shop_id=shop_a,
-            device_identifier="ws-counter-anna-1",
-            name="Guindy Counter PC 1",
-            os_info="Windows 11 Pro",
-            public_key_pem="MOCK_ED25519_PUBKEY_ANNA_1",
-            status="active"
-        )
-        self._device_identifiers[(shop_a, "ws-counter-anna-1")] = dev_a_id
-
-        # Seed paired device for Shop B
-        dev_b_id = "d2222222-0000-0000-0000-000000000002"
-        shop_b = "22222222-2222-2222-2222-222222222222"
-        self._devices[dev_b_id] = DeviceRecord(
-            id=dev_b_id,
-            shop_id=shop_b,
-            device_identifier="ws-counter-bharat-1",
-            name="Madurai Counter PC 1",
-            os_info="Windows 11 Pro",
-            public_key_pem="MOCK_ED25519_PUBKEY_BHARAT_1",
-            status="active"
-        )
-        self._device_identifiers[(shop_b, "ws-counter-bharat-1")] = dev_b_id
 
     def create_pairing_code(
         self,
@@ -433,7 +403,6 @@ class DeviceService:
         self._device_identifiers.clear()
         self._challenges.clear()
         self._device_tokens.clear()
-        self._init_defaults()
 
 
 device_service = DeviceService()

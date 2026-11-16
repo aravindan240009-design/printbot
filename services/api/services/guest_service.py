@@ -39,22 +39,6 @@ class GuestService:
         self._qr_links: Dict[str, QRLink] = {}
         # Maps session_token -> GuestSession
         self._guest_sessions: Dict[str, GuestSession] = {}
-        self._init_defaults()
-
-    def _init_defaults(self):
-        # Seed QR codes for adversarial shops
-        self._qr_links["qr_anna_guindy"] = QRLink(
-            code="qr_anna_guindy",
-            shop_id="11111111-1111-1111-1111-111111111111",
-            shop_slug="anna-chennai",
-            shop_name="Anna University Quick Xerox"
-        )
-        self._qr_links["qr_bharat_simmakkal"] = QRLink(
-            code="qr_bharat_simmakkal",
-            shop_id="22222222-2222-2222-2222-222222222222",
-            shop_slug="bharat-madurai",
-            shop_name="Bharat Fast Prints"
-        )
 
     def resolve_qr_code(self, qr_code: str) -> QRLink:
         link = self._qr_links.get(qr_code.strip())
@@ -122,7 +106,6 @@ class GuestService:
     def clear(self):
         self._qr_links.clear()
         self._guest_sessions.clear()
-        self._init_defaults()
 
 
 guest_service = GuestService()

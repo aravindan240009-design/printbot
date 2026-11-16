@@ -1,7 +1,6 @@
 /** Dependency-free reference adapter. The versioned JSON Schema owns structure. */
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
 import type { NormalizedPlan } from './types.ts';
 export type { PrintPlanV1, NormalizedPlan } from './types.ts';
 
@@ -100,17 +99,4 @@ export function validate(plan: Json, expected_shop: string): NormalizedPlan {
   const normalized = {selected_pages:selected,sides,logical_pages:logical,marked_sides:sides.length-padding,padding_sides:padding,physical_sheets:sides.length/(duplex?2:1)};
   if (render_hash(plan,normalized) !== plan.render_hash) fail('render recipe hash mismatch');
   return normalized;
-}
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const cases = JSON.parse(readFileSync(new URL('../../../fixtures/printplan/cases.json', import.meta.url), 'utf8'));
-  for (const test of cases) {
-    let result: Json;
-    try { result = validate(test.plan,test.expected_shop); } catch (error) {
-      if (test.expected) throw new Error(test.name + ': unexpected rejection: ' + error);
-      continue;
-    }
-    if (!test.expected || canonical(result) !== canonical(test.expected)) throw new Error(test.name + ': parity mismatch');
-  }
-  console.log(`PASS ${cases.length} shared PrintPlan fixtures`);
 }

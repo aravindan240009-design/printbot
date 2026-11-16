@@ -186,7 +186,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
               <input
                 type={showPassword ? 'text' : 'password'}
                 className="pb-input"
-                placeholder={activeMode === 'ADMIN' ? 'Enter admin password (default: admin@123)' : 'PB-KEY-2026-XXXX'}
+                placeholder={activeMode === 'ADMIN' ? 'Enter Super Admin password' : 'Enter station license key'}
                 value={loginKey}
                 onChange={(e) => handleKeyInputChange(e.target.value)}
                 disabled={isLocked}
@@ -219,7 +219,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
               </span>
             ) : (
               <span className="pb-form-hint">
-                Cloud Authenticated: <code>admin</code> / <code>admin@123</code> (verified live via Supabase)
+                Sign in with your configured Super Admin credentials.
               </span>
             )}
           </div>

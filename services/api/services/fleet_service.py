@@ -36,40 +36,6 @@ class FleetService:
         self._telemetry: Dict[str, List[FleetTelemetryReport]] = {}
         # Maps bundle_ref -> DiagnosticBundleSubmit
         self._diagnostic_bundles: Dict[str, Dict[str, Any]] = {}
-        self._init_defaults()
-
-    def _init_defaults(self):
-        # Seed production signed release
-        prod_v = "1.2.0"
-        self._releases[prod_v] = FleetRelease(
-            version=prod_v,
-            release_channel=ReleaseChannel.PRODUCTION_SIGNED,
-            download_url=f"https://releases.printbot.in/v{prod_v}/printbot-agent-setup.exe",
-            sha256_hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-            signature_verified=True,
-            min_supported_version="1.0.0",
-            is_critical=False,
-            grace_period_hours=72,
-            rollout_percentage=100,
-            release_notes="Production signed GA release with TPM 2.0 PCP support.",
-            created_at=datetime.utcnow() - timedelta(days=7)
-        )
-
-        # Seed beta release
-        beta_v = "1.3.0-beta.1"
-        self._releases[beta_v] = FleetRelease(
-            version=beta_v,
-            release_channel=ReleaseChannel.BETA_TESTED,
-            download_url=f"https://releases.printbot.in/v{beta_v}/printbot-agent-beta.exe",
-            sha256_hash="d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592",
-            signature_verified=True,
-            min_supported_version="1.1.0",
-            is_critical=False,
-            grace_period_hours=72,
-            rollout_percentage=25,
-            release_notes="Beta release with ESC/P-R direct raster pipeline.",
-            created_at=datetime.utcnow() - timedelta(days=2)
-        )
 
     def publish_release(self, release: FleetRelease, actor_id: str = "superadmin@printbot.in") -> FleetRelease:
         """Publishes a new agent software release with channel tags and signature checks."""
@@ -259,7 +225,6 @@ class FleetService:
         self._releases.clear()
         self._telemetry.clear()
         self._diagnostic_bundles.clear()
-        self._init_defaults()
 
 
 fleet_service = FleetService()

@@ -24,27 +24,6 @@ class CatalogueService:
     def __init__(self):
         # Maps shop_id -> ShopServiceCatalogue
         self._catalogues: Dict[str, ShopServiceCatalogue] = {}
-        self._init_defaults()
-
-    def _init_defaults(self):
-        shop_a = "11111111-1111-1111-1111-111111111111"
-        shop_b = "22222222-2222-2222-2222-222222222222"
-        self._catalogues[shop_a] = ShopServiceCatalogue(
-            shop_id=shop_a,
-            time_zone="Asia/Kolkata",
-            slot_duration_minutes=15,
-            capacity_per_slot=4,
-            lead_time_minutes=30,
-            last_booking_cutoff_minutes=60,
-        )
-        self._catalogues[shop_b] = ShopServiceCatalogue(
-            shop_id=shop_b,
-            time_zone="Asia/Kolkata",
-            slot_duration_minutes=15,
-            capacity_per_slot=4,
-            lead_time_minutes=30,
-            last_booking_cutoff_minutes=60,
-        )
 
     def get_catalogue(self, shop_id: str) -> ShopServiceCatalogue:
         if shop_id not in self._catalogues:
@@ -168,7 +147,6 @@ class CatalogueService:
 
     def clear(self):
         self._catalogues.clear()
-        self._init_defaults()
 
 
 catalogue_service = CatalogueService()

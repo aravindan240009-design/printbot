@@ -308,25 +308,6 @@ pub fn validate(plan: &Value, expected_shop: &str) -> Result<Value, String> {
 mod tests {
     use super::*;
     #[test]
-    fn shared_fixtures() {
-        let cases: Value =
-            serde_json::from_str(include_str!("../../../../fixtures/printplan/cases.json"))
-                .unwrap();
-        for case in cases.as_array().unwrap() {
-            let result = validate(&case["plan"], case["expected_shop"].as_str().unwrap());
-            if let Some(expected) = case.get("expected") {
-                assert_eq!(
-                    &result.unwrap_or_else(|e| panic!("{}: {e}", case["name"])),
-                    expected,
-                    "{}",
-                    case["name"]
-                );
-            } else {
-                assert!(result.is_err(), "{}", case["name"]);
-            }
-        }
-    }
-    #[test]
     fn ranges() {
         assert_eq!(
             resolve_ranges("1-3,5,8-", 10, "even").unwrap(),

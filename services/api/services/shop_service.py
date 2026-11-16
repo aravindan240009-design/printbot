@@ -32,24 +32,6 @@ class ShopService:
     def __init__(self):
         # Maps shop_id -> ShopSettings
         self._settings: Dict[str, ShopSettings] = {}
-        self._init_defaults()
-
-    def _init_defaults(self):
-        shop_a = "11111111-1111-1111-1111-111111111111"
-        shop_b = "22222222-2222-2222-2222-222222222222"
-        # Both default to FULL_AUTOMATIC per database schema
-        self._settings[shop_a] = ShopSettings(
-            shop_id=shop_a,
-            order_mode=OrderMode.FULL_AUTOMATIC,
-            cash_allowed=True,
-            upi_allowed=True,
-        )
-        self._settings[shop_b] = ShopSettings(
-            shop_id=shop_b,
-            order_mode=OrderMode.FULL_AUTOMATIC,
-            cash_allowed=True,
-            upi_allowed=True,
-        )
 
     def get_settings(self, shop_id: str) -> ShopSettings:
         if shop_id not in self._settings:
@@ -98,7 +80,6 @@ class ShopService:
 
     def clear(self):
         self._settings.clear()
-        self._init_defaults()
 
 
 shop_service = ShopService()
