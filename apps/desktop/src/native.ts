@@ -93,3 +93,26 @@ export async function readSpoolJob(jobId: string) {
     throw new NativeWorkstationError(String(error));
   }
 }
+
+export interface PrintToHardwarePayload {
+  job_id: string;
+  printer_name: string;
+  file_name: string;
+  file_bytes: number[];
+  copies?: number;
+}
+
+export interface PrintToHardwareResult {
+  success: boolean;
+  spooler_job_id: number;
+  printer_name: string;
+  message: string;
+}
+
+export async function printToHardware(payload: PrintToHardwarePayload): Promise<PrintToHardwareResult> {
+  try {
+    return await invoke<PrintToHardwareResult>('print_to_native_hardware', { payload });
+  } catch (error) {
+    throw new NativeWorkstationError(String(error));
+  }
+}

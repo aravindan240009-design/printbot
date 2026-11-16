@@ -72,6 +72,137 @@ pub fn prepare_spool_job(
 }
 
 #[cfg(windows)]
+pub fn submit_to_windows_spooler(
+    printer_name: &str,
+    doc_title: &str,
+    bytes: &[u8],
+) -> Result<u32, String> {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+
+    #[repr(C)]
+    struct DOC_INFO_1W {
+        p_doc_name: *const u16,
+        p_output_file: *const u16,
+        p_datatype: *const u16,
+    }
+
+    #[link(name = "winspool")]
+    extern "system" {
+        fn OpenPrinterW(
+            p_printer_name: *const u16,
+            ph_printer: *mut isize,
+            p_default: *const std::ffi::c_void,
+        ) -> i32;
+
+        fn StartDocPrinterW(
+            h_printer: isize,
+            level: u32,
+            p_doc_info: *const DOC_INFO_1W,
+        ) -> u32;
+
+        fn StartPagePrinter(h_printer: isize) -> i32;
+
+        fn WritePrinter(
+            h_printer: isize,
+            p_buf: *const u8,
+            cb_buf: u32,
+            pc_written: *mut u32,
+        ) -> i32;
+
+        fn EndPagePrinter(h_printer: isize) -> i32;
+
+        fn EndDocPrinter(h_printer: isize) -> i32;
+
+        fn ClosePrinter(h_printer: isize) -> i32;
+    }
+
+    let to_wide = |s: &str| -> Vec<u16> {
+        OsStr::new(s).encode_wide().chain(Some(0)).collect()
+    };
+
+    let wide_printer = to_wide(printer_name);
+    let wide_title = to_wide(doc_title);
+    let wide_datatype = to_wide("RAW");
+
+    let mut h_printer: isize = 0;
+    let open_res = unsafe {
+        OpenPrinterW(wide_printer.as_ptr(), &mut h_printer, std::ptr::null())
+    };
+
+    if open_res == 0 || h_printer == 0 {
+        return Err(format!(
+            "Could not open Windows printer '{}': {}",
+            printer_name,
+            std::io::Error::last_os_error()
+        ));
+    }
+
+    // If PDF virtual printer, output to temp file so it doesn't hang on save prompt
+    let clean_title = doc_title.chars().filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_').collect::<String>();
+    let temp_out = if printer_name.to_lowercase().contains("pdf") {
+        let p = std::env::temp_dir().join(format!("{}.pdf", clean_title));
+        Some(to_wide(&p.to_string_lossy()))
+    } else {
+        None
+    };
+
+    let doc_info = DOC_INFO_1W {
+        p_doc_name: wide_title.as_ptr(),
+        p_output_file: temp_out.as_ref().map(|v| v.as_ptr()).unwrap_or(std::ptr::null()),
+        p_datatype: wide_datatype.as_ptr(),
+    };
+
+    let job_id = unsafe { StartDocPrinterW(h_printer, 1, &doc_info) };
+    if job_id == 0 {
+        let err = std::io::Error::last_os_error();
+        unsafe { ClosePrinter(h_printer); }
+        return Err(format!("StartDocPrinter failed for '{}': {}", printer_name, err));
+    }
+
+    let start_page = unsafe { StartPagePrinter(h_printer) };
+    if start_page == 0 {
+        let err = std::io::Error::last_os_error();
+        unsafe {
+            EndDocPrinter(h_printer);
+            ClosePrinter(h_printer);
+        }
+        return Err(format!("StartPagePrinter failed: {}", err));
+    }
+
+    let mut written = 0u32;
+    let write_res = unsafe {
+        WritePrinter(
+            h_printer,
+            bytes.as_ptr(),
+            bytes.len() as u32,
+            &mut written,
+        )
+    };
+
+    unsafe {
+        EndPagePrinter(h_printer);
+        EndDocPrinter(h_printer);
+        ClosePrinter(h_printer);
+    }
+
+    if write_res == 0 {
+        return Err(format!("WritePrinter failed: {}", std::io::Error::last_os_error()));
+    }
+
+    Ok(job_id)
+}
+
+#[cfg(not(windows))]
+pub fn submit_to_windows_spooler(
+    _printer_name: &str,
+    _doc_title: &str,
+    _bytes: &[u8],
+) -> Result<u32, String> {
+    Ok(1)
+}
+
+#[cfg(windows)]
 pub fn discover_printers(bound_shop_id: &str) -> Result<Vec<PrinterInfo>, String> {
     use std::mem::size_of;
     use windows::Win32::Graphics::Printing::{

@@ -47,7 +47,7 @@ import {
   Globe
 } from 'lucide-react';
 import { ThemeProvider, ThemeSwitch, MotionSurface, PaperScene, PrinterScene, useGsapStagger } from '@xerox/ui';
-import { discoverPrinters, bindWorkstation, getWorkstationDeviceIdentity, preparePrintJob, type NativePrinterInfo, type WorkstationDeviceIdentity } from './native';
+import { discoverPrinters, bindWorkstation, getWorkstationDeviceIdentity, preparePrintJob, printToHardware, type NativePrinterInfo, type WorkstationDeviceIdentity } from './native';
 import { supabase } from './supabase';
 import QRCode from 'qrcode';
 import { DesktopShell, type Tab } from './components/DesktopShell';
@@ -1649,6 +1649,7 @@ export default function App() {
   const [printers] = useState<ConnectedPrinter[]>([]);
 
   const [jobs, setJobs] = useState<PrintJob[]>([]);
+  const [selectedPrinterName, setSelectedPrinterName] = useState<string>('');
 
   // Fetch native Windows spooler printers if available
   useEffect(() => {
@@ -1659,6 +1660,16 @@ export default function App() {
         }
         const discovered = await discoverPrinters();
         setNativePrinters(discovered);
+        if (discovered && discovered.length > 0 && !selectedPrinterName) {
+          const hp = discovered.find(
+            (p) =>
+              p.name.toLowerCase().includes('hp') ||
+              p.name.toLowerCase().includes('laser') ||
+              p.name.toLowerCase().includes('4004')
+          );
+          const def = discovered.find((p) => p.is_default);
+          setSelectedPrinterName(hp?.name || def?.name || discovered[0].name);
+        }
       } catch {
         setNativePrinters(null);
       }
@@ -1771,6 +1782,7 @@ export default function App() {
 
     const targetJob = jobs.find((j) => j.id === jobId);
     const shopId = currentShop?.username || activeSession?.username || 'shop';
+    const targetPrinter = selectedPrinterName || nativePrinters?.[0]?.name || 'HP758E10 (HP LaserJet Pro 4004)';
 
     // 1. Direct Cloud Sync: Mark as queued in Supabase
     try {
@@ -1782,22 +1794,49 @@ export default function App() {
       console.warn('Supabase job approval update warning:', sbErr);
     }
 
-    // 2. Submit to Tauri Spool Journal if native printers available
-    if (nativePrinters && nativePrinters.length > 0 && targetJob) {
+    // 2. Direct Hardware Dispatch to connected Windows printer!
+    let spoolJobId: number | null = null;
+    if (targetJob) {
       try {
-        await preparePrintJob({
+        let fileBytes: number[] = [];
+        if (targetJob.file_data) {
+          const cleanB64 = targetJob.file_data.includes('base64,')
+            ? targetJob.file_data.split('base64,')[1]
+            : targetJob.file_data;
+          const binaryStr = atob(cleanB64.trim());
+          fileBytes = new Array(binaryStr.length);
+          for (let i = 0; i < binaryStr.length; i++) {
+            fileBytes[i] = binaryStr.charCodeAt(i);
+          }
+        }
+
+        const res = await printToHardware({
           job_id: jobId,
-          shop_id: shopId,
-          printer_name: nativePrinters[0].name,
-          document_path: `${jobId}.pdf`,
+          printer_name: targetPrinter,
+          file_name: targetJob.file_name,
+          file_bytes: fileBytes,
           copies: targetJob.options.copies || 1,
         });
-      } catch (spoolErr) {
-        console.warn('Tauri native spool intent recorded with note:', spoolErr);
+        spoolJobId = res.spooler_job_id;
+        setNotice(`🖨️ Job #${jobId} printed to ${targetPrinter} (Spooler Job #${res.spooler_job_id})`);
+      } catch (printErr: any) {
+        console.warn('Hardware printing dispatch:', printErr);
+        setNotice(`Job #${jobId} approved. Spooler status: ${printErr?.message || printErr}`);
       }
     }
 
-    // 3. Report approval to backend API if active
+    // 3. Spool Journal record
+    try {
+      await preparePrintJob({
+        job_id: jobId,
+        shop_id: shopId,
+        printer_name: targetPrinter,
+        document_path: `${jobId}.pdf`,
+        copies: targetJob?.options.copies || 1,
+      });
+    } catch {}
+
+    // 4. Report approval to backend API if active
     try {
       const headers: Record<string, string> = { 'X-Tenant-ID': shopId };
       if (currentShop?.deviceToken) headers['Authorization'] = `Bearer ${currentShop.deviceToken}`;
@@ -1807,7 +1846,41 @@ export default function App() {
       });
     } catch {}
 
-    setNotice(`Job #${jobId} approved and placed into Windows dispatch queue.`);
+    if (!spoolJobId) {
+      setNotice(`Job #${jobId} approved and placed into Windows dispatch queue.`);
+    }
+  };
+
+  const handleDirectPrint = async (jobId: string) => {
+    const targetJob = jobs.find((j) => j.id === jobId);
+    if (!targetJob) return;
+    const targetPrinter = selectedPrinterName || nativePrinters?.[0]?.name || 'HP758E10 (HP LaserJet Pro 4004)';
+
+    try {
+      let fileBytes: number[] = [];
+      if (targetJob.file_data) {
+        const cleanB64 = targetJob.file_data.includes('base64,')
+          ? targetJob.file_data.split('base64,')[1]
+          : targetJob.file_data;
+        const binaryStr = atob(cleanB64.trim());
+        fileBytes = new Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) {
+          fileBytes[i] = binaryStr.charCodeAt(i);
+        }
+      }
+
+      const res = await printToHardware({
+        job_id: jobId,
+        printer_name: targetPrinter,
+        file_name: targetJob.file_name,
+        file_bytes: fileBytes,
+        copies: targetJob.options.copies || 1,
+      });
+
+      setNotice(`🖨️ Sent #${jobId} to ${targetPrinter} (Win32 Spooler Job #${res.spooler_job_id})`);
+    } catch (err: any) {
+      alert(`Hardware print error for ${targetPrinter}: ${err?.message || err}`);
+    }
   };
 
   const handleCompleteJob = async (jobId: string) => {
@@ -2156,6 +2229,10 @@ export default function App() {
           onApproveJob={handleApproveJob}
           onRejectJob={(jobId) => setRejectionModalJobId(jobId)}
           onCompleteJob={handleCompleteJob}
+          onDirectPrint={handleDirectPrint}
+          selectedPrinterName={selectedPrinterName}
+          setSelectedPrinterName={setSelectedPrinterName}
+          nativePrinters={nativePrinters || []}
           onRefreshJobs={() => {
             setNotice('Checking for incoming cloud orders...');
             fetchServerQueue();

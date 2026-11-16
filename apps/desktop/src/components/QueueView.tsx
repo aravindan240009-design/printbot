@@ -32,6 +32,10 @@ interface QueueViewProps {
   onCompleteJob?: (jobId: string) => void;
   onInspectJob?: (job: PrintJob) => void;
   onRefreshJobs?: () => void;
+  selectedPrinterName?: string;
+  setSelectedPrinterName?: (val: string) => void;
+  nativePrinters?: Array<{ name: string; is_default?: boolean }>;
+  onDirectPrint?: (jobId: string) => void;
 }
 
 export const QueueView: React.FC<QueueViewProps> = ({
@@ -51,6 +55,10 @@ export const QueueView: React.FC<QueueViewProps> = ({
   onCompleteJob,
   onInspectJob,
   onRefreshJobs,
+  selectedPrinterName,
+  setSelectedPrinterName,
+  nativePrinters,
+  onDirectPrint,
 }) => {
   const getStatusBadge = (status: PrintJob['status']) => {
     switch (status) {
@@ -185,6 +193,25 @@ export const QueueView: React.FC<QueueViewProps> = ({
               <option value="REJECTED">Rejected</option>
             </select>
           </div>
+
+          {setSelectedPrinterName && nativePrinters && nativePrinters.length > 0 && (
+            <div className="pb-filter-group" style={{ marginLeft: 'auto' }}>
+              <Printer size={14} color="var(--pb-desk-accent)" />
+              <select
+                className="pb-select"
+                value={selectedPrinterName}
+                onChange={(e) => setSelectedPrinterName(e.target.value)}
+                title="Active Output Printer"
+                style={{ fontWeight: 650, color: 'var(--pb-desk-accent)' }}
+              >
+                {nativePrinters.map((p) => (
+                  <option key={p.name} value={p.name}>
+                    {p.name.includes('4004') || p.name.includes('LaserJet') ? `🖨️ ${p.name} (Laser Hardware)` : `🖨️ ${p.name}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Job List / Cards */}
@@ -266,8 +293,9 @@ export const QueueView: React.FC<QueueViewProps> = ({
                         type="button"
                         className="pb-btn pb-btn-primary pb-btn-sm"
                         onClick={() => onApproveJob(job.id)}
+                        title={`Approve and send print stream directly to ${selectedPrinterName || 'connected printer'}`}
                       >
-                        <Printer size={13} /> Approve &amp; Spool
+                        <Printer size={13} /> Approve &amp; Print
                       </button>
                       <button
                         type="button"
@@ -296,9 +324,42 @@ export const QueueView: React.FC<QueueViewProps> = ({
                       <button
                         type="button"
                         className="pb-btn pb-btn-primary pb-btn-sm"
+                        onClick={() => onDirectPrint && onDirectPrint(job.id)}
+                        title={`Send print job to ${selectedPrinterName || 'hardware printer'}`}
+                      >
+                        <Printer size={13} /> Print to Device
+                      </button>
+                      <button
+                        type="button"
+                        className="pb-btn pb-btn-success pb-btn-sm"
                         onClick={() => onCompleteJob && onCompleteJob(job.id)}
                       >
                         <CheckCircle2 size={13} /> Mark Printed &amp; Ready
+                      </button>
+                      {job.file_data && (
+                        <a
+                          href={job.file_data}
+                          download={job.file_name}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="pb-btn pb-btn-secondary pb-btn-sm"
+                          style={{ textDecoration: 'none' }}
+                        >
+                          <FileText size={13} /> View File
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  {job.status === 'COMPLETED' && (
+                    <div className="pb-job-action-row">
+                      <button
+                        type="button"
+                        className="pb-btn pb-btn-secondary pb-btn-sm"
+                        onClick={() => onDirectPrint && onDirectPrint(job.id)}
+                        title={`Print an extra copy to ${selectedPrinterName || 'hardware printer'}`}
+                      >
+                        <Printer size={13} /> Print Again
                       </button>
                       {job.file_data && (
                         <a

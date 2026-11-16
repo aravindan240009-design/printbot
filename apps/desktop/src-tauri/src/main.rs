@@ -11,7 +11,7 @@ mod printers;
 mod workstation;
 
 use journal::SpoolJournal;
-use printers::{discover_printers, prepare_spool_job, SpoolReceipt};
+use printers::{discover_printers, prepare_spool_job, submit_to_windows_spooler, SpoolReceipt};
 use workstation::{JournalEntry, PrintRequest, PrinterInfo};
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
@@ -217,6 +217,63 @@ fn mark_spool_unknown(
     state.journal.mark_unknown(&job_id, &reason)
 }
 
+#[derive(serde::Deserialize)]
+pub struct NativePrintPayload {
+    pub job_id: String,
+    pub printer_name: String,
+    pub file_name: String,
+    pub file_bytes: Vec<u8>,
+    pub copies: Option<u32>,
+}
+
+#[derive(serde::Serialize)]
+pub struct NativePrintResult {
+    pub success: bool,
+    pub spooler_job_id: u32,
+    pub printer_name: String,
+    pub message: String,
+}
+
+#[tauri::command]
+fn print_to_native_hardware(
+    payload: NativePrintPayload,
+    state: State<'_, WorkstationState>,
+) -> Result<NativePrintResult, String> {
+    let bytes = if payload.file_bytes.is_empty() {
+        format!(
+            "%PDF-1.4\n% PrintBot Order Ticket #{}\n% File: {}\n% Copies: {}\n\x0C",
+            payload.job_id,
+            payload.file_name,
+            payload.copies.unwrap_or(1)
+        )
+        .into_bytes()
+    } else {
+        payload.file_bytes
+    };
+
+    let _ = std::fs::create_dir_all(&state.spool_root);
+    let spool_file = state.spool_root.join(format!("{}.pdf", payload.job_id));
+    let _ = std::fs::write(&spool_file, &bytes);
+
+    let spooler_job_id = submit_to_windows_spooler(
+        &payload.printer_name,
+        &format!("PrintBot - {}", payload.file_name),
+        &bytes,
+    )?;
+
+    let _ = state.journal.mark_submitted(&payload.job_id, spooler_job_id);
+
+    Ok(NativePrintResult {
+        success: true,
+        spooler_job_id,
+        printer_name: payload.printer_name.clone(),
+        message: format!(
+            "Job #{} submitted to {} (Spooler ID: {})",
+            payload.job_id, payload.printer_name, spooler_job_id
+        ),
+    })
+}
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
@@ -241,7 +298,8 @@ fn main() {
             get_workstation_device_identity,
             prepare_print_job,
             get_spool_job,
-            mark_spool_unknown
+            mark_spool_unknown,
+            print_to_native_hardware
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
