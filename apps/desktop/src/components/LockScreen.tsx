@@ -157,7 +157,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
             <input
               type="text"
               className="pb-input"
-              placeholder={activeMode === 'ADMIN' ? 'admin or admin@printbot.in' : 'e.g. ashwin, metro-xerox'}
+              placeholder={activeMode === 'ADMIN' ? 'admin or admin@printbot.in' : 'Enter shop username'}
               value={loginUsername}
               onChange={(e) => setLoginUsername(e.target.value)}
               autoFocus={activeMode === 'ADMIN'}

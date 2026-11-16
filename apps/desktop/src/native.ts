@@ -10,6 +10,9 @@ export interface NativePrinterInfo {
   supported_paper_sizes: string[];
   queue_count: number;
   status: string;
+  driver_name?: string;
+  port_name?: string;
+  protocol?: string;
 }
 
 export interface WorkstationDeviceIdentity {
@@ -33,7 +36,7 @@ export async function getWorkstationDeviceIdentity(): Promise<WorkstationDeviceI
     return {
       device_id: stored,
       hardware_hash: 'hw_' + stored,
-      device_name: 'COUNTER-PC',
+      device_name: typeof navigator !== 'undefined' ? (navigator.userAgent.includes('Windows') ? 'Workstation-PC' : 'Station') : 'Station',
     };
   }
 }

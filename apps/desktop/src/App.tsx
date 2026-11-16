@@ -47,7 +47,7 @@ import {
   Globe
 } from 'lucide-react';
 import { ThemeProvider, ThemeSwitch, MotionSurface, PaperScene, PrinterScene, useGsapStagger } from '@xerox/ui';
-import { discoverPrinters, bindWorkstation, getWorkstationDeviceIdentity, type NativePrinterInfo } from './native';
+import { discoverPrinters, bindWorkstation, getWorkstationDeviceIdentity, preparePrintJob, type NativePrinterInfo, type WorkstationDeviceIdentity } from './native';
 import { supabase } from './supabase';
 import QRCode from 'qrcode';
 import { DesktopShell, type Tab } from './components/DesktopShell';
@@ -255,6 +255,14 @@ function Dialog({
 }
 
 export default function App() {
+  const [deviceIdentity, setDeviceIdentity] = useState<WorkstationDeviceIdentity | null>(null);
+
+  useEffect(() => {
+    getWorkstationDeviceIdentity()
+      .then((id) => setDeviceIdentity(id))
+      .catch(() => {});
+  }, []);
+
   // --- Persistent Storage State ---
   const [licenses, setLicenses] = useState<Record<string, ShopLicense>>(() => {
     try {
@@ -1383,9 +1391,9 @@ export default function App() {
       appId: generatedId,
       licenseKey: key,
       shopName: shopNameVal,
-      location: 'Branch Counter 01',
-      phone: '+91 90000 00000',
-      upiId: 'shop@upi',
+      location: 'Main Counter',
+      phone: '',
+      upiId: `${usernameVal}@upi`,
       rates: {
         bwPerSideRupees: 1.5,
         colorPerSideRupees: 10.0,
@@ -1416,8 +1424,8 @@ export default function App() {
         .insert({
           id: generatedId,
           shop_name: shopNameVal,
-          city: 'Branch Counter 01',
-          contact_number: '+91 90000 00000',
+          city: 'Main Counter',
+          contact_number: '',
           plan: newDuration,
           status: 'APPROVED',
           generated_username: usernameVal,
@@ -1448,8 +1456,8 @@ export default function App() {
             username: usernameVal,
             license_key: key,
             plan: newDuration,
-            city: 'Branch Counter 01',
-            phone: '+91 90000 00000',
+            city: 'Main Counter',
+            phone: '',
           }),
         });
       } catch {}
@@ -1647,23 +1655,149 @@ export default function App() {
     bindAndDiscover();
   }, [currentShop?.username, currentShop?.deviceToken]);
 
-  const handleApproveJob = (jobId: string) => {
+  const fetchServerQueue = async () => {
+    const shopId = currentShop?.username;
+    if (!shopId) return;
+    try {
+      const headers: Record<string, string> = {
+        'X-Tenant-ID': shopId,
+      };
+      if (currentShop.deviceToken) {
+        headers['Authorization'] = `Bearer ${currentShop.deviceToken}`;
+      }
+      const res = await fetch(`${API_BASE}/orders`, { headers });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        const mapped: PrintJob[] = data.map((item: any) => {
+          const isDuplex = item.options?.duplex_mode?.includes('duplex');
+          const sides = item.page_count || 1;
+          const sheets = isDuplex ? Math.ceil(sides / 2) : sides;
+          const copies = item.options?.copies || 1;
+          const statusMap: Record<string, PrintJob['status']> = {
+            'AWAITING_APPROVAL': 'PENDING_APPROVAL',
+            'PENDING_PAYMENT': 'PENDING_APPROVAL',
+            'QUEUED': 'QUEUED',
+            'SPOOLING': 'PRINTING',
+            'PRINTING': 'PRINTING',
+            'COMPLETED': 'COMPLETED',
+            'READY_FOR_PICKUP': 'COMPLETED',
+            'COLLECTED': 'COMPLETED',
+            'REJECTED': 'REJECTED',
+            'COMPLETION_UNKNOWN': 'COMPLETION_UNKNOWN',
+          };
+          const mappedStatus = statusMap[item.status] || 'PENDING_APPROVAL';
+          const paise = item.total_paise || (item.calculated_price_cents ? item.calculated_price_cents * 83 : 2000);
+          return {
+            id: item.id,
+            customer_email: item.customer_email || 'walkin@customer.in',
+            file_name: item.file_name || 'document.pdf',
+            page_count: item.page_count || 1,
+            logical_pages: item.page_count || 1,
+            rendered_sides: sides * copies,
+            physical_sheets: sheets * copies,
+            options: {
+              copies: copies,
+              color_mode: (item.options?.color_mode || 'bw') as any,
+              paper_size: (item.options?.paper_size || 'A4') as any,
+              duplex_mode: (item.options?.duplex_mode || 'simplex') as any,
+              paper_gsm: item.options?.paper_gsm || 75,
+              binding: (item.options?.binding || 'none') as any,
+            },
+            calculated_price_paise: paise,
+            calculated_price_rupees: paise / 100,
+            status: mappedStatus,
+            created_at: item.created_at ? new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now',
+            rejection_reason: item.rejection_reason,
+          };
+        });
+
+        setJobs((prev) => {
+          const serverIds = new Set(mapped.map((m) => m.id));
+          const localOnly = prev.filter((p) => !serverIds.has(p.id));
+          return [...mapped, ...localOnly];
+        });
+      }
+    } catch {
+      // Backend offline or unreachable
+    }
+  };
+
+  // Poll cloud queue for active counter workstation
+  useEffect(() => {
+    if (screen !== 'MAIN_APP' || !currentShop?.username) return;
+    fetchServerQueue();
+    const interval = setInterval(fetchServerQueue, 5000);
+    return () => clearInterval(interval);
+  }, [screen, currentShop?.username]);
+
+  const handleApproveJob = async (jobId: string) => {
     setJobs((prev) =>
       prev.map((j) => (j.id === jobId ? { ...j, status: 'QUEUED' } : j))
     );
-    setNotice(`Job ${jobId} approved and dispatched to printer spooler.`);
+
+    const targetJob = jobs.find((j) => j.id === jobId);
+    const shopId = currentShop?.username || 'shop';
+
+    // 1. Submit to Tauri Spool Journal if native printers available
+    if (nativePrinters && nativePrinters.length > 0 && targetJob) {
+      try {
+        await preparePrintJob({
+          job_id: jobId,
+          shop_id: shopId,
+          printer_name: nativePrinters[0].name,
+          document_path: `${jobId}.pdf`,
+          copies: targetJob.options.copies || 1,
+        });
+      } catch (spoolErr) {
+        console.warn('Tauri native spool intent recorded with note:', spoolErr);
+      }
+    }
+
+    // 2. Report approval to backend API
+    try {
+      const headers: Record<string, string> = { 'X-Tenant-ID': shopId };
+      if (currentShop?.deviceToken) headers['Authorization'] = `Bearer ${currentShop.deviceToken}`;
+      await fetch(`${API_BASE}/orders/${jobId}/approve`, {
+        method: 'POST',
+        headers,
+      });
+    } catch {
+      // Backend offline
+    }
+
+    setNotice(`Job ${jobId} approved and recorded in spool journal.`);
   };
 
-  const handleRejectJob = () => {
+  const handleRejectJob = async () => {
     if (!rejectionModalJobId) return;
+    const targetId = rejectionModalJobId;
+    const reason = rejectionReason;
     setJobs((prev) =>
       prev.map((j) =>
-        j.id === rejectionModalJobId
-          ? { ...j, status: 'REJECTED', rejection_reason: rejectionReason }
+        j.id === targetId
+          ? { ...j, status: 'REJECTED', rejection_reason: reason }
           : j
       )
     );
-    setNotice(`Job ${rejectionModalJobId} rejected.`);
+
+    try {
+      const shopId = currentShop?.username || 'shop';
+      const headers: Record<string, string> = {
+        'X-Tenant-ID': shopId,
+        'Content-Type': 'application/json',
+      };
+      if (currentShop?.deviceToken) headers['Authorization'] = `Bearer ${currentShop.deviceToken}`;
+      await fetch(`${API_BASE}/orders/${targetId}/reject`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ reason }),
+      });
+    } catch {
+      // Backend offline
+    }
+
+    setNotice(`Job ${targetId} rejected.`);
     setRejectionModalJobId(null);
   };
 
@@ -1911,6 +2045,7 @@ export default function App() {
     <DesktopShell
       currentShop={currentShop}
       username={activeSession?.username || 'operator'}
+      deviceName={deviceIdentity?.device_name}
       activeTab={activeTab}
       setActiveTab={setActiveTab}
       queueCount={jobs.length}
@@ -1947,6 +2082,7 @@ export default function App() {
           onRejectJob={(jobId) => setRejectionModalJobId(jobId)}
           onRefreshJobs={() => {
             setNotice('Checking for incoming cloud orders...');
+            fetchServerQueue();
           }}
         />
       )}

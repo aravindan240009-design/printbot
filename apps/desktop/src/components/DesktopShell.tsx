@@ -24,6 +24,7 @@ export type Tab = 'queue' | 'printers' | 'services' | 'website' | 'settings';
 interface DesktopShellProps {
   currentShop?: ShopLicense;
   username: string;
+  deviceName?: string;
   activeTab: Tab;
   setActiveTab: (tab: Tab) => void;
   queueCount: number;
@@ -43,6 +44,7 @@ interface DesktopShellProps {
 export const DesktopShell: React.FC<DesktopShellProps> = ({
   currentShop,
   username,
+  deviceName,
   activeTab,
   setActiveTab,
   queueCount,
@@ -78,7 +80,7 @@ export const DesktopShell: React.FC<DesktopShellProps> = ({
           </div>
 
           <div className="pb-titlebar-status-chip">
-            <span>Counter-PC-01</span>
+            <span>{deviceName || 'Station'}</span>
             <span style={{ color: 'var(--pb-desk-text-dim)' }}>•</span>
             <span style={{ color: 'var(--pb-desk-text)' }}>{username}</span>
           </div>

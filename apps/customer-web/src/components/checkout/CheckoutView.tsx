@@ -12,9 +12,26 @@ import {
   MessageSquare,
   ExternalLink,
   MapPin,
+  CreditCard,
+  RefreshCw,
 } from 'lucide-react';
 import { DocumentItem, ServerQuote, ShopSession } from '../../types';
 import { TranslationKeys } from '../../locales';
+
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof window !== 'undefined' && (window as any).Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
 
 interface CheckoutViewProps {
   files: DocumentItem[];
@@ -25,6 +42,7 @@ interface CheckoutViewProps {
     customerPhone: string;
     notes: string;
     paymentMethod: 'upi' | 'cash';
+    paymentId?: string;
   }) => void;
   onBack: () => void;
   t: TranslationKeys;
@@ -44,10 +62,12 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   const [notes, setNotes] = useState('');
   const [copiedVpa, setCopiedVpa] = useState(false);
   const [timeLeft, setTimeLeft] = useState(15 * 60); // 15 mins
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const amount = quote ? quote.total_rupees.toFixed(2) : '0.00';
-  const vpa = 'quickxerox@okaxis';
+  const vpa = (session as any).upi_id || `${session.shop_slug || session.shop_id || 'printbot'}@okaxis`;
   const upiIntentUrl = `upi://pay?pa=${vpa}&pn=${encodeURIComponent(session.shop_name || 'PrintBot')}&am=${amount}&cu=INR&tn=${encodeURIComponent('Print order at ' + session.shop_name)}`;
+  const razorpayKeyId = (import.meta as any).env?.VITE_RAZORPAY_KEY_ID || 'rzp_test_Ts9MJsdti9RG2c';
 
   // Countdown timer for UPI session
   useEffect(() => {
@@ -70,13 +90,77 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     setTimeout(() => setCopiedVpa(false), 2000);
   };
 
+  const handleRazorpayCheckout = async () => {
+    setIsProcessingPayment(true);
+    const loaded = await loadRazorpayScript();
+    if (!loaded) {
+      alert('Unable to load Razorpay payment gateway. Please check your internet connection.');
+      setIsProcessingPayment(false);
+      return;
+    }
+
+    const paise = quote ? Math.round(quote.total_rupees * 100) : Math.round(Number(amount) * 100);
+
+    const options = {
+      key: razorpayKeyId,
+      amount: paise,
+      currency: 'INR',
+      name: session.shop_name || 'Print Bot',
+      description: `Print Order (${quote?.total_physical_sheets || 1} Sheets / ₹${amount})`,
+      image: '/favicon.svg',
+      handler: function (response: any) {
+        setIsProcessingPayment(false);
+        onConfirmOrder({
+          customerName: customerName.trim(),
+          customerPhone: customerPhone.trim(),
+          notes: notes.trim(),
+          paymentMethod: 'upi',
+          paymentId: response.razorpay_payment_id,
+        });
+      },
+      prefill: {
+        name: customerName.trim() || undefined,
+        contact: customerPhone.trim() || undefined,
+      },
+      notes: {
+        shop_id: session.shop_id,
+        shop_slug: session.shop_slug,
+      },
+      theme: {
+        color: '#2563eb',
+      },
+      modal: {
+        ondismiss: function () {
+          setIsProcessingPayment(false);
+        },
+      },
+    };
+
+    try {
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', function (errResp: any) {
+        alert(`Payment Failed: ${errResp?.error?.description || 'Transaction declined'}`);
+        setIsProcessingPayment(false);
+      });
+      rzp.open();
+    } catch (err) {
+      console.error('Razorpay launch error:', err);
+      alert('Unable to launch Razorpay gateway. Please pay at counter or scan UPI.');
+      setIsProcessingPayment(false);
+    }
+  };
+
   const handleSubmit = () => {
-    onConfirmOrder({
-      customerName: customerName.trim(),
-      customerPhone: customerPhone.trim(),
-      notes: notes.trim(),
-      paymentMethod,
-    });
+    if (paymentMethod === 'upi') {
+      handleRazorpayCheckout();
+    } else {
+      onConfirmOrder({
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        notes: notes.trim(),
+        paymentMethod,
+      });
+    }
   };
 
   return (
@@ -316,6 +400,43 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               </button>
             </div>
 
+            <div style={{ margin: '16px 0 10px' }}>
+              <button
+                type="button"
+                onClick={handleRazorpayCheckout}
+                disabled={isProcessingPayment}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  width: '100%',
+                  maxWidth: '380px',
+                  padding: '14px 22px',
+                  borderRadius: 'var(--pb-radius-lg)',
+                  background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontSize: '0.98rem',
+                  fontWeight: 800,
+                  cursor: isProcessingPayment ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
+                }}
+              >
+                {isProcessingPayment ? (
+                  <>
+                    <RefreshCw size={18} className="pb-spin" />
+                    <span>Opening Razorpay...</span>
+                  </>
+                ) : (
+                  <>
+                    <CreditCard size={18} />
+                    <span>Pay ₹{amount} with Razorpay (UPI / Cards)</span>
+                  </>
+                )}
+              </button>
+            </div>
+
             <div style={{ margin: '14px 0' }}>
               <a
                 href={upiIntentUrl}
@@ -391,9 +512,19 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           className="pb-btn-primary"
           style={{ flex: 1, minHeight: '52px', minWidth: '240px', fontSize: '1rem' }}
           onClick={handleSubmit}
+          disabled={isProcessingPayment}
         >
-          <span>{paymentMethod === 'upi' ? t.upiVerifyButton : t.payCashButton}</span>
-          <ArrowRight size={18} />
+          {isProcessingPayment ? (
+            <>
+              <RefreshCw size={18} className="pb-spin" />
+              <span>Processing Payment...</span>
+            </>
+          ) : (
+            <>
+              <span>{paymentMethod === 'upi' ? `Pay ₹${amount} with Razorpay` : t.payCashButton}</span>
+              <ArrowRight size={18} />
+            </>
+          )}
         </button>
       </div>
     </div>

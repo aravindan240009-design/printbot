@@ -26,19 +26,42 @@ export const PrintersView: React.FC<PrintersViewProps> = ({
 }) => {
   const displayPrinters =
     nativePrinters && nativePrinters.length > 0
-      ? nativePrinters.map((p) => ({
-          id: p.name,
-          name: p.name,
-          isOnline: p.is_online,
-          statusText: p.status ? `Windows Spooler (${p.status})` : 'Windows Print Spooler Driver',
-          isDefault: p.is_default,
-        }))
+      ? nativePrinters.map((p) => {
+          const media =
+            p.supported_paper_sizes && p.supported_paper_sizes.length > 0
+              ? p.supported_paper_sizes.slice(0, 5).join(', ') +
+                (p.supported_paper_sizes.length > 5 ? ` +${p.supported_paper_sizes.length - 5} more` : '')
+              : 'Standard Media (A4, Letter)';
+          return {
+            id: p.name,
+            name: p.name,
+            isOnline: p.is_online,
+            statusText: p.driver_name
+              ? `${p.driver_name} (${p.status || 'Ready'})`
+              : p.status
+              ? `Windows Spooler (${p.status})`
+              : 'Windows Print Spooler Driver',
+            isDefault: p.is_default,
+            channels: p.supports_color ? 'Color & Monochrome' : 'Monochrome Only',
+            duplex: p.supports_duplex ? 'Automatic Long & Short Edge' : 'Manual / Simplex Only',
+            supportedMedia: media,
+            fullMediaList: p.supported_paper_sizes?.join(', ') || media,
+            protocol: p.protocol || (p.port_name ? `Win32 Stream (${p.port_name})` : 'Win32 RAW Stream'),
+            queueCount: p.queue_count,
+          };
+        })
       : fallbackPrinters.map((p, idx) => ({
           id: p.id || p.name,
           name: p.name,
           isOnline: true,
           statusText: p.driver_name || 'Windows Print Spooler Driver',
           isDefault: idx === 0,
+          channels: 'Monochrome Only',
+          duplex: 'Manual / Simplex Only',
+          supportedMedia: 'A4, Letter',
+          fullMediaList: 'A4, Letter',
+          protocol: 'Win32 Print Spooler',
+          queueCount: 0,
         }));
 
   return (
@@ -146,19 +169,21 @@ export const PrintersView: React.FC<PrintersViewProps> = ({
                 <div className="pb-printer-specs-table">
                   <div className="pb-printer-spec-row">
                     <span className="pb-printer-spec-label">Print Channels</span>
-                    <span className="pb-printer-spec-val">Color &amp; Monochrome</span>
+                    <span className="pb-printer-spec-val">{prn.channels}</span>
                   </div>
                   <div className="pb-printer-spec-row">
                     <span className="pb-printer-spec-label">Duplex Engine</span>
-                    <span className="pb-printer-spec-val">Automatic Long &amp; Short Edge</span>
+                    <span className="pb-printer-spec-val">{prn.duplex}</span>
                   </div>
                   <div className="pb-printer-spec-row">
                     <span className="pb-printer-spec-label">Supported Media</span>
-                    <span className="pb-printer-spec-val">A4, A3, Legal, Letter, Glossy</span>
+                    <span className="pb-printer-spec-val" title={prn.fullMediaList}>
+                      {prn.supportedMedia}
+                    </span>
                   </div>
                   <div className="pb-printer-spec-row">
                     <span className="pb-printer-spec-label">Spooler Protocol</span>
-                    <span className="pb-printer-spec-val">EMF / RAW Win32 Stream</span>
+                    <span className="pb-printer-spec-val">{prn.protocol}</span>
                   </div>
                 </div>
               </div>

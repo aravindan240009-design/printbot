@@ -57,6 +57,17 @@ async def scan_document(
             "content": content,
             "scan": scan_res
         }
+        import hashlib
+        sha = hashlib.sha256(content).hexdigest()
+        asset_service.register_scanned_asset(
+            shop_id=tenant_id,
+            asset_id=asset_id,
+            filename=file.filename or "document.pdf",
+            mime_type=file.content_type or "application/pdf",
+            file_size_bytes=len(content),
+            sha256_hash=sha,
+            content=content,
+        )
 
     # The temporary asset identifier is returned only after the server has
     # inspected the bytes. The customer must use this identifier for previews

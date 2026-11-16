@@ -62,3 +62,40 @@ export async function quoteFiles(items: Array<{ fileId: string; fileName: string
   }, token);
   return result;
 }
+
+export interface CreateOrderPayload {
+  customer_email: string;
+  customer_phone?: string;
+  file_name: string;
+  file_size_bytes: number;
+  page_count: number;
+  options: {
+    copies: number;
+    color_mode: string;
+    paper_size: string;
+    duplex_mode: string;
+    paper_gsm?: number;
+    binding?: string;
+    page_range?: string;
+  };
+  quote_hash?: string;
+}
+
+export async function createOrder(payload: CreateOrderPayload, token?: string, shopId?: string): Promise<any> {
+  const headers: Record<string, string> = {};
+  if (shopId) headers['X-Tenant-ID'] = shopId;
+  return request<any>('/orders', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  }, token);
+}
+
+export async function fetchOrderStatus(orderId: string, token?: string, shopId?: string): Promise<any> {
+  const headers: Record<string, string> = {};
+  if (shopId) headers['X-Tenant-ID'] = shopId;
+  return request<any>(`/orders/${orderId}`, {
+    method: 'GET',
+    headers,
+  }, token);
+}

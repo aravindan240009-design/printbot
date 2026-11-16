@@ -1444,6 +1444,10 @@ html, body {
    ========================================================================= */
 .pb-lockscreen-root {
   min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: grid;
   place-items: center;
   background: #f1f5f9 !important;
@@ -1650,7 +1654,11 @@ html, body {
    PRINT BOT ADMIN CENTER (SUPER ADMIN PORTAL)
    ========================================================================= */
 .pb-admin-root {
+  height: 100vh;
   min-height: 100vh;
+  max-height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: #f8fafc !important;
   color: #0f172a !important;
   display: flex;
@@ -1668,6 +1676,7 @@ html, body {
   position: sticky;
   top: 0;
   z-index: 40;
+  flex-shrink: 0;
 }
 
 .pb-admin-logo-box {
@@ -1691,6 +1700,7 @@ html, body {
   position: sticky;
   top: 64px;
   z-index: 30;
+  flex-shrink: 0;
 }
 
 .pb-admin-tab {
@@ -1738,7 +1748,7 @@ html, body {
   max-width: 1280px;
   width: 100%;
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px 24px 80px;
   box-sizing: border-box;
 }
 

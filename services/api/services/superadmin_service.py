@@ -92,9 +92,32 @@ class SuperAdminService:
         self._tax_invoices: Dict[str, ShopTaxInvoice] = {}
         # Manual coupon / adjustment credits per shop in paise
         self._manual_credits: Dict[str, int] = {}
+        # Pilot applications & direct licenses
+        self._applications: Dict[str, Dict[str, Any]] = {}
+        self._direct_licenses: Dict[str, Dict[str, Any]] = {}
         self._init_defaults()
 
     def _init_defaults(self):
+        self._applications = {
+            "APP-PILOT-8492": {
+                "id": "APP-PILOT-8492",
+                "shop_name": "Raghavendra Xerox Center",
+                "city": "Bengaluru",
+                "contact_number": "+91-98450-84920",
+                "plan": "1 Year",
+                "status": "PENDING",
+                "created_at": datetime.utcnow().isoformat(),
+            },
+            "APP-PILOT-5120": {
+                "id": "APP-PILOT-5120",
+                "shop_name": "Kavitha Print Point",
+                "city": "Coimbatore",
+                "contact_number": "+91-98420-51200",
+                "plan": "1 Month",
+                "status": "PENDING",
+                "created_at": datetime.utcnow().isoformat(),
+            },
+        }
         shop_a = "11111111-1111-1111-1111-111111111111"
         shop_b = "22222222-2222-2222-2222-222222222222"
 
@@ -497,12 +520,134 @@ class SuperAdminService:
             ])
         return output.getvalue()
 
+    def list_applications(self) -> List[Dict[str, Any]]:
+        return list(self._applications.values())
+
+    def update_application_plan(self, app_id: str, new_plan: str, actor_id: str) -> Dict[str, Any]:
+        if app_id not in self._applications:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Application '{app_id}' not found.")
+        app = self._applications[app_id]
+        app["plan"] = new_plan
+        app["updated_at"] = datetime.utcnow().isoformat()
+        app["updated_by"] = actor_id
+        audit_service.record_event(
+            actor_type="SUPERADMIN",
+            actor_id=actor_id,
+            action="APPLICATION_PLAN_UPDATED",
+            resource_type="applications",
+            resource_id=app_id,
+            shop_id="superadmin-plane",
+            metadata={"new_plan": new_plan},
+        )
+        return app
+
+    def approve_application(self, app_id: str, generated_username: str, generated_key: str, plan: str, actor_id: str) -> Dict[str, Any]:
+        if app_id not in self._applications:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Application '{app_id}' not found.")
+        app = self._applications[app_id]
+        app["status"] = "APPROVED"
+        app["generated_username"] = generated_username
+        app["generated_key"] = generated_key
+        app["plan"] = plan
+        app["approved_at"] = datetime.utcnow().isoformat()
+        app["approved_by"] = actor_id
+        audit_service.record_event(
+            actor_type="SUPERADMIN",
+            actor_id=actor_id,
+            action="APPLICATION_APPROVED",
+            resource_type="applications",
+            resource_id=app_id,
+            shop_id="superadmin-plane",
+            metadata={"generated_username": generated_username, "plan": plan},
+        )
+        return app
+
+    def reject_application(self, app_id: str, actor_id: str) -> Dict[str, Any]:
+        if app_id not in self._applications:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Application '{app_id}' not found.")
+        app = self._applications[app_id]
+        app["status"] = "REJECTED"
+        app["rejected_at"] = datetime.utcnow().isoformat()
+        app["rejected_by"] = actor_id
+        audit_service.record_event(
+            actor_type="SUPERADMIN",
+            actor_id=actor_id,
+            action="APPLICATION_REJECTED",
+            resource_type="applications",
+            resource_id=app_id,
+            shop_id="superadmin-plane",
+            metadata={},
+        )
+        return app
+
+    def delete_application(self, app_id: str, actor_id: str) -> bool:
+        if app_id not in self._applications:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Application '{app_id}' not found.")
+        del self._applications[app_id]
+        audit_service.record_event(
+            actor_type="SUPERADMIN",
+            actor_id=actor_id,
+            action="APPLICATION_DELETED",
+            resource_type="applications",
+            resource_id=app_id,
+            shop_id="superadmin-plane",
+            metadata={},
+        )
+        return True
+
+    def issue_direct_license(self, req: Dict[str, Any], actor_id: str) -> Dict[str, Any]:
+        username = req["username"]
+        lic = {
+            "username": username,
+            "license_key": req["license_key"],
+            "shop_name": req.get("shop_name", "Direct Test Shop"),
+            "plan": req.get("plan", "1 Year"),
+            "status": "APPROVED",
+            "issued_by": actor_id,
+            "issued_at": datetime.utcnow().isoformat(),
+        }
+        self._direct_licenses[username] = lic
+        audit_service.record_event(
+            actor_type="SUPERADMIN",
+            actor_id=actor_id,
+            action="DIRECT_LICENSE_ISSUED",
+            resource_type="licenses",
+            resource_id=username,
+            shop_id="superadmin-plane",
+            metadata=req,
+        )
+        return lic
+
+    def revoke_direct_license(self, username: str, actor_id: str) -> Dict[str, Any]:
+        lic = self._direct_licenses.get(username)
+        if not lic:
+            lic = {
+                "username": username,
+                "status": "APPROVED",
+            }
+            self._direct_licenses[username] = lic
+        lic["status"] = "REVOKED" if lic.get("status") == "APPROVED" else "APPROVED"
+        lic["updated_by"] = actor_id
+        lic["updated_at"] = datetime.utcnow().isoformat()
+        audit_service.record_event(
+            actor_type="SUPERADMIN",
+            actor_id=actor_id,
+            action="DIRECT_LICENSE_STATUS_TOGGLED",
+            resource_type="licenses",
+            resource_id=username,
+            shop_id="superadmin-plane",
+            metadata={"status": lic["status"]},
+        )
+        return lic
+
     def clear(self):
         self._shops.clear()
         self._dunning.clear()
         self._saas_billing_ledger.clear()
         self._tax_invoices.clear()
         self._manual_credits.clear()
+        self._applications.clear()
+        self._direct_licenses.clear()
         self._init_defaults()
 
 

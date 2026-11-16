@@ -20,6 +20,9 @@ pub struct PrinterInfo {
     pub supported_paper_sizes: Vec<String>,
     pub queue_count: u32,
     pub status: String,
+    pub driver_name: String,
+    pub port_name: String,
+    pub protocol: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

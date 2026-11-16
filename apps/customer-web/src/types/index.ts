@@ -65,6 +65,7 @@ export interface PlacedOrder {
   totalLogicalPages: number;
   paymentMethod: 'upi' | 'cash';
   paymentStatus: 'paid' | 'pending_cash';
+  paymentId?: string;
   status: OrderStatus;
   placedAt: string;
   items: PlacedOrderItem[];

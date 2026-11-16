@@ -711,11 +711,68 @@ def test_privileged_application_operations_authorized():
     )
 
     assert del_res.status_code == 200
-
     assert del_res.json()["status"] == "deleted"
 
 
+def test_document_scan_asset_download_and_order_flow():
+    """Verifies document upload -> asset registration -> signed raw download -> order approve pipeline."""
+    sample_pdf_bytes = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/MediaBox[0 0 612 792]>>endobj xref\n0 4\n0000000000 65535 f\n0000000009 00000 n\n0000000052 00000 n\n0000000108 00000 n\ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n162\n%%EOF"
 
+    # 1. Scan document
+    res_scan = client.post(
+        "/api/v1/documents/scan",
+        files={"file": ("report.pdf", sample_pdf_bytes, "application/pdf")},
+        headers={"X-Tenant-ID": "test_shop_1"}
+    )
+    assert res_scan.status_code == 200
+    scan_data = res_scan.json()
+    assert scan_data["is_valid"] is True
+    asset_id = scan_data["asset_id"]
+    assert asset_id is not None
+
+    # 2. Get signed download URL
+    res_dl = client.get(
+        f"/api/v1/assets/{asset_id}/download",
+        headers={"X-Tenant-ID": "test_shop_1"}
+    )
+    assert res_dl.status_code == 200
+    dl_data = res_dl.json()
+    download_url = dl_data["download_url"]
+    assert "/raw?" in download_url
+
+    # 3. Download raw asset
+    res_raw = client.get(download_url)
+    assert res_raw.status_code == 200
+    assert res_raw.content == sample_pdf_bytes
+
+    # 4. Create and approve order
+    order_res = client.post(
+        "/api/v1/orders",
+        headers={"X-Tenant-ID": "test_shop_1"},
+        json={
+            "customer_email": "walkin@customer.in",
+            "file_name": "report.pdf",
+            "file_size_bytes": len(sample_pdf_bytes),
+            "page_count": 1,
+            "options": {
+                "copies": 1,
+                "color_mode": "bw",
+                "paper_size": "A4",
+                "duplex_mode": "simplex",
+                "paper_gsm": 75,
+                "binding": "none"
+            }
+        }
+    )
+    assert order_res.status_code == 201
+    job_id = order_res.json()["id"]
+
+    approve_res = client.post(
+        f"/api/v1/orders/{job_id}/approve",
+        headers={"X-Tenant-ID": "test_shop_1"}
+    )
+    assert approve_res.status_code == 200
+    assert approve_res.json()["status"] == "QUEUED"
 
 
 if __name__ == "__main__":

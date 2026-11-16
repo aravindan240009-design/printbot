@@ -62,6 +62,34 @@ async def get_download_url(
     )
 
 
+@router.get("/{asset_id}/raw")
+async def download_raw_asset(
+    asset_id: str,
+    shop_id: str = Query(...),
+    expires: int = Query(...),
+    sig: str = Query(...),
+):
+    """Downloads raw binary document bytes if signed URL is valid."""
+    from fastapi.responses import Response
+
+    if not asset_service.verify_upload_signature(shop_id, asset_id, expires, sig):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Expired or invalid signed download URL.")
+
+    item = asset_service.get_asset_bytes(shop_id, asset_id)
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset binary content not found or deleted.")
+
+    meta, content = item
+    return Response(
+        content=content,
+        media_type=meta.mime_type or "application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{meta.file_name}"',
+            "X-Asset-SHA256": meta.sha256_hash,
+        }
+    )
+
+
 @router.delete("/{asset_id}")
 async def delete_asset(asset_id: str, request: Request):
     """

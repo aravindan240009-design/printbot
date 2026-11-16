@@ -39,7 +39,7 @@ import {
   saveOrderToStorage,
   updateStoredOrderStatus,
 } from './utils/storage';
-import { openShopSession, scanFile } from './api';
+import { openShopSession, scanFile, createOrder, fetchOrderStatus, type CreateOrderPayload } from './api';
 import {
   resolveShopSlugFromUrl,
   loadShopProfile,
@@ -214,19 +214,50 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
     );
   };
 
-  const handleConfirmOrder = (details: {
+  const handleConfirmOrder = async (details: {
     customerName: string;
     customerPhone: string;
     notes: string;
     paymentMethod: 'upi' | 'cash';
+    paymentId?: string;
   }) => {
     if (!quote || files.length === 0) return;
 
     const randomPin = String(Math.floor(1000 + Math.random() * 9000));
-    const randomOrderId = 'PB-' + Math.floor(10000 + Math.random() * 90000);
+    let assignedOrderId = 'PB-' + Math.floor(10000 + Math.random() * 90000);
+
+    const firstFile = files[0];
+    const cleanPhone = details.customerPhone ? details.customerPhone.replace(/[^0-9]/g, '') : '';
+    const customerEmail = cleanPhone ? `${cleanPhone}@walkin.customer.in` : 'customer@walkin.in';
+
+    const createPayload: CreateOrderPayload = {
+      customer_email: customerEmail,
+      customer_phone: details.customerPhone || undefined,
+      file_name: firstFile.name,
+      file_size_bytes: firstFile.sizeBytes || firstFile.source?.size || 1024,
+      page_count: firstFile.pageCount || 1,
+      options: {
+        copies: firstFile.options.copies || 1,
+        color_mode: firstFile.options.colorMode === 'color' ? 'color' : firstFile.options.colorMode === 'grayscale' ? 'grayscale' : 'bw',
+        paper_size: firstFile.options.paperSize || 'A4',
+        duplex_mode: firstFile.options.duplex === 'simplex' ? 'simplex' : firstFile.options.duplex === 'duplex_short' ? 'duplex_short' : 'duplex_long',
+        paper_gsm: parseInt(firstFile.options.paperGsm || '75', 10) || 75,
+        binding: firstFile.options.finishing || 'none',
+        page_range: firstFile.options.pageRange || 'all',
+      },
+    };
+
+    try {
+      const serverJob = await createOrder(createPayload, session.session_token, session.shop_id);
+      if (serverJob && serverJob.id) {
+        assignedOrderId = serverJob.id;
+      }
+    } catch (orderErr) {
+      console.warn('Realtime cloud order submission fallback to local queue:', orderErr);
+    }
 
     const newOrder: PlacedOrder = {
-      orderId: randomOrderId,
+      orderId: assignedOrderId,
       pickupPin: randomPin,
       shopId: session.shop_id,
       shopName: session.shop_name,
@@ -237,6 +268,7 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
       totalLogicalPages: quote.total_logical_pages,
       paymentMethod: details.paymentMethod,
       paymentStatus: details.paymentMethod === 'upi' ? 'paid' : 'pending_cash',
+      paymentId: details.paymentId,
       status: 'ORDER_RECEIVED',
       placedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       items: files.map((f) => ({
@@ -247,7 +279,7 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
         paperSize: f.options.paperSize,
         finishing: f.options.finishing,
       })),
-      qrToken: 'printbot_token_' + randomOrderId,
+      qrToken: 'printbot_token_' + assignedOrderId,
     };
 
     saveOrderToStorage(newOrder);
@@ -258,21 +290,24 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
     setActiveFileId('');
     setPrintStep(1);
 
-    // Simulate printer workstation state progression
-    setTimeout(() => {
-      updateStoredOrderStatus(newOrder.shopId, newOrder.orderId, 'SPOOLING');
-      setActiveOrder((curr) => (curr ? { ...curr, status: 'SPOOLING' } : curr));
-    }, 4000);
+    // Poll server order status if order was assigned on server
+    const pollInterval = setInterval(async () => {
+      try {
+        const live = await fetchOrderStatus(newOrder.orderId, session.session_token, newOrder.shopId);
+        if (live && live.status) {
+          updateStoredOrderStatus(newOrder.shopId, newOrder.orderId, live.status);
+          setActiveOrder((curr) => (curr && curr.orderId === newOrder.orderId ? { ...curr, status: live.status } : curr));
+          if (live.status === 'READY_FOR_PICKUP' || live.status === 'COLLECTED' || live.status === 'CANCELLED') {
+            clearInterval(pollInterval);
+          }
+        }
+      } catch {
+        // Continue polling or wait
+      }
+    }, 3000);
 
-    setTimeout(() => {
-      updateStoredOrderStatus(newOrder.shopId, newOrder.orderId, 'PRINTING');
-      setActiveOrder((curr) => (curr ? { ...curr, status: 'PRINTING' } : curr));
-    }, 8000);
-
-    setTimeout(() => {
-      updateStoredOrderStatus(newOrder.shopId, newOrder.orderId, 'READY_FOR_PICKUP');
-      setActiveOrder((curr) => (curr ? { ...curr, status: 'READY_FOR_PICKUP' } : curr));
-    }, 14000);
+    // Timeout safety for poller (after 10 minutes)
+    setTimeout(() => clearInterval(pollInterval), 600000);
   };
 
   const unlockingFile = files.find((f) => f.id === unlockingFileId);

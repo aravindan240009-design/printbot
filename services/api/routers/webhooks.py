@@ -63,7 +63,7 @@ async def handle_payment_webhook(
                 tenant_id=payload.tenant_id,
                 job_id=job_id,
                 payment_intent_id=payload.payment_intent_id,
-                amount_paise=payload.amount_cents * 10
+                amount_paise=payload.amount_cents * 83
             )
             result = {
                 "status": "success",

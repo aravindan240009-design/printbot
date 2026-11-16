@@ -56,9 +56,48 @@ class AssetService:
     def __init__(self):
         # Maps (shop_id, asset_id) -> AssetMetadata
         self._assets: Dict[str, AssetMetadata] = {}
+        self._asset_buffers: Dict[str, bytes] = {}
 
     def _key(self, shop_id: str, asset_id: str) -> str:
         return f"{shop_id}:{asset_id}"
+
+    def register_scanned_asset(
+        self,
+        shop_id: str,
+        asset_id: str,
+        filename: str,
+        mime_type: str,
+        file_size_bytes: int,
+        sha256_hash: str,
+        content: bytes,
+    ) -> AssetMetadata:
+        safe_name = sanitize_filename(filename)
+        storage_path = f"tenants/{shop_id}/assets/{asset_id}/{safe_name}"
+        retention = datetime.utcnow() + timedelta(days=7)
+        meta = AssetMetadata(
+            id=asset_id,
+            shop_id=shop_id,
+            storage_path=storage_path,
+            file_name=safe_name,
+            mime_type=mime_type,
+            file_size_bytes=file_size_bytes,
+            sha256_hash=sha256_hash,
+            retention_until=retention,
+        )
+        key = self._key(shop_id, asset_id)
+        self._assets[key] = meta
+        self._asset_buffers[key] = content
+        return meta
+
+    def get_asset_bytes(self, shop_id: str, asset_id: str) -> Optional[tuple[AssetMetadata, bytes]]:
+        key = self._key(shop_id, asset_id)
+        meta = self._assets.get(key)
+        if not meta or meta.is_deleted:
+            return None
+        buf = self._asset_buffers.get(key)
+        if buf is None:
+            return None
+        return meta, buf
 
     def create_upload_intent(
         self,
@@ -156,11 +195,13 @@ class AssetService:
         if key in self._assets:
             self._assets[key].is_deleted = True
             self._assets[key].storage_path = ""
+            self._asset_buffers.pop(key, None)
             return True
         return False
 
     def clear(self):
         self._assets.clear()
+        self._asset_buffers.clear()
 
 
 asset_service = AssetService()

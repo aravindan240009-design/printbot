@@ -60,7 +60,7 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
             return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"detail": "Not found."})
 
         # Exempt public endpoints (exact match, qr route, or lab diagnostic simulator)
-        if path in EXEMPT_EXACT_PATHS or path.startswith("/api/v1/qr/") or path.startswith("/api/v1/lab") or path.startswith("/docs") or path.startswith("/openapi"):
+        if path in EXEMPT_EXACT_PATHS or path.startswith("/api/v1/qr/") or path.startswith("/api/v1/lab") or path.startswith("/docs") or path.startswith("/openapi") or (path.startswith("/api/v1/assets/") and "/raw" in path):
             response = await call_next(request)
             self._add_security_headers(response, request_id)
             return response

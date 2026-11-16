@@ -85,7 +85,7 @@ class JobService:
         job_id = str(uuid.uuid4())
         now = datetime.utcnow()
         total_cents = quote["total_cents"]
-        total_paise = quote.get("total_paise", total_cents * 10)
+        total_paise = quote.get("total_paise", total_cents * 83)
 
         job = PrintJobResponse(
             id=job_id,

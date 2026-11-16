@@ -236,7 +236,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   });
 
   return (
-    <div className="pb-admin-root">
+    <div
+      className="pb-admin-root"
+      style={{
+        height: '100vh',
+        maxHeight: '100vh',
+        overflowY: 'auto',
+        overflowX: 'hidden',
+      }}
+    >
       {/* Top Header */}
       <header className="pb-admin-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
