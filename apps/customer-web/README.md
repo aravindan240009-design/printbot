@@ -56,4 +56,4 @@ addresses.
 - **Multi-Lingual Support**: English, Tamil (தமிழ்), and Hindi (हिन्दी) translations.
 - **Accurate Instant Quote**: Calculates logical pages, rendered sides, and physical sheets according to the shop's live rates.
 - **Flexible Payments**: Instant UPI payment intent / QR code and Cash at counter.
-- **Order Tracking & Pickup PIN**: Displays four-digit collection PIN and live order status.
+- **Order Tracking & Pickup PIN**: Displays the four-digit collection PIN and live status updates from the workstation queue, print submission, and ready-for-pickup action.

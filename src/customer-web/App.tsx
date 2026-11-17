@@ -284,30 +284,7 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
       })),
     };
 
-    // 1. Direct Cloud Sync: Write order into Supabase pilot_applications table
-    try {
-      const orderRecord = {
-        id: assignedOrderId,
-        shop_name: targetShopId,
-        city: firstFile.name,
-        contact_number: details.customerPhone || '',
-        plan: 'ORDER',
-        status: 'ORDER_PENDING',
-        generated_username: targetShopId,
-        generated_key: randomPin,
-        applied_at: new Date().toISOString(),
-        approved_at: new Date().toISOString(),
-        notes: JSON.stringify(orderMeta),
-      };
-      const { error: sbInsertErr } = await supabase.from('pilot_applications').insert(orderRecord);
-      if (sbInsertErr) {
-        console.warn('Supabase order insertion warning:', sbInsertErr);
-      }
-    } catch (sbEx) {
-      console.warn('Supabase order submission exception:', sbEx);
-    }
-
-    // 2. Also forward to local backend API if available
+    // Create the API job before writing the shared order row so both systems use the same ID.
     const createPayload: CreateOrderPayload = {
       customer_email: customerEmail,
       customer_phone: details.customerPhone || undefined,
@@ -334,6 +311,30 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
       } catch (apiError) {
         console.error('Configured Print Bot API order sync failed; the Supabase order record remains available.', apiError);
       }
+    }
+    orderMeta.orderId = assignedOrderId;
+
+    // The workstation and customer tracker both use this row as the live order record.
+    try {
+      const orderRecord = {
+        id: assignedOrderId,
+        shop_name: targetShopId,
+        city: firstFile.name,
+        contact_number: details.customerPhone || '',
+        plan: 'ORDER',
+        status: 'ORDER_PENDING',
+        generated_username: targetShopId,
+        generated_key: randomPin,
+        applied_at: new Date().toISOString(),
+        approved_at: new Date().toISOString(),
+        notes: JSON.stringify(orderMeta),
+      };
+      const { error: sbInsertErr } = await supabase.from('pilot_applications').insert(orderRecord);
+      if (sbInsertErr) {
+        console.warn('Supabase order insertion warning:', sbInsertErr);
+      }
+    } catch (sbEx) {
+      console.warn('Supabase order submission exception:', sbEx);
     }
 
     const newOrder: PlacedOrder = {
@@ -371,13 +372,14 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
     setPrintStep(1);
 
     // Live Supabase subscription + fallback polling for order status changes
-    const mapLiveStatusToClient = (rawStatus: string): PlacedOrder['status'] => {
+    const mapLiveStatusToClient = (rawStatus: string): PlacedOrder['status'] | null => {
       const s = rawStatus.toUpperCase();
-      if (s === 'ORDER_QUEUED' || s === 'QUEUED') return 'SPOOLING';
+      if (s === 'ORDER_QUEUED' || s === 'QUEUED' || s === 'SPOOL_SUBMITTED' || s === 'LEASED' || s === 'SPOOLING') return 'SPOOLING';
       if (s === 'ORDER_PRINTING' || s === 'PRINTING') return 'PRINTING';
       if (s === 'ORDER_COMPLETED' || s === 'COMPLETED' || s === 'READY_FOR_PICKUP' || s === 'COLLECTED') return 'READY_FOR_PICKUP';
       if (s === 'ORDER_REJECTED' || s === 'REJECTED') return 'CANCELLED';
-      return 'ORDER_RECEIVED';
+      if (s === 'ORDER_PENDING' || s === 'PENDING' || s === 'PENDING_APPROVAL' || s === 'ORDER_RECEIVED') return 'ORDER_RECEIVED';
+      return null;
     };
 
     const statusChannel = supabase
@@ -389,34 +391,45 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
           const newStatus = payload.new?.status;
           if (newStatus) {
             const mapped = mapLiveStatusToClient(newStatus);
-            updateStoredOrderStatus(newOrder.shopId, assignedOrderId, mapped);
-            setActiveOrder((curr) => (curr && curr.orderId === assignedOrderId ? { ...curr, status: mapped } : curr));
+            if (mapped) {
+              updateStoredOrderStatus(newOrder.shopId, assignedOrderId, mapped);
+              setActiveOrder((curr) => (curr && curr.orderId === assignedOrderId ? { ...curr, status: mapped } : curr));
+            }
           }
         }
       )
       .subscribe();
 
-    const pollInterval = setInterval(async () => {
+    const syncCurrentStatus = async () => {
       try {
-        const { data: liveRow } = await supabase
+        const { data: liveRow, error } = await supabase
           .from('pilot_applications')
           .select('status')
           .eq('id', assignedOrderId)
           .maybeSingle();
 
+        if (error) {
+          console.warn('Unable to refresh live order status; polling will continue.', error);
+          return;
+        }
+
         if (liveRow && liveRow.status) {
           const mapped = mapLiveStatusToClient(liveRow.status);
-          updateStoredOrderStatus(newOrder.shopId, assignedOrderId, mapped);
-          setActiveOrder((curr) => (curr && curr.orderId === assignedOrderId ? { ...curr, status: mapped } : curr));
-          if (mapped === 'READY_FOR_PICKUP' || mapped === 'CANCELLED') {
-            clearInterval(pollInterval);
-            supabase.removeChannel(statusChannel);
+          if (mapped) {
+            updateStoredOrderStatus(newOrder.shopId, assignedOrderId, mapped);
+            setActiveOrder((curr) => (curr && curr.orderId === assignedOrderId ? { ...curr, status: mapped } : curr));
+            if (mapped === 'READY_FOR_PICKUP' || mapped === 'CANCELLED') {
+              clearInterval(pollInterval);
+              supabase.removeChannel(statusChannel);
+            }
           }
         }
-      } catch {
-        // Continue polling
+      } catch (error) {
+        console.warn('Unable to refresh live order status; polling will continue.', error);
       }
-    }, 3000);
+    };
+    const pollInterval = setInterval(syncCurrentStatus, 3000);
+    void syncCurrentStatus();
 
     setTimeout(() => {
       clearInterval(pollInterval);

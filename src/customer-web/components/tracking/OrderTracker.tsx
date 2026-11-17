@@ -51,6 +51,12 @@ export const OrderTracker: React.FC<OrderTrackerProps> = ({ order, onPrintAnothe
   };
 
   const currentStep = getActiveStepIndex();
+  const statusHints = [
+    t.statusReceivedHint,
+    t.statusSpooledHint,
+    t.statusPrintingHint,
+    t.statusReadyHint,
+  ];
 
   const handleCopyPin = () => {
     navigator.clipboard?.writeText(order.pickupPin);
@@ -110,9 +116,7 @@ Your files are purged from server memory after printing.
         <h2 style={{ fontSize: '1.75rem', fontWeight: 850, letterSpacing: '-0.03em', marginBottom: '6px' }}>
           {t.orderPlacedTitle}
         </h2>
-        <p style={{ color: 'var(--pb-muted)', fontSize: '0.92rem' }}>
-          Transmitted to <strong>{order.shopName}</strong> counter spooler.
-        </p>
+        <p style={{ color: 'var(--pb-muted)', fontSize: '0.92rem' }}>{t.orderSubtitle}</p>
       </div>
 
       {/* 4-Digit Pickup PIN Card */}
@@ -187,7 +191,7 @@ Your files are purged from server memory after printing.
                 </span>
                 {isCurrent && (
                   <span style={{ fontSize: '0.78rem', color: 'var(--pb-brand)', fontWeight: 650 }}>
-                    In progress on shop printer fleet...
+                    {statusHints[currentStep]}
                   </span>
                 )}
               </div>

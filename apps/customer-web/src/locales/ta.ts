@@ -142,7 +142,7 @@ export const ta: typeof en = {
 
   // Order Confirmation & Live Tracking
   orderPlacedTitle: 'ஆர்டர் வெற்றிகரமாக பதிவு செய்யப்பட்டது!',
-  orderSubtitle: 'உங்கள் பிரிண்ட் வேலை நேரடியாக கடை இயந்திரத்திற்கு அனுப்பப்பட்டுள்ளது.',
+  orderSubtitle: 'கடை உங்கள் அச்சுப் பணியைச் செயல்படுத்தும் நிலையை நேரலையில் கண்காணிக்கவும்.',
   pickupPinHeadline: 'இந்த 4-இலக்க PIN-ஐ கவுண்டரில் காட்டவும்',
   orderIdLabel: 'கண்காணிப்பு எண் (Order ID)',
   placedAtLabel: 'ஆர்டர் நேரம்',
@@ -150,6 +150,10 @@ export const ta: typeof en = {
   statusSpooled: 'பிரிண்டர் ஸ்பூலருக்கு அனுப்பப்பட்டது',
   statusPrinting: 'இயந்திரத்தில் அச்சிடப்படுகிறது...',
   statusReady: 'கவுண்டரில் பெற தயாராக உள்ளது',
+  statusReceivedHint: 'கடை உங்கள் அச்சுப் பணியைத் தொடங்க காத்திருக்கிறது.',
+  statusSpooledHint: 'பணிநிலையம் உங்கள் பணியை ஏற்று பிரிண்டர் வரிசையில் சேர்த்துள்ளது.',
+  statusPrintingHint: 'பணிநிலையம் உங்கள் பணியை பிரிண்டருக்கு அனுப்பியுள்ளது.',
+  statusReadyHint: 'அச்சிடுதல் முடிந்தது. கவுண்டரில் உங்கள் PIN-ஐக் காட்டுங்கள்.',
   statusCompleted: 'வழங்கப்பட்டு நிறைவடைந்தது',
   statusCancelled: 'ஆர்டர் ரத்து செய்யப்பட்டது',
   liveStatusTitle: 'நேரலை ஆர்டர் நிலை',

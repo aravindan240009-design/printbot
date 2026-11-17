@@ -140,7 +140,7 @@ export const en = {
 
   // Order Confirmation & Live Tracking
   orderPlacedTitle: 'Order Placed Successfully!',
-  orderSubtitle: 'Your print job is transmitted directly to the workstation spooler.',
+  orderSubtitle: 'Track your print job as the shop processes it.',
   pickupPinHeadline: 'Show this 4-Digit PIN at Counter',
   orderIdLabel: 'Order Tracking ID',
   placedAtLabel: 'Time Submitted',
@@ -148,6 +148,10 @@ export const en = {
   statusSpooled: 'Spooled to Print Workstation',
   statusPrinting: 'Printing on Machine...',
   statusReady: 'Ready for Collection at Counter',
+  statusReceivedHint: 'Waiting for the shop to start your print job.',
+  statusSpooledHint: 'The workstation accepted your job and sent it to the printer queue.',
+  statusPrintingHint: 'The workstation submitted your job to the printer.',
+  statusReadyHint: 'Printing is complete. Show your PIN at the counter.',
   statusCompleted: 'Order Completed & Delivered',
   statusCancelled: 'Order Cancelled',
   liveStatusTitle: 'Live Counter Progress',

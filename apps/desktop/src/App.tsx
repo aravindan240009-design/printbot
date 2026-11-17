@@ -63,6 +63,24 @@ import { AdminPortal } from './components/AdminPortal';
 
 const API_BASE = ((import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '');
 
+type CloudOrderStatus = 'ORDER_PENDING' | 'ORDER_QUEUED' | 'ORDER_PRINTING' | 'ORDER_COMPLETED' | 'ORDER_REJECTED';
+
+async function syncOrderStatusToCloud(jobId: string, status: CloudOrderStatus): Promise<void> {
+  const { data, error } = await supabase
+    .from('pilot_applications')
+    .update({ status })
+    .eq('id', jobId)
+    .select('id')
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Could not sync order ${jobId} status to ${status}: ${error.message}`);
+  }
+  if (!data) {
+    throw new Error(`Order ${jobId} was not found in the cloud queue; status was not synchronized.`);
+  }
+}
+
 // --- Models & Contracts ---
 
 export interface ShopServiceItem {
@@ -1953,15 +1971,14 @@ export default function App() {
   };
 
   const handleApproveJob = async (jobId: string) => {
-    setJobs((prev) =>
-      prev.map((j) => (j.id === jobId ? { ...j, status: 'QUEUED' } : j))
-    );
-
     const targetJob = jobs.find((j) => j.id === jobId);
     if (!targetJob) {
       setNotice(`Job #${jobId} was not found in the queue.`);
       return;
     }
+    setJobs((prev) =>
+      prev.map((j) => (j.id === jobId ? { ...j, status: 'QUEUED' } : j))
+    );
 
     const shopId = currentShop?.username || activeSession?.username || 'shop';
     const targetPrinter = selectedPrinterName || nativePrinters?.[0]?.name || 'HP758E10 (HP LaserJet Pro 4004)';
@@ -1993,6 +2010,21 @@ export default function App() {
 
     try {
       await ensureCurrentWorkstationBinding();
+    } catch (bindingError) {
+      setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, status: 'PENDING_APPROVAL' } : j)));
+      setNotice(`Job #${jobId} could not be sent to the printer: ${bindingError instanceof Error ? bindingError.message : bindingError}`);
+      return;
+    }
+
+    try {
+      await syncOrderStatusToCloud(jobId, 'ORDER_QUEUED');
+    } catch (syncError) {
+      setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, status: 'PENDING_APPROVAL' } : j)));
+      setNotice(`Job #${jobId} was not sent to the printer because its queue status could not be synchronized: ${syncError instanceof Error ? syncError.message : syncError}`);
+      return;
+    }
+
+    try {
       const result = await printToHardware({
         job_id: jobId,
         attempt_id: createPrintAttemptId(jobId),
@@ -2003,21 +2035,25 @@ export default function App() {
         copies: targetJob.options.copies || 1,
         duplex_mode: targetJob.options.duplex_mode,
       });
-      setNotice(`Job #${jobId} submitted to ${targetPrinter} (Windows spooler job #${result.spooler_job_id}).`);
+      setJobs((prev) =>
+        prev.map((j) => (j.id === jobId ? { ...j, status: 'PRINTING' } : j))
+      );
+      try {
+        await syncOrderStatusToCloud(jobId, 'ORDER_PRINTING');
+        setNotice(`Job #${jobId} submitted to ${targetPrinter} (Windows spooler job #${result.spooler_job_id}).`);
+      } catch (syncError) {
+        setNotice(`Job #${jobId} was submitted to ${targetPrinter}, but live status sync failed: ${syncError instanceof Error ? syncError.message : syncError}`);
+      }
     } catch (printErr: any) {
       console.warn('Hardware printing dispatch:', printErr);
       setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, status: 'PENDING_APPROVAL' } : j)));
-      setNotice(`Job #${jobId} could not be printed: ${printErr?.message || printErr}`);
+      try {
+        await syncOrderStatusToCloud(jobId, 'ORDER_PENDING');
+        setNotice(`Job #${jobId} could not be printed: ${printErr?.message || printErr}`);
+      } catch (syncError) {
+        setNotice(`Job #${jobId} could not be printed, and its cloud status could not be reset: ${syncError instanceof Error ? syncError.message : syncError}`);
+      }
       return;
-    }
-
-    try {
-      await supabase
-        .from('pilot_applications')
-        .update({ status: 'ORDER_QUEUED' })
-        .eq('id', jobId);
-    } catch (sbErr) {
-      console.warn('Supabase job approval update warning:', sbErr);
     }
 
     try {
@@ -2035,6 +2071,7 @@ export default function App() {
     if (!targetJob) return;
     const targetPrinter = selectedPrinterName || nativePrinters?.[0]?.name || 'HP758E10 (HP LaserJet Pro 4004)';
 
+    let result: Awaited<ReturnType<typeof printToHardware>>;
     try {
       const fileBytes = await resolvePrintableFileBytes(targetJob);
       if (!fileBytes || fileBytes.length === 0) {
@@ -2047,7 +2084,7 @@ export default function App() {
         targetJob.options.color_mode !== 'color',
       );
       await ensureCurrentWorkstationBinding();
-      const result = await printToHardware({
+      result = await printToHardware({
         job_id: jobId,
         attempt_id: createPrintAttemptId(jobId),
         printer_name: targetPrinter,
@@ -2057,28 +2094,33 @@ export default function App() {
         copies: targetJob.options.copies || 1,
         duplex_mode: targetJob.options.duplex_mode,
       });
-
-      setNotice(`Job #${jobId} submitted to ${targetPrinter} (Windows spooler job #${result.spooler_job_id}).`);
     } catch (err: any) {
       alert(`Hardware print error for ${targetPrinter}: ${err?.message || err}`);
+      return;
+    }
+
+    setJobs((prev) =>
+      prev.map((j) => (j.id === jobId ? { ...j, status: 'PRINTING' } : j))
+    );
+    try {
+      await syncOrderStatusToCloud(jobId, 'ORDER_PRINTING');
+      setNotice(`Job #${jobId} submitted to ${targetPrinter} (Windows spooler job #${result.spooler_job_id}).`);
+    } catch (syncError) {
+      setNotice(`Job #${jobId} was submitted to ${targetPrinter}, but live status sync failed: ${syncError instanceof Error ? syncError.message : syncError}`);
     }
   };
 
   const handleCompleteJob = async (jobId: string) => {
+    try {
+      await syncOrderStatusToCloud(jobId, 'ORDER_COMPLETED');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : `Unable to sync ready status for order ${jobId}.`);
+      return;
+    }
+
     setJobs((prev) =>
       prev.map((j) => (j.id === jobId ? { ...j, status: 'COMPLETED' } : j))
     );
-
-    // Direct Cloud Sync: Mark as completed in Supabase
-    try {
-      await supabase
-        .from('pilot_applications')
-        .update({ status: 'ORDER_COMPLETED' })
-        .eq('id', jobId);
-    } catch (sbErr) {
-      console.warn('Supabase job completion update warning:', sbErr);
-    }
-
     setNotice(`Job #${jobId} marked as completed & ready for counter collection.`);
   };
 

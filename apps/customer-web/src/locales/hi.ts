@@ -142,7 +142,7 @@ export const hi: typeof en = {
 
   // Order Confirmation & Live Tracking
   orderPlacedTitle: 'ऑर्डर सफलतापूर्वक दर्ज हो गया!',
-  orderSubtitle: 'आपका प्रिंट जॉब सीधे दुकान के प्रिंटर को भेज दिया गया है।',
+  orderSubtitle: 'दुकान में आपके प्रिंट ऑर्डर की प्रगति लाइव देखें।',
   pickupPinHeadline: 'काउंटर पर यह 4-अंकों का पिन दिखाएं',
   orderIdLabel: 'ऑर्डर ट्रैकिंग आईडी',
   placedAtLabel: 'ऑर्डर का समय',
@@ -150,6 +150,10 @@ export const hi: typeof en = {
   statusSpooled: 'प्रिंटर में भेजा गया',
   statusPrinting: 'मशीन पर छपाई हो रही है...',
   statusReady: 'काउंटर पर लेने के लिए तैयार',
+  statusReceivedHint: 'दुकान द्वारा प्रिंट शुरू करने की प्रतीक्षा है।',
+  statusSpooledHint: 'वर्कस्टेशन ने ऑर्डर स्वीकार करके प्रिंटर कतार में भेज दिया है।',
+  statusPrintingHint: 'वर्कस्टेशन ने आपका ऑर्डर प्रिंटर को भेज दिया है।',
+  statusReadyHint: 'प्रिंट पूरा हो गया है। काउंटर पर अपना PIN दिखाएं।',
   statusCompleted: 'ऑर्डर पूरा हुआ और दिया गया',
   statusCancelled: 'ऑर्डर रद्द हुआ',
   liveStatusTitle: 'लाइव प्रिंट प्रगति',
