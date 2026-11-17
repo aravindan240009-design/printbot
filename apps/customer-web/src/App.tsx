@@ -190,9 +190,6 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
     const timer = window.setTimeout(() => {
       const calculateServerQuote = async () => {
         try {
-          if (!isApiConfigured) {
-            throw new Error('Shop server pricing is unavailable. Please try again later.');
-          }
           const fileQuotes = await Promise.all(files.map((file) => quoteOrder(
             file.pageCount || 1,
             {
@@ -206,8 +203,7 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
               pages_per_sheet: file.options.nup,
               orientation: file.options.orientation,
             },
-            session.session_token,
-            session.shop_id,
+            session.shop_slug,
           )));
           if (cancelled) return;
 

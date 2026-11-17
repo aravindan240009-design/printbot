@@ -188,6 +188,27 @@ export function mapSupabaseRowToApp(row: any): PilotApplication {
   };
 }
 
+export function isCloudPermissionDenied(error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false;
+  return error.code === '42501' || /permission denied/i.test(error.message || '');
+}
+
+export function mapShopRowToApp(row: any): PilotApplication {
+  const status: PilotApplication['status'] =
+    row.status === 'ACTIVE' ? 'APPROVED' : row.status === 'PENDING' ? 'PENDING' : 'REJECTED';
+  return {
+    id: String(row.legacy_source_id || row.id),
+    shopName: row.name || 'Unnamed Shop',
+    city: row.city || '',
+    contactNumber: row.contact_phone || '',
+    plan: '1 Year',
+    appliedAt: row.created_at || new Date().toISOString(),
+    status,
+    generatedUsername: row.slug || undefined,
+    notes: row.rates ? JSON.stringify(row.rates) : undefined,
+  };
+}
+
 export interface AdminAuditEntry {
   id: string;
   timestamp: string;
@@ -535,7 +556,13 @@ export default function App() {
 
       if (error) {
         console.warn('Station license validation failed:', error.message);
-        setLoginError('Could not verify the station license. Check your internet connection and try again.');
+        // A missing/out-of-date RPC is a deployment problem, not a bad key.
+        // Surface it explicitly so operators do not waste time retrying login.
+        if (error.code === 'PGRST202') {
+          setLoginError('The license service is not fully deployed. Ask the administrator to apply the station-license database migration.');
+        } else {
+          setLoginError('Could not verify the station license. Check your internet connection and try again.');
+        }
         return;
       }
       authRes = data;
@@ -781,11 +808,18 @@ export default function App() {
   };
 
   const [platformDomain] = useState<string>(() => {
-    return (
+    const configuredDomain =
       localStorage.getItem('printbot_platform_domain') ||
       (import.meta.env.VITE_PLATFORM_DOMAIN as string) ||
-      'printbotak.vercel.app'
-    );
+      '';
+    const normalizedDomain = configuredDomain
+      .trim()
+      .replace(/^https?:\/\//, '')
+      .replace(/\/+$/, '');
+
+    return normalizedDomain && normalizedDomain !== 'printbotak.vercel.app'
+      ? configuredDomain
+      : 'printbotak.callofduty12mobile18.workers.dev';
   });
 
   const [websiteQrDataUrl, setWebsiteQrDataUrl] = useState<string>('');
@@ -823,7 +857,9 @@ export default function App() {
   const [adminNotice, setAdminNotice] = useState<string | null>(null);
 
   // --- Pilot Applications State, Cloud Sync & Event Listeners ---
-  const [cloudSyncStatus, setCloudSyncStatus] = useState<'CONNECTING' | 'CONNECTED' | 'OFFLINE'>('CONNECTING');
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<
+    'CONNECTING' | 'CONNECTED' | 'OFFLINE' | 'ACCESS_DENIED'
+  >('CONNECTING');
   const [isSyncing, setIsSyncing] = useState(false);
 
   const [applications, setApplications] = useState<PilotApplication[]>(() => {
@@ -864,6 +900,56 @@ export default function App() {
     } catch {}
   }, [applications]);
 
+  const hydrateLicensesFromApplications = (mapped: PilotApplication[]) => {
+    if (mapped.length === 0) return;
+    setLicenses((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const app of mapped) {
+        if (app.status === 'APPROVED' && app.generatedUsername && app.generatedKey) {
+          const uKey = app.generatedUsername.toLowerCase();
+          if (!next[uKey]) {
+            let duration: '1 Month' | '1 Year' | 'Lifetime Commercial' = '1 Year';
+            if (typeof app.plan === 'string') {
+              if (app.plan.includes('Month') || app.plan === '1 Month') duration = '1 Month';
+              else if (app.plan.includes('Lifetime') || app.plan === 'Lifetime Commercial') duration = 'Lifetime Commercial';
+            }
+            const expiry = new Date();
+            if (duration === '1 Month') expiry.setDate(expiry.getDate() + 30);
+            else if (duration === '1 Year') expiry.setFullYear(expiry.getFullYear() + 1);
+            else expiry.setFullYear(expiry.getFullYear() + 50);
+
+            next[uKey] = {
+              username: uKey,
+              appId: app.id,
+              licenseKey: app.generatedKey,
+              shopName: app.shopName,
+              location: app.city || 'Counter 01',
+              phone: app.contactNumber.startsWith('+91') ? app.contactNumber : `+91 ${app.contactNumber}`,
+              upiId: `${uKey}@upi`,
+              rates: {
+                bwPerSideRupees: 1.5,
+                colorPerSideRupees: 10.0,
+                duplexDiscountPercent: 15,
+              },
+              orderMode: 'MANUAL_APPROVAL',
+              status: 'ACTIVE',
+              expiresAt: expiry.toISOString().split('T')[0],
+              isConfigured: true,
+              duration: duration,
+              deviceId: null,
+              totalOrdersCount: 0,
+              totalPagesCount: 0,
+              lastActive: app.approvedAt || 'Active',
+            };
+            changed = true;
+          }
+        }
+      }
+      return changed ? next : prev;
+    });
+  };
+
   // Fetch applications directly from Supabase Cloud Database & Hydrate Licenses
   const fetchApplicationsFromCloud = async () => {
     setIsSyncing(true);
@@ -874,11 +960,7 @@ export default function App() {
         .select('*')
         .order('applied_at', { ascending: false });
 
-      if (error) {
-        console.warn('Supabase fetch error, maintaining local cache:', error.message);
-        setCloudSyncStatus('OFFLINE');
-      } else if (data) {
-        // Filter out system administrative records and customer orders so only shop applications appear in the UI
+      if (!error && data) {
         const shopRows = data.filter(
           (r: any) =>
             r.id !== 'APP-ADMIN-MASTER-ROOT' &&
@@ -892,56 +974,38 @@ export default function App() {
         try {
           localStorage.setItem('printbot_pilot_requests', JSON.stringify(mapped));
         } catch {}
+        hydrateLicensesFromApplications(mapped);
+        return;
+      }
 
-        if (mapped.length > 0) {
-          // Automatically hydrate licenses for any approved shops from the cloud database
-          setLicenses((prev) => {
-            let changed = false;
-            const next = { ...prev };
-            for (const app of mapped) {
-              if (app.status === 'APPROVED' && app.generatedUsername && app.generatedKey) {
-                const uKey = app.generatedUsername.toLowerCase();
-                if (!next[uKey]) {
-                  let duration: '1 Month' | '1 Year' | 'Lifetime Commercial' = '1 Year';
-                  if (typeof app.plan === 'string') {
-                    if (app.plan.includes('Month') || app.plan === '1 Month') duration = '1 Month';
-                    else if (app.plan.includes('Lifetime') || app.plan === 'Lifetime Commercial') duration = 'Lifetime Commercial';
-                  }
-                  const expiry = new Date();
-                  if (duration === '1 Month') expiry.setDate(expiry.getDate() + 30);
-                  else if (duration === '1 Year') expiry.setFullYear(expiry.getFullYear() + 1);
-                  else expiry.setFullYear(expiry.getFullYear() + 50);
+      if (isCloudPermissionDenied(error)) {
+        console.warn('Supabase applications permission denied:', error?.message);
+        const { data: shops, error: shopsError } = await supabase
+          .from('shops')
+          .select('id, legacy_source_id, slug, name, city, contact_phone, status, rates, created_at')
+          .order('created_at', { ascending: false });
 
-                  next[uKey] = {
-                    username: uKey,
-                    appId: app.id,
-                    licenseKey: app.generatedKey,
-                    shopName: app.shopName,
-                    location: app.city || 'Counter 01',
-                    phone: app.contactNumber.startsWith('+91') ? app.contactNumber : `+91 ${app.contactNumber}`,
-                    upiId: `${uKey}@upi`,
-                    rates: {
-                      bwPerSideRupees: 1.5,
-                      colorPerSideRupees: 10.0,
-                      duplexDiscountPercent: 15,
-                    },
-                    orderMode: 'MANUAL_APPROVAL',
-                    status: 'ACTIVE',
-                    expiresAt: expiry.toISOString().split('T')[0],
-                    isConfigured: true,
-                    duration: duration,
-                    deviceId: null,
-                    totalOrdersCount: 0,
-                    totalPagesCount: 0,
-                    lastActive: app.approvedAt || 'Active',
-                  };
-                  changed = true;
-                }
-              }
-            }
-            return changed ? next : prev;
-          });
+        if (!shopsError && shops) {
+          const mapped = shops.map(mapShopRowToApp);
+          setApplications(mapped);
+          setCloudSyncStatus('CONNECTED');
+          try {
+            localStorage.setItem('printbot_pilot_requests', JSON.stringify(mapped));
+          } catch {}
+          hydrateLicensesFromApplications(mapped);
+          setAdminNotice(
+            'Cloud is reachable, but public application access is intentionally locked. Do not restore public table access; secure server-side order functions must be set up before online orders can resume.'
+          );
+          return;
         }
+
+        setCloudSyncStatus('ACCESS_DENIED');
+        return;
+      }
+
+      if (error) {
+        console.warn('Supabase fetch error, maintaining local cache:', error.message);
+        setCloudSyncStatus('OFFLINE');
       }
     } catch (err) {
       console.warn('Network offline, using local cache:', err);
@@ -969,10 +1033,10 @@ export default function App() {
       )
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          setCloudSyncStatus('CONNECTED');
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          setCloudSyncStatus('OFFLINE');
+          setCloudSyncStatus((current) => (current === 'CONNECTING' ? 'CONNECTED' : current));
         }
+        // Realtime channel errors are not the same as the database being offline.
+        // fetchApplicationsFromCloud owns CONNECTED / ACCESS_DENIED / OFFLINE.
       });
 
     // Local cross-tab sync
@@ -1091,11 +1155,40 @@ export default function App() {
         p_admin_username: activeSession.username,
         p_admin_key: adminKey,
       });
-      if (error) throw new Error(error.message);
-      if (!data?.success) {
-        throw new Error(data?.error || 'The license could not be activated in the central database.');
+      if (error) {
+        // Fallback: RPC not deployed yet — update pilot_applications directly
+        const isRpcMissing = error.code === 'PGRST202' || error.message.includes('Could not find the function');
+        if (!isRpcMissing) throw new Error(error.message);
+
+        const { error: updateErr } = await supabase
+          .from('pilot_applications')
+          .update({
+            status: 'APPROVED',
+            generated_username: u,
+            generated_key: key,
+            approved_at: nowIso,
+            notes: JSON.stringify({
+              bwRate: 1.5,
+              colorRate: 10.0,
+              duplexDiscountPercent: 15,
+              orderMode: 'MANUAL_APPROVAL',
+            }),
+          })
+          .eq('id', app.id);
+        if (updateErr) throw new Error(updateErr.message);
+
+        activationData = {
+          success: true,
+          shop_id: app.id,
+          is_lifetime: duration === 'Lifetime Commercial',
+          expires_at: expiryStr,
+        };
+      } else {
+        if (!data?.success) {
+          throw new Error(data?.error || 'The license could not be activated in the central database.');
+        }
+        activationData = data as StationLicenseMutationResult;
       }
-      activationData = data as StationLicenseMutationResult;
     } catch (error) {
       console.error('Unable to activate central shop license:', error);
       setAdminNotice(error instanceof Error ? error.message : 'Unable to activate this license. Please retry.');
@@ -1331,11 +1424,44 @@ export default function App() {
         p_admin_username: activeSession.username,
         p_admin_key: adminKey,
       });
-      if (error) throw new Error(error.message);
-      if (!data?.success) {
-        throw new Error(data?.error || 'The license could not be saved in the central database.');
+      if (error) {
+        // Fallback: RPC not deployed yet — write directly to pilot_applications
+        const isRpcMissing = error.code === 'PGRST202' || error.message.includes('Could not find the function');
+        if (!isRpcMissing) throw new Error(error.message);
+
+        const appId = `APP-${Date.now().toString(36).toUpperCase()}`;
+        const { error: insertErr } = await supabase.from('pilot_applications').insert({
+          id: appId,
+          shop_name: shopNameVal,
+          city: 'Main Counter',
+          contact_number: '',
+          plan: newDuration,
+          status: 'APPROVED',
+          generated_username: usernameVal,
+          generated_key: key,
+          applied_at: new Date().toISOString(),
+          approved_at: new Date().toISOString(),
+          notes: JSON.stringify({
+            bwRate: 1.5,
+            colorRate: 10.0,
+            duplexDiscountPercent: 15,
+            orderMode: 'MANUAL_APPROVAL',
+          }),
+        });
+        if (insertErr) throw new Error(insertErr.message);
+
+        issueData = {
+          success: true,
+          shop_id: appId,
+          is_lifetime: newDuration === 'Lifetime Commercial',
+          expires_at: expiryStr,
+        };
+      } else {
+        if (!data?.success) {
+          throw new Error(data?.error || 'The license could not be saved in the central database.');
+        }
+        issueData = data as StationLicenseMutationResult;
       }
-      issueData = data as StationLicenseMutationResult;
     } catch (error) {
       console.error('Unable to issue central shop license:', error);
       setAdminNotice(error instanceof Error ? error.message : 'Unable to issue this license. Please retry.');
@@ -2413,9 +2539,16 @@ export default function App() {
 
     try {
       const shopName = currentShop?.shopName || setupShopName || u;
+      const rates = currentShop?.rates;
       const notesPayload = JSON.stringify({
         services: shopServices,
         orderMode: setupOrderMode,
+        bwRate: rates?.bwPerSideRupees ?? 1.5,
+        colorRate: rates?.colorPerSideRupees ?? 10,
+        duplexDiscountPercent: rates?.duplexDiscountPercent ?? 15,
+        stapleRate: rates?.stapleRate ?? 5,
+        spiralRate: rates?.spiralRate ?? 40,
+        hardBoundRate: rates?.hardBoundRate ?? 150,
         updatedAt: new Date().toISOString(),
       });
 

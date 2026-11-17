@@ -91,7 +91,7 @@ interface AdminPortalProps {
   onLogout: () => void;
   applications: PilotApplication[];
   licenses: Record<string, ShopLicense>;
-  cloudSyncStatus: 'CONNECTED' | 'CONNECTING' | 'OFFLINE';
+  cloudSyncStatus: 'CONNECTED' | 'CONNECTING' | 'OFFLINE' | 'ACCESS_DENIED';
   isSyncing: boolean;
   fetchApplicationsFromCloud: () => Promise<void>;
   adminNotice: string | null;
@@ -469,7 +469,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     color: cloudSyncStatus === 'CONNECTED' ? '#059669' : '#dc2626',
                     border: `1px solid ${cloudSyncStatus === 'CONNECTED' ? '#a7f3d0' : '#fecaca'}`,
                   }}
-                  title="Live connection status with Supabase PostgreSQL cloud database"
+                  title={
+                    cloudSyncStatus === 'ACCESS_DENIED'
+                      ? 'Supabase is reachable, but public access to pilot_applications is intentionally locked. Do not grant public table access.'
+                      : 'Live connection status with Supabase PostgreSQL cloud database'
+                  }
                 >
                   <div
                     style={{
@@ -488,6 +492,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     ? 'Cloud Connected'
                     : cloudSyncStatus === 'CONNECTING'
                     ? 'Connecting...'
+                    : cloudSyncStatus === 'ACCESS_DENIED'
+                    ? 'Cloud Access Denied'
                     : 'Cloud Offline'}
                 </div>
 

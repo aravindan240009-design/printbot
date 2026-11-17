@@ -1,3 +1,5 @@
+import { supabase } from './supabase';
+
 export interface ShopSession {
   session_token: string;
   shop_id: string;
@@ -127,15 +129,21 @@ export async function createOrder(payload: CreateOrderPayload, token?: string, s
 export async function quoteOrder(
   pageCount: number,
   options: object,
-  token: string,
-  shopId: string,
+  shopSlug: string,
 ): Promise<ServerQuote> {
-  const headers: Record<string, string> = { 'X-Tenant-ID': shopId };
-  return request<ServerQuote>('/orders/quote', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ page_count: pageCount, options }),
-  }, token);
+  const { data, error } = await supabase.functions.invoke<ServerQuote>('quote-order', {
+    body: { shop_slug: shopSlug, page_count: pageCount, options },
+  });
+  if (error) {
+    const response = error.context;
+    if (response instanceof Response) {
+      const body = await response.clone().json().catch(() => null) as { detail?: unknown } | null;
+      if (typeof body?.detail === 'string') throw new Error(body.detail);
+    }
+    throw new Error(`Could not load the shop price: ${error.message}`);
+  }
+  if (!data) throw new Error('The shop pricing service returned no quote.');
+  return data;
 }
 
 export async function createPaymentIntent(orderId: string, token: string, shopId: string): Promise<PaymentIntent> {

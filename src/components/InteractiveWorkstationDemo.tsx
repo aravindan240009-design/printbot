@@ -567,7 +567,7 @@ export const InteractiveWorkstationDemo: React.FC = () => {
                   Scan to Print at Counter
                 </span>
                 <span className="text-[10px] text-slate-500 font-mono">
-                  printbotak.vercel.app/counter
+                  printbotak.callofduty12mobile18.workers.dev/counter
                 </span>
               </div>
             </div>

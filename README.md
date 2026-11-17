@@ -137,6 +137,8 @@ assume one folder is simply nested inside or built from the other.
 
 - `package.json`, `pnpm-workspace.yaml`, and `pnpm-lock.yaml` define the
   JavaScript workspace, commands, and locked dependencies.
+- `wrangler.jsonc` configures the root Vite website's Cloudflare Worker static
+  assets deployment from `dist/`, including its single-page-app fallback.
 - `Cargo.toml` and `Cargo.lock` define the Rust workspace. The Tauri desktop
   crate has its own manifest and lockfile in `apps/desktop/src-tauri/`.
 - `requirements.txt` lists Python dependencies; `.env.example` is the safe
@@ -381,6 +383,7 @@ tests pass:
 - [docs/OPERATIONS_RUNBOOK.md](docs/OPERATIONS_RUNBOOK.md): local operation and incident procedures
 - [docs/SOFTWARE_BILL_OF_MATERIALS.md](docs/SOFTWARE_BILL_OF_MATERIALS.md): dependency/license record
 - [docs/superpowers/specs/2026-10-25-tauri-rust-workstation-design.md](docs/superpowers/specs/2026-10-25-tauri-rust-workstation-design.md): Tauri workstation design
+- [docs/superpowers/specs/2026-11-17-cloudflare-migration-design.md](docs/superpowers/specs/2026-11-17-cloudflare-migration-design.md): Cloudflare migration design
 
 ## Contributing
 

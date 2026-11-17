@@ -38,6 +38,19 @@ do not send requests to a visitor's `localhost`; the Supabase order flow remains
 available. Configured production URLs must use HTTPS and cannot target loopback
 addresses.
 
+Customer price quotes are calculated by the Supabase `quote-order` Edge Function,
+not by the browser or the optional Print Bot API. Deploy it to the configured
+Supabase project with:
+
+```powershell
+supabase functions deploy quote-order --project-ref kiseniigikzncpzczurp
+```
+
+The function reads active shop rates from `pilot_applications.notes` (or the
+`shops` table when available). Keep the Supabase service-role key server-side;
+never add it to a `VITE_` variable or the customer bundle. The separate order
+creation and payment-intent flow still requires a reachable Print Bot API.
+
 ---
 
 ## ✨ Features

@@ -1,0 +1,4 @@
+project_id = "kiseniigikzncpzczurp"
+
+[functions.quote-order]
+verify_jwt = true

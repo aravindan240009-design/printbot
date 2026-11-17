@@ -44,7 +44,7 @@ pnpm --filter @xerox/desktop tauri build
   - Brute-force rate limiting with automatic 60-second lockout after 5 consecutive failed attempts.
 - **Printer Discovery**: Automatic enumeration of local USB and network printers using Windows print spooler drivers.
 - **Counter Stand QR & URL**:
-  - Automatically generates the shop's customer access URL (`https://printbotak.vercel.app/?shop={shopSlug}`).
+  - Automatically generates the shop's customer access URL (`https://printbotak.callofduty12mobile18.workers.dev/{shopSlug}`).
   - Generates downloadable and printable Counter Stand tent cards.
 - **Order Management & Audio Alerts**: Live visual and sound notifications for incoming walk-in customer print jobs.
 - **Shop Configuration**:
