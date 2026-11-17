@@ -1124,17 +1124,204 @@ button:disabled {
 
 .pb-config-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr);
-  gap: 24px;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 18px;
   align-items: start;
 }
 
 .pb-config-form {
-  padding: 24px;
+  min-width: 0;
+  padding: clamp(16px, 2vw, 24px);
   border-radius: var(--pb-radius-xl);
   border: 1px solid var(--pb-border);
   background: var(--pb-surface);
   box-shadow: var(--pb-shadow-sm);
+}
+
+.pb-duplex-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.pb-finishing-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pb-more-options {
+  border: 1px solid var(--pb-border);
+  border-radius: var(--pb-radius-md);
+  padding: 12px 14px;
+  background: var(--pb-surface-alt);
+}
+
+.pb-more-options > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 700;
+  list-style: none;
+}
+
+.pb-more-options > summary::-webkit-details-marker {
+  display: none;
+}
+
+.pb-more-options-content {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.pb-more-options-content .pb-form-group {
+  margin-bottom: 0;
+}
+
+.pb-document-preview {
+  display: grid;
+  grid-template-rows: auto minmax(320px, 1fr) auto;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--pb-border);
+  border-radius: var(--pb-radius-xl);
+  background: var(--pb-surface);
+  box-shadow: var(--pb-shadow-sm);
+}
+
+.pb-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pb-preview-file-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: var(--pb-radius-sm);
+  background: var(--pb-brand-soft);
+  color: var(--pb-brand);
+}
+
+.pb-preview-file-meta {
+  min-width: 0;
+}
+
+.pb-preview-file-meta h3 {
+  overflow: hidden;
+  margin: 0;
+  color: var(--pb-text);
+  font-size: 0.9rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pb-preview-file-meta p {
+  margin: 3px 0 0;
+  color: var(--pb-muted);
+  font-size: 0.76rem;
+}
+
+.pb-preview-area {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 320px;
+  padding: 16px;
+  overflow: auto;
+  border-radius: var(--pb-radius-md);
+  background: var(--pb-surface-alt);
+}
+
+.pb-preview-canvas {
+  display: block;
+  max-width: 100%;
+  background: #ffffff;
+  box-shadow: var(--pb-shadow-md);
+}
+
+.pb-preview-image {
+  display: block;
+  max-width: 100%;
+  max-height: 560px;
+  object-fit: contain;
+  box-shadow: var(--pb-shadow-md);
+}
+
+.pb-preview-message {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  max-width: 300px;
+  margin: auto;
+  background: var(--pb-surface-alt);
+  color: var(--pb-muted);
+  text-align: center;
+  z-index: 1;
+}
+
+.pb-preview-message p {
+  margin: 0;
+  font-size: 0.86rem;
+}
+
+.pb-preview-action {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--pb-brand-border);
+  border-radius: var(--pb-radius-md);
+  background: var(--pb-surface);
+  color: var(--pb-brand);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pb-preview-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--pb-text-secondary);
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.pb-preview-pagination button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--pb-border);
+  border-radius: var(--pb-radius-sm);
+  background: var(--pb-surface);
+  color: var(--pb-text);
+  cursor: pointer;
+}
+
+.pb-preview-pagination button:disabled {
+  color: var(--pb-muted);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.pb-preview-spinner {
+  animation: pb-preview-spin 1s linear infinite;
+}
+
+@keyframes pb-preview-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Segmented Pill Grid */
@@ -1275,9 +1462,12 @@ button:disabled {
    ========================================================================== */
 
 .pb-price-quote-card {
-  position: sticky;
-  top: 90px;
-  padding: 24px;
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(250px, 1.5fr) minmax(160px, 0.8fr) minmax(170px, auto);
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
   border-radius: var(--pb-radius-xl);
   border: 1px solid var(--pb-border);
   background: var(--pb-surface);
@@ -1288,16 +1478,23 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--pb-border);
+  min-width: 0;
+}
+
+.pb-quote-metrics {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 4px 18px !important;
+  margin: 0 !important;
 }
 
 .pb-quote-metric-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 0;
-  font-size: 0.88rem;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 0.8rem;
   color: var(--pb-text-secondary);
 }
 
@@ -1311,17 +1508,29 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 16px;
-  margin-top: 10px;
-  border-top: 2px dashed var(--pb-border);
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  border: 0;
 }
 
 .pb-quote-total-val {
   font-family: Outfit, "JetBrains Mono", sans-serif;
-  font-size: 1.95rem;
+  font-size: 1.65rem;
   font-weight: 850;
   color: var(--pb-brand);
   letter-spacing: -0.02em;
+}
+
+.pb-price-quote-card > .pb-btn-primary {
+  margin: 0 !important;
+  white-space: nowrap;
+}
+
+.pb-quote-security-note {
+  grid-column: 1 / -1;
+  margin: 0 !important;
+  padding: 6px 10px !important;
 }
 
 /* ==========================================================================
@@ -1561,11 +1770,24 @@ button:disabled {
     grid-template-columns: 1fr;
   }
   .pb-price-quote-card {
+    display: block;
     position: static;
   }
 }
 
+@media (min-width: 901px) and (max-width: 1100px) {
+  .pb-price-quote-card {
+    grid-template-columns: minmax(150px, 1fr) minmax(220px, 1.4fr) minmax(150px, 1fr);
+  }
+  .pb-price-quote-card > .pb-btn-primary {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 768px) {
+  .pb-price-quote-card {
+    display: none;
+  }
   .pb-header-nav-links {
     display: none; /* Replaced by bottom nav on mobile */
   }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Printer,
   Sparkles,
@@ -25,6 +25,7 @@ import { BottomNav } from './components/common/BottomNav';
 import { ServiceCatalog } from './components/services/ServiceCatalog';
 import { FileUploadZone } from './components/print/FileUploadZone';
 import { DocumentConfigurator } from './components/print/DocumentConfigurator';
+import { DocumentPreview } from './components/print/DocumentPreview';
 import { LivePriceBreakdown } from './components/print/LivePriceBreakdown';
 import { CartView } from './components/cart/CartView';
 import { CheckoutView } from './components/checkout/CheckoutView';
@@ -214,6 +215,14 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
       })
     );
   };
+
+  const handlePageCountChange = useCallback((fileId: string, pageCount: number) => {
+    setFiles((prev) =>
+      prev.map((file) =>
+        file.id === fileId && file.pageCount !== pageCount ? { ...file, pageCount } : file
+      )
+    );
+  }, []);
 
   const handleConfirmOrder = async (details: {
     customerName: string;
@@ -634,6 +643,12 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
                       onUpdateOptions={handleUpdateOptions}
                       t={t}
                       rates={session.rates}
+                    />
+
+                    <DocumentPreview
+                      file={activeFile}
+                      onPageCountChange={handlePageCountChange}
+                      onPromptPasswordUnlock={setUnlockingFileId}
                     />
 
                     <LivePriceBreakdown

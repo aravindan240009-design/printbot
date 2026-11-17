@@ -1,24 +1,12 @@
 import React from 'react';
-import {
-  SlidersHorizontal,
-  Layers,
-  Check,
-  BookOpen,
-  Paperclip,
-  Bookmark,
-  Camera,
-  FileCheck,
-  Percent,
-} from 'lucide-react';
+import { SlidersHorizontal } from 'lucide-react';
 import {
   DocumentItem,
   PrintOptions,
-  ColorMode,
-  DuplexMode,
   PaperSize,
   PaperGsm,
-  FinishingOption,
   PhotoPreset,
+  OrientationOption,
   ShopRates,
 } from '../../types';
 import { TranslationKeys } from '../../locales';
@@ -200,7 +188,7 @@ export const DocumentConfigurator: React.FC<DocumentConfiguratorProps> = ({
             </span>
           ) : null}
         </div>
-        <div className="pb-pill-grid">
+        <div className="pb-pill-grid pb-duplex-grid">
           <button
             type="button"
             className={`pb-pill-choice ${options.duplex === 'simplex' ? 'active' : ''}`}
@@ -228,7 +216,7 @@ export const DocumentConfigurator: React.FC<DocumentConfiguratorProps> = ({
         </div>
       </div>
 
-      {/* Paper Size & Paper Weight */}
+      {/* Paper size and orientation */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
         <div className="pb-form-group">
           <label className="pb-form-label">{t.paperSize}</label>
@@ -244,96 +232,88 @@ export const DocumentConfigurator: React.FC<DocumentConfiguratorProps> = ({
             ))}
           </select>
         </div>
-
         <div className="pb-form-group">
-          <label className="pb-form-label">{t.paperGsm}</label>
+          <label className="pb-form-label">{t.orientation}</label>
           <select
             className="pb-select-control"
-            value={options.paperGsm}
-            onChange={(e) => onUpdateOptions({ paperGsm: e.target.value as PaperGsm })}
+            value={options.orientation}
+            onChange={(e) => onUpdateOptions({ orientation: e.target.value as OrientationOption })}
           >
-            <option value="75">{t.gsm75}</option>
-            <option value="100">{t.gsm100} (+₹1)</option>
-            <option value="220">{t.gsm220} (+₹4)</option>
+            <option value="auto">{t.orientAuto}</option>
+            <option value="portrait">{t.orientPortrait}</option>
+            <option value="landscape">{t.orientLandscape}</option>
           </select>
         </div>
       </div>
 
-      {/* Finishing & Binding Options */}
-      <div className="pb-form-group">
-        <label className="pb-form-label">{t.finishing}</label>
-        <div className="pb-pill-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))' }}>
-          <button
-            type="button"
-            className={`pb-pill-choice ${options.finishing === 'none' ? 'active' : ''}`}
-            onClick={() => onUpdateOptions({ finishing: 'none' })}
-          >
-            <span>{t.finishingNone}</span>
-            <span className="pb-pill-subtext">Loose</span>
-          </button>
-          <button
-            type="button"
-            className={`pb-pill-choice ${options.finishing === 'staple' ? 'active' : ''}`}
-            onClick={() => onUpdateOptions({ finishing: 'staple' })}
-          >
-            <span>Corner Staple</span>
-            <span className="pb-pill-subtext">+₹5.00</span>
-          </button>
-          <button
-            type="button"
-            className={`pb-pill-choice ${options.finishing === 'spiral' ? 'active' : ''}`}
-            onClick={() => onUpdateOptions({ finishing: 'spiral' })}
-          >
-            <span>Spiral Coil</span>
-            <span className="pb-pill-subtext">+₹40.00</span>
-          </button>
-          <button
-            type="button"
-            className={`pb-pill-choice ${options.finishing === 'hard_bind' ? 'active' : ''}`}
-            onClick={() => onUpdateOptions({ finishing: 'hard_bind' })}
-          >
-            <span>Hard Bound</span>
-            <span className="pb-pill-subtext">+₹150.00</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Visual Page Range Picker */}
-      <div className="pb-form-group">
-        <VisualPageRangePicker
-          range={options.pageRange}
-          totalPageCount={activeFile.pageCount || 1}
-          onChange={(newRange) => onUpdateOptions({ pageRange: newRange })}
-          t={t}
-        />
-      </div>
-
-      {/* Advanced N-Up & Photo Layout Details */}
-      <details
-        style={{
-          border: '1px solid var(--pb-border)',
-          borderRadius: 'var(--pb-radius-md)',
-          padding: '12px 16px',
-          background: 'var(--pb-surface-alt)',
-        }}
-      >
-        <summary
-          style={{
-            cursor: 'pointer',
-            fontWeight: 700,
-            fontSize: '0.88rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
+      <details className="pb-more-options">
+        <summary>
           <SlidersHorizontal size={16} />
-          <span>Handouts (N-Up) &amp; Photo Layout Presets</span>
+          <span>More options</span>
         </summary>
 
-        <div style={{ display: 'grid', gap: '14px', marginTop: '14px' }}>
-          {/* N-Up */}
-          <div className="pb-form-group" style={{ marginBottom: 0 }}>
+        <div className="pb-more-options-content">
+          <div className="pb-form-group">
+            <label className="pb-form-label">{t.paperGsm}</label>
+            <select
+              className="pb-select-control"
+              value={options.paperGsm}
+              onChange={(e) => onUpdateOptions({ paperGsm: e.target.value as PaperGsm })}
+            >
+              <option value="75">{t.gsm75}</option>
+              <option value="100">{t.gsm100} (+₹1)</option>
+              <option value="220">{t.gsm220} (+₹4)</option>
+            </select>
+          </div>
+
+          <div className="pb-form-group">
+            <label className="pb-form-label">{t.finishing}</label>
+            <div className="pb-pill-grid pb-finishing-grid">
+              <button
+                type="button"
+                className={`pb-pill-choice ${options.finishing === 'none' ? 'active' : ''}`}
+                onClick={() => onUpdateOptions({ finishing: 'none' })}
+              >
+                <span>{t.finishingNone}</span>
+                <span className="pb-pill-subtext">Loose</span>
+              </button>
+              <button
+                type="button"
+                className={`pb-pill-choice ${options.finishing === 'staple' ? 'active' : ''}`}
+                onClick={() => onUpdateOptions({ finishing: 'staple' })}
+              >
+                <span>Corner Staple</span>
+                <span className="pb-pill-subtext">+₹5.00</span>
+              </button>
+              <button
+                type="button"
+                className={`pb-pill-choice ${options.finishing === 'spiral' ? 'active' : ''}`}
+                onClick={() => onUpdateOptions({ finishing: 'spiral' })}
+              >
+                <span>Spiral Coil</span>
+                <span className="pb-pill-subtext">+₹40.00</span>
+              </button>
+              <button
+                type="button"
+                className={`pb-pill-choice ${options.finishing === 'hard_bind' ? 'active' : ''}`}
+                onClick={() => onUpdateOptions({ finishing: 'hard_bind' })}
+              >
+                <span>Hard Bound</span>
+                <span className="pb-pill-subtext">+₹150.00</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="pb-form-group">
+            <VisualPageRangePicker
+              range={options.pageRange}
+              totalPageCount={activeFile.pageCount || 1}
+              onChange={(newRange) => onUpdateOptions({ pageRange: newRange })}
+              t={t}
+            />
+          </div>
+
+          <div className="pb-form-group">
             <label className="pb-form-label">{t.pagesPerSheet}</label>
             <select
               className="pb-select-control"
@@ -349,8 +329,7 @@ export const DocumentConfigurator: React.FC<DocumentConfiguratorProps> = ({
             </select>
           </div>
 
-          {/* Photo Presets */}
-          <div className="pb-form-group" style={{ marginBottom: 0 }}>
+          <div className="pb-form-group">
             <label className="pb-form-label">Photo &amp; ID Layout Preset</label>
             <select
               className="pb-select-control"

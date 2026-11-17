@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, ShieldCheck, Lock, Sparkles } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Lock } from 'lucide-react';
 import { ServerQuote } from '../../types';
 import { TranslationKeys } from '../../locales';
 
@@ -42,7 +42,7 @@ export const LivePriceBreakdown: React.FC<LivePriceBreakdownProps> = ({
         </div>
       </div>
 
-      <div style={{ display: 'grid', gap: '4px', margin: '14px 0' }}>
+      <div className="pb-quote-metrics">
         <div className="pb-quote-metric-row">
           <span>{t.filesSelected}</span>
           <span className="pb-quote-metric-val">{fileCount}</span>
@@ -78,7 +78,7 @@ export const LivePriceBreakdown: React.FC<LivePriceBreakdownProps> = ({
       <button
         type="button"
         className="pb-btn-primary"
-        style={{ width: '100%', marginTop: '20px', minHeight: '50px' }}
+        style={{ width: '100%', minHeight: '50px' }}
         disabled={!quote || fileCount === 0}
         onClick={onProceed}
       >
@@ -87,6 +87,7 @@ export const LivePriceBreakdown: React.FC<LivePriceBreakdownProps> = ({
       </button>
 
       <div
+        className="pb-quote-security-note"
         style={{
           display: 'flex',
           alignItems: 'center',
