@@ -64,7 +64,7 @@ export interface PlacedOrder {
   totalSheets: number;
   totalLogicalPages: number;
   paymentMethod: 'upi' | 'cash';
-  paymentStatus: 'paid' | 'pending_cash';
+  paymentStatus: 'paid' | 'pending_cash' | 'pending_verification';
   paymentId?: string;
   status: OrderStatus;
   placedAt: string;

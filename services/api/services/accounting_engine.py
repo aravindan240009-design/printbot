@@ -40,9 +40,10 @@ DEFAULT_SHOP_PRICING = {
     "paper_gsm_addon_paise": {
         75: 0,
         80: 25,     # +25 paise per sheet
-        100: 75,    # +75 paise per sheet
+        100: 100,   # +₹1.00 per sheet
         120: 150,   # +150 paise per sheet
         200: 300,   # +300 paise per sheet (heavy cardstock)
+        220: 400,   # +₹4.00 per sheet
     },
     "binding_cost_paise": {
         BindingType.NONE.value: 0,
@@ -68,12 +69,38 @@ class AccountingEngine:
         file_id: str,
         file_name: str,
         total_file_pages: int,
-        options: PrintOptions
+        options: PrintOptions,
+        pricing_rates_paise: Optional[Dict[str, int]] = None,
     ) -> FileQuoteItemResponse:
         """
         Calculates itemized accounting and pricing for a single file.
         Strictly pads duplex sheets per copy boundary.
         """
+        rates = {
+            **self.rates,
+            "paper_size_multiplier": dict(self.rates["paper_size_multiplier"]),
+            "paper_gsm_addon_paise": dict(self.rates["paper_gsm_addon_paise"]),
+            "binding_cost_paise": dict(self.rates["binding_cost_paise"]),
+        }
+        if pricing_rates_paise:
+            base_rate_keys = {
+                "bw_per_side_paise": "base_page_bw_paise",
+                "color_per_side_paise": "base_page_color_paise",
+            }
+            binding_rate_keys = {
+                "staple_paise": BindingType.STAPLE.value,
+                "spiral_paise": BindingType.SPIRAL.value,
+                "hard_bind_paise": BindingType.HARD_BIND.value,
+            }
+            for source, target in base_rate_keys.items():
+                if source in pricing_rates_paise:
+                    rates[target] = pricing_rates_paise[source]
+            for source, target in binding_rate_keys.items():
+                if source in pricing_rates_paise:
+                    rates["binding_cost_paise"][target] = pricing_rates_paise[source]
+            if "duplex_discount_percent" in pricing_rates_paise:
+                rates["duplex_discount_percent"] = pricing_rates_paise["duplex_discount_percent"]
+
         # 1. Resolve logical pages from range expression
         if options.page_range and options.page_range.strip() not in ("all", "*", ""):
             try:
@@ -97,8 +124,8 @@ class AccountingEngine:
             total_sheets = sheets_per_copy * options.copies
 
             # Pricing: Front side at full rate, Back side at discounted rate
-            base_rate = self.rates["base_page_color_paise"] if options.color_mode == ColorMode.COLOR else self.rates["base_page_bw_paise"]
-            discount_factor = (100 - self.rates["duplex_discount_percent"]) / 100.0
+            base_rate = self._base_rate_paise(options.color_mode, rates)
+            discount_factor = (100 - rates["duplex_discount_percent"]) / 100.0
 
             front_sides_per_copy = sheets_per_copy
             back_sides_per_copy = rendered_sides - front_sides_per_copy
@@ -106,15 +133,15 @@ class AccountingEngine:
         else:
             sheets_per_copy = rendered_sides
             total_sheets = sheets_per_copy * options.copies
-            base_rate = self.rates["base_page_color_paise"] if options.color_mode == ColorMode.COLOR else self.rates["base_page_bw_paise"]
+            base_rate = self._base_rate_paise(options.color_mode, rates)
             print_cost_per_copy = rendered_sides * base_rate
 
         # 4. Paper size multiplier
-        size_mult = self.rates["paper_size_multiplier"].get(options.paper_size.value, 1.0)
+        size_mult = rates["paper_size_multiplier"].get(options.paper_size.value, 1.0)
         adjusted_print_cost_per_copy = print_cost_per_copy * size_mult
 
         # 5. Paper GSM add-on per sheet
-        gsm_addon = self.rates["paper_gsm_addon_paise"].get(options.paper_gsm, 0)
+        gsm_addon = rates["paper_gsm_addon_paise"].get(options.paper_gsm, 0)
         gsm_cost_per_copy = sheets_per_copy * gsm_addon
 
         # 6. Total print & paper cost
@@ -122,7 +149,7 @@ class AccountingEngine:
         total_print_cost = subtotal_per_copy * options.copies
 
         # 7. Binding cost (per copy)
-        binding_cost = self.rates["binding_cost_paise"].get(options.binding.value, 0) * options.copies
+        binding_cost = rates["binding_cost_paise"].get(options.binding.value, 0) * options.copies
 
         # 8. Grand total in paise
         cost_paise = int(round(total_print_cost + binding_cost))
@@ -143,7 +170,18 @@ class AccountingEngine:
             options=options
         )
 
-    def generate_multi_file_quote(self, request: MultiFileQuoteRequest) -> MultiFileQuoteResponse:
+    def _base_rate_paise(self, color_mode: ColorMode, rates: Dict[str, Any]) -> float:
+        if color_mode == ColorMode.COLOR:
+            return rates["base_page_color_paise"]
+        if color_mode == ColorMode.GRAYSCALE:
+            return rates["base_page_bw_paise"] * 1.33
+        return rates["base_page_bw_paise"]
+
+    def generate_multi_file_quote(
+        self,
+        request: MultiFileQuoteRequest,
+        pricing_rates_paise: Optional[Dict[str, int]] = None,
+    ) -> MultiFileQuoteResponse:
         """
         Generates an aggregated, tamper-proof quote across multiple files.
         """
@@ -160,11 +198,12 @@ class AccountingEngine:
                 file_id=item.file_id,
                 file_name=item.file_name,
                 total_file_pages=item.page_count,
-                options=effective_opts
+                options=effective_opts,
+                pricing_rates_paise=pricing_rates_paise,
             )
             items_resp.append(res)
             total_paise += res.cost_paise
-            total_logical_pages += res.logical_pages
+            total_logical_pages += res.logical_pages * effective_opts.copies
             total_rendered_sides += res.rendered_sides
             total_physical_sheets += res.physical_sheets
 

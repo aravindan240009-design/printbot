@@ -6,6 +6,8 @@ import { TranslationKeys } from '../../locales';
 interface CartViewProps {
   files: DocumentItem[];
   quote: ServerQuote | null;
+  quoteStatus: 'idle' | 'loading' | 'ready' | 'error';
+  quoteError: string;
   onRemoveFile: (id: string) => void;
   onClearCart: () => void;
   onAddMoreFiles: () => void;
@@ -16,6 +18,8 @@ interface CartViewProps {
 export const CartView: React.FC<CartViewProps> = ({
   files,
   quote,
+  quoteStatus,
+  quoteError,
   onRemoveFile,
   onClearCart,
   onAddMoreFiles,
@@ -286,7 +290,7 @@ export const CartView: React.FC<CartViewProps> = ({
           <div>
             <span style={{ fontSize: '0.85rem', color: 'var(--pb-muted)', display: 'block' }}>{t.totalAmount}</span>
             <span style={{ fontSize: '0.75rem', color: 'var(--pb-success)', fontWeight: 600 }}>
-              Live counter rate guaranteed
+              Calculated by the shop server
             </span>
           </div>
           <strong
@@ -297,14 +301,18 @@ export const CartView: React.FC<CartViewProps> = ({
               letterSpacing: '-0.02em',
             }}
           >
-            ₹{quote ? quote.total_rupees.toFixed(2) : '0.00'}
+            ₹{quote ? quote.total_rupees.toFixed(2) : '--'}
           </strong>
         </div>
+
+        {quoteStatus === 'loading' && <p role="status">Getting the current price from the shop server...</p>}
+        {quoteStatus === 'error' && <p role="alert" style={{ color: 'var(--pb-danger)' }}>{quoteError}</p>}
 
         <button
           type="button"
           className="pb-btn-primary"
           style={{ width: '100%', minHeight: '52px', fontSize: '1rem' }}
+          disabled={!quote || quoteStatus !== 'ready'}
           onClick={onProceedToCheckout}
         >
           <span>{t.proceedToCheckout}</span>

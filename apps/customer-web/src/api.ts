@@ -99,8 +99,19 @@ export interface CreateOrderPayload {
     paper_gsm?: number;
     binding?: string;
     page_range?: string;
+    pages_per_sheet?: number;
   };
   quote_hash?: string;
+}
+
+export interface PaymentIntent {
+  provider: 'RAZORPAY';
+  payment_intent_id: string;
+  order_id: string;
+  shop_id: string;
+  amount_paise: number;
+  currency: string;
+  client_secret: string;
 }
 
 export async function createOrder(payload: CreateOrderPayload, token?: string, shopId?: string): Promise<any> {
@@ -111,6 +122,32 @@ export async function createOrder(payload: CreateOrderPayload, token?: string, s
     headers,
     body: JSON.stringify(payload),
   }, token);
+}
+
+export async function quoteOrder(
+  pageCount: number,
+  options: object,
+  token: string,
+  shopId: string,
+): Promise<ServerQuote> {
+  const headers: Record<string, string> = { 'X-Tenant-ID': shopId };
+  return request<ServerQuote>('/orders/quote', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ page_count: pageCount, options }),
+  }, token);
+}
+
+export async function createPaymentIntent(orderId: string, token: string, shopId: string): Promise<PaymentIntent> {
+  const headers: Record<string, string> = { 'X-Tenant-ID': shopId };
+  const result = await request<PaymentIntent>(`/orders/${encodeURIComponent(orderId)}/payment-intent`, {
+    method: 'POST',
+    headers,
+  }, token);
+  if (result.provider !== 'RAZORPAY' || !result.payment_intent_id || !result.client_secret) {
+    throw new Error('The server did not return a valid Razorpay payment order.');
+  }
+  return result;
 }
 
 export async function fetchOrderStatus(orderId: string, token?: string, shopId?: string): Promise<any> {

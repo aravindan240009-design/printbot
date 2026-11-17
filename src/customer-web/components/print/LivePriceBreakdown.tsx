@@ -5,6 +5,8 @@ import { TranslationKeys } from '../../locales';
 
 interface LivePriceBreakdownProps {
   quote: ServerQuote | null;
+  quoteStatus: 'idle' | 'loading' | 'ready' | 'error';
+  quoteError: string;
   fileCount: number;
   onProceed: () => void;
   proceedLabel?: string;
@@ -13,6 +15,8 @@ interface LivePriceBreakdownProps {
 
 export const LivePriceBreakdown: React.FC<LivePriceBreakdownProps> = ({
   quote,
+  quoteStatus,
+  quoteError,
   fileCount,
   onProceed,
   proceedLabel,
@@ -67,19 +71,30 @@ export const LivePriceBreakdown: React.FC<LivePriceBreakdownProps> = ({
             {t.totalAmount}
           </span>
           <span style={{ fontSize: '0.72rem', color: 'var(--pb-success)', fontWeight: 600 }}>
-            Includes Shop GST / Counter Rate
+            Calculated by the shop server
           </span>
         </div>
         <span className="pb-quote-total-val">
-          ₹{quote ? quote.total_rupees.toFixed(2) : '0.00'}
+          ₹{quote ? quote.total_rupees.toFixed(2) : '--'}
         </span>
       </div>
+
+      {quoteStatus === 'loading' && (
+        <p role="status" style={{ color: 'var(--pb-muted)', fontSize: '0.82rem' }}>
+          Getting the current price from the shop server…
+        </p>
+      )}
+      {quoteStatus === 'error' && (
+        <p role="alert" style={{ color: 'var(--pb-danger)', fontSize: '0.82rem' }}>
+          {quoteError}
+        </p>
+      )}
 
       <button
         type="button"
         className="pb-btn-primary"
         style={{ width: '100%', minHeight: '50px' }}
-        disabled={!quote || fileCount === 0}
+        disabled={!quote || quoteStatus !== 'ready' || fileCount === 0}
         onClick={onProceed}
       >
         <span>{proceedLabel || t.proceedToCheckout}</span>
@@ -101,7 +116,7 @@ export const LivePriceBreakdown: React.FC<LivePriceBreakdownProps> = ({
         }}
       >
         <ShieldCheck size={16} color="var(--pb-success)" />
-        <span>Price locked & verified against counter pricing table.</span>
+        <span>Price calculated by the shop server and checked again before payment.</span>
       </div>
     </div>
   );

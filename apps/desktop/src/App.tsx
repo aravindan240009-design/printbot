@@ -235,6 +235,7 @@ export interface PrintJob {
   calculated_price_paise: number;
   calculated_price_rupees: number;
   status: 'PENDING_APPROVAL' | 'QUEUED' | 'PRINTING' | 'COMPLETED' | 'COMPLETION_UNKNOWN' | 'REJECTED';
+  order_mode?: 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC';
   rejection_reason?: string;
   created_at: string;
   pickup_pin?: string;
@@ -1585,6 +1586,7 @@ export default function App() {
 
   const [jobs, setJobs] = useState<PrintJob[]>([]);
   const [selectedPrinterName, setSelectedPrinterName] = useState<string>('');
+  const autoPrintAttemptedJobIds = useRef<Set<string>>(new Set());
 
   // Fetch native Windows spooler printers if available
   useEffect(() => {
@@ -1690,7 +1692,7 @@ export default function App() {
                 pickup_pin: row.generated_key || meta.pickupPin || undefined,
                 file_data: meta.fileData || undefined,
                 payment_method: meta.paymentMethod || 'upi',
-                payment_status: meta.paymentStatus || 'paid',
+                payment_status: meta.paymentMethod === 'cash' ? 'pending_cash' : 'unverified',
               } as PrintJob;
             } catch (err) {
               console.warn('Error parsing cloud order row:', err);
@@ -1705,6 +1707,60 @@ export default function App() {
         const prevNonCloud = prev.filter((p) => !cloudIds.has(p.id) && !p.id.startsWith('PB-'));
         return [...cloudMapped, ...prevNonCloud];
       });
+
+      if (currentShop?.deviceToken && cloudMapped.length > 0) {
+        const headers: Record<string, string> = {
+          'X-Tenant-ID': currentShop.username,
+          Authorization: `Bearer ${currentShop.deviceToken}`,
+        };
+        const serverMapped = await Promise.all(
+          cloudMapped.map(async (cloudJob) => {
+            try {
+              const response = await fetch(`${API_BASE}/orders/${encodeURIComponent(cloudJob.id)}`, { headers });
+              if (response.status === 404) return cloudJob;
+              if (!response.ok) {
+                throw new Error(`Order status request failed (${response.status}).`);
+              }
+
+              const serverJob = await response.json();
+              const serverStatus = String(serverJob.status || '').toUpperCase();
+              let status = cloudJob.status;
+              if (serverStatus === 'QUEUED') {
+                status = cloudJob.status === 'PRINTING' || cloudJob.status === 'COMPLETED'
+                  ? cloudJob.status
+                  : 'QUEUED';
+              }
+              else if (serverStatus === 'AWAITING_APPROVAL') status = 'PENDING_APPROVAL';
+              else if (['LEASED', 'SPOOLING', 'SPOOL_SUBMITTED', 'PRINTING', 'PRINT_CONFIRMED'].includes(serverStatus)) {
+                status = 'PRINTING';
+              } else if (['READY_FOR_PICKUP', 'COLLECTED', 'COMPLETED'].includes(serverStatus)) {
+                status = 'COMPLETED';
+              } else if (['REJECTED', 'CANCELLED'].includes(serverStatus)) {
+                status = 'REJECTED';
+              }
+
+              return {
+                ...cloudJob,
+                status,
+                payment_status: ['AWAITING_APPROVAL', 'QUEUED', 'LEASED', 'SPOOLING', 'SPOOL_SUBMITTED', 'PRINTING', 'PRINT_CONFIRMED', 'READY_FOR_PICKUP', 'COLLECTED', 'COMPLETED'].includes(serverStatus)
+                  ? 'verified'
+                  : cloudJob.payment_status,
+                order_mode: serverJob.order_mode === 'FULL_AUTOMATIC' || serverJob.order_mode === 'MANUAL_APPROVAL'
+                  ? serverJob.order_mode
+                  : undefined,
+              };
+            } catch (error) {
+              console.warn(`Could not refresh server status for order ${cloudJob.id}:`, error);
+              return cloudJob;
+            }
+          }),
+        );
+        setJobs((prev) => {
+          const serverIds = new Set(serverMapped.map((job) => job.id));
+          const prevNonServer = prev.filter((job) => !serverIds.has(job.id));
+          return [...serverMapped, ...prevNonServer];
+        });
+      }
     } catch (err) {
       console.warn('Error fetching server queue:', err);
     }
@@ -2066,16 +2122,18 @@ export default function App() {
     } catch {}
   };
 
-  const handleDirectPrint = async (jobId: string) => {
+  const handleDirectPrint = async (jobId: string, automatic = false, printerOverride?: string) => {
     const targetJob = jobs.find((j) => j.id === jobId);
     if (!targetJob) return;
-    const targetPrinter = selectedPrinterName || nativePrinters?.[0]?.name || 'HP758E10 (HP LaserJet Pro 4004)';
+    const targetPrinter = printerOverride || selectedPrinterName || nativePrinters?.[0]?.name || 'HP758E10 (HP LaserJet Pro 4004)';
 
     let result: Awaited<ReturnType<typeof printToHardware>>;
     try {
       const fileBytes = await resolvePrintableFileBytes(targetJob);
       if (!fileBytes || fileBytes.length === 0) {
-        alert(`No printable file is attached for ${targetJob.file_name}. Re-download or re-upload the document before printing.`);
+        const message = `No printable file is attached for ${targetJob.file_name}. Re-download or re-upload the document before printing.`;
+        if (automatic) setNotice(`Automatic printing stopped for job #${jobId}: ${message}`);
+        else alert(message);
         return;
       }
 
@@ -2086,7 +2144,9 @@ export default function App() {
       await ensureCurrentWorkstationBinding();
       result = await printToHardware({
         job_id: jobId,
-        attempt_id: createPrintAttemptId(jobId),
+        attempt_id: automatic
+          ? `auto-${currentShop?.username || activeSession?.username || 'shop'}-${jobId}`
+          : createPrintAttemptId(jobId),
         printer_name: targetPrinter,
         file_name: targetJob.file_name,
         file_bytes: fileBytes,
@@ -2095,7 +2155,9 @@ export default function App() {
         duplex_mode: targetJob.options.duplex_mode,
       });
     } catch (err: any) {
-      alert(`Hardware print error for ${targetPrinter}: ${err?.message || err}`);
+      const message = `Hardware print error for ${targetPrinter}: ${err?.message || err}`;
+      if (automatic) setNotice(`Automatic printing stopped for job #${jobId}. Check the printer before retrying. ${message}`);
+      else alert(message);
       return;
     }
 
@@ -2109,6 +2171,27 @@ export default function App() {
       setNotice(`Job #${jobId} was submitted to ${targetPrinter}, but live status sync failed: ${syncError instanceof Error ? syncError.message : syncError}`);
     }
   };
+
+  useEffect(() => {
+    if (screen !== 'WORKSTATION' || currentShop?.orderMode !== 'FULL_AUTOMATIC') return;
+
+    const onlinePrinters = nativePrinters?.filter((printer) => printer.is_online) || [];
+    const targetPrinter =
+      onlinePrinters.find((printer) => printer.name === selectedPrinterName) ||
+      onlinePrinters.find((printer) => printer.is_default) ||
+      onlinePrinters[0];
+    if (!targetPrinter) return;
+
+    for (const job of jobs) {
+      if (
+        job.status !== 'QUEUED' ||
+        job.order_mode !== 'FULL_AUTOMATIC' ||
+        autoPrintAttemptedJobIds.current.has(job.id)
+      ) continue;
+      autoPrintAttemptedJobIds.current.add(job.id);
+      void handleDirectPrint(job.id, true, targetPrinter.name);
+    }
+  }, [screen, currentShop?.orderMode, jobs, nativePrinters, selectedPrinterName]);
 
   const handleCompleteJob = async (jobId: string) => {
     try {
@@ -2312,6 +2395,8 @@ export default function App() {
     e.preventDefault();
     if (!activeSession) return;
     const u = activeSession.username;
+    const username = currentShop?.username || u;
+    let serviceSettingsSyncWarning = '';
 
     setLicenses((prev) => {
       const updated = {
@@ -2328,7 +2413,6 @@ export default function App() {
 
     try {
       const shopName = currentShop?.shopName || setupShopName || u;
-      const username = currentShop?.username || u;
       const notesPayload = JSON.stringify({
         services: shopServices,
         orderMode: setupOrderMode,
@@ -2356,7 +2440,56 @@ export default function App() {
       console.warn('Failed to sync settings to cloud:', err);
     }
 
-    setNotice('Shop settings updated successfully.');
+    if (currentShop?.deviceToken) {
+      try {
+        const headers: Record<string, string> = {
+          'X-Tenant-ID': currentShop.username,
+          Authorization: `Bearer ${currentShop.deviceToken}`,
+          'Content-Type': 'application/json',
+        };
+        const response = await fetch(`${API_BASE}/shops/settings`, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({ order_mode: setupOrderMode }),
+        });
+        const result = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(result?.detail || `Settings sync failed (${response.status}).`);
+        }
+
+        const rates = currentShop?.rates;
+        const pricingResponse = await fetch(
+          `${API_BASE}/shops/${encodeURIComponent(username)}/customization`,
+          {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({
+              pricing_rates_paise: {
+                bw_per_side_paise: Math.round((rates?.bwPerSideRupees ?? 1.5) * 100),
+                color_per_side_paise: Math.round((rates?.colorPerSideRupees ?? 10) * 100),
+                duplex_discount_percent: Math.round(rates?.duplexDiscountPercent ?? 15),
+                staple_paise: Math.round((rates?.stapleRate ?? 5) * 100),
+                spiral_paise: Math.round((rates?.spiralRate ?? 40) * 100),
+                hard_bind_paise: Math.round((rates?.hardBoundRate ?? 150) * 100),
+              },
+            }),
+          },
+        );
+        const pricingResult = await pricingResponse.json().catch(() => null);
+        if (!pricingResponse.ok) {
+          throw new Error(pricingResult?.detail || `Pricing sync failed (${pricingResponse.status}).`);
+        }
+      } catch (error) {
+        console.warn('Failed to sync dispatch mode with the print service:', error);
+        serviceSettingsSyncWarning =
+          ' The print service could not be updated, so customer pricing or dispatch settings may be out of date.';
+      }
+    } else {
+      serviceSettingsSyncWarning =
+        ' No workstation authorization is available to update the print service pricing or dispatch mode.';
+    }
+
+    setNotice(`Shop settings updated successfully.${serviceSettingsSyncWarning}`);
   };
 
   const handleSaveServiceSubmit = (e: React.FormEvent) => {

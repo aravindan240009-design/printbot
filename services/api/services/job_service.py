@@ -29,7 +29,8 @@ from packages.contracts.models import (
     DuplexMode,
     PaperSize,
 )
-from services.api.services.pricing import pricing_engine
+from services.api.services.accounting_engine import accounting_engine
+from services.api.services.shop_customization_service import shop_customization_service
 from services.api.services.subscription_service import subscription_service
 from services.api.services.audit_service import audit_service
 from services.api.services.shop_service import shop_service
@@ -67,7 +68,14 @@ class JobService:
                 detail=reason,
             )
 
-        quote = pricing_engine.calculate(req.page_count, req.options)
+        pricing_rates = shop_customization_service.get_config(tenant_id).pricing_rates_paise
+        quote = accounting_engine.calculate_file_accounting(
+            file_id="order",
+            file_name=req.file_name,
+            total_file_pages=req.page_count,
+            options=req.options,
+            pricing_rates_paise=pricing_rates,
+        )
 
         # Anti-tampering check: verify quote_hash if client provided one
         if req.quote_hash:
@@ -84,8 +92,8 @@ class JobService:
 
         job_id = str(uuid.uuid4())
         now = datetime.utcnow()
-        total_cents = quote["total_cents"]
-        total_paise = quote.get("total_paise", total_cents * 83)
+        total_cents = quote.cost_cents
+        total_paise = quote.cost_paise
 
         job = PrintJobResponse(
             id=job_id,
@@ -98,7 +106,7 @@ class JobService:
             options=req.options,
             calculated_price_cents=total_cents,
             total_paise=total_paise,
-            currency=quote.get("currency", "INR"),
+            currency="INR",
             status=JobStatus.PENDING_PAYMENT,
             order_mode=shop_mode,
             booking_state=booking_st,
@@ -163,8 +171,13 @@ class JobService:
             # Idempotent replay
             return job
 
+        effective_paise = job.total_paise if amount_paise is None else amount_paise
+        if effective_paise != job.total_paise:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Verified payment amount does not match the print order total.",
+            )
         job.payment_intent_id = payment_intent_id
-        effective_paise = amount_paise or job.total_paise
 
         # Record payment in financial ledger
         ledger_service.record_online_payment(

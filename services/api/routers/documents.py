@@ -26,6 +26,7 @@ from services.api.services.conversion_engine import conversion_engine, MAX_FILE_
 from services.api.services.preview_service import preview_service
 from services.api.services.accounting_engine import accounting_engine
 from services.api.services.asset_service import asset_service
+from services.api.services.shop_customization_service import shop_customization_service
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -142,7 +143,11 @@ async def calculate_quote(req: MultiFileQuoteRequest, request: Request):
         item.file_name = cached["filename"]
         validated_items.append(item)
     req.items = validated_items
-    return accounting_engine.generate_multi_file_quote(req)
+    pricing_rates = shop_customization_service.get_config(tenant_id).pricing_rates_paise
+    return accounting_engine.generate_multi_file_quote(
+        req,
+        pricing_rates_paise=pricing_rates,
+    )
 
 
 @router.get("/{asset_id}/preview/{page_num}")

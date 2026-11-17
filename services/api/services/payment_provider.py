@@ -20,6 +20,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional, Tuple
 from fastapi import HTTPException, status
 from pydantic import BaseModel, Field
+import httpx
 
 from packages.contracts.models import (
     PaymentMethod,
@@ -336,6 +337,7 @@ class RazorpayProvider(BasePaymentProvider):
         # Maps shop_id -> MerchantCredentials
         self._merchant_configs: Dict[str, MerchantCredentials] = {}
         self._orders: Dict[str, Dict[str, Any]] = {}
+        self._payment_intents: Dict[str, PaymentIntentResult] = {}
         self._refunds: Dict[str, RefundResult] = {}
 
     def configure_shop_merchant(
@@ -380,9 +382,51 @@ class RazorpayProvider(BasePaymentProvider):
         customer_info: Optional[Dict[str, Any]] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> PaymentIntentResult:
+        intent_key = f"{shop_id}:{order_id}"
+        if intent_key in self._payment_intents:
+            return self._payment_intents[intent_key]
+
         creds = self._get_credentials(shop_id)
-        # Create simulated or real Razorpay order ID
-        rzp_order_id = f"order_rzp_{uuid.uuid4().hex[:14]}"
+        try:
+            with httpx.Client(timeout=15.0) as client:
+                response = client.post(
+                    "https://api.razorpay.com/v1/orders",
+                    auth=(creds.key_id, creds.key_secret),
+                    json={
+                        "amount": amount_paise,
+                        "currency": currency,
+                        "receipt": order_id[:40],
+                        "notes": {
+                            "shop_id": shop_id,
+                            "order_id": order_id,
+                        },
+                    },
+                )
+                response.raise_for_status()
+                order = response.json()
+        except httpx.HTTPStatusError as error:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="The payment provider rejected the payment order request.",
+            ) from error
+        except httpx.RequestError as error:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Could not connect to the payment provider.",
+            ) from error
+
+        rzp_order_id = order.get("id")
+        if (
+            not isinstance(rzp_order_id, str)
+            or not rzp_order_id
+            or order.get("amount") != amount_paise
+            or order.get("currency") != currency
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="The payment provider returned an invalid payment order.",
+            )
+
         self._orders[rzp_order_id] = {
             "id": rzp_order_id,
             "shop_id": shop_id,
@@ -393,10 +437,9 @@ class RazorpayProvider(BasePaymentProvider):
             "key_id": creds.key_id,
         }
 
-        checkout_url = f"https://api.razorpay.com/v1/checkout/{rzp_order_id}"
         upi_string = f"upi://pay?pa=merchant_{shop_id[:8]}@razorpay&pn=PrintShop&am={amount_paise/100:.2f}&cu={currency}&tr={rzp_order_id}"
 
-        return PaymentIntentResult(
+        result = PaymentIntentResult(
             provider=PaymentProviderType.RAZORPAY,
             payment_intent_id=rzp_order_id,
             order_id=order_id,
@@ -404,10 +447,12 @@ class RazorpayProvider(BasePaymentProvider):
             amount_paise=amount_paise,
             currency=currency,
             client_secret=creds.key_id,
-            checkout_url=checkout_url,
+            checkout_url=None,
             upi_intent_string=upi_string,
             qr_code_data=upi_string,
         )
+        self._payment_intents[intent_key] = result
+        return result
 
     def verify_webhook(
         self,
@@ -446,7 +491,9 @@ class RazorpayProvider(BasePaymentProvider):
         payload_obj = data.get("payload", {})
         payment_entity = payload_obj.get("payment", {}).get("entity", {})
         notes = payment_entity.get("notes", {})
-        shop_id = notes.get("shop_id") or data.get("shop_id")
+        gateway_order_id = payment_entity.get("order_id", "")
+        created_order = self._orders.get(gateway_order_id, {})
+        shop_id = notes.get("shop_id") or data.get("shop_id") or created_order.get("shop_id")
 
         if not shop_id:
             # Fallback to inspecting expected_shop_id
@@ -472,8 +519,8 @@ class RazorpayProvider(BasePaymentProvider):
 
         event_id = data.get("event_id") or data.get("id") or f"rzp_evt_{uuid.uuid4().hex[:12]}"
         event_type = data.get("event", "payment.captured")
-        payment_intent_id = payment_entity.get("order_id", "")
-        order_id = notes.get("order_id") or payment_intent_id.replace("order_rzp_", "")
+        payment_intent_id = gateway_order_id
+        order_id = notes.get("order_id") or created_order.get("order_id") or payment_intent_id.replace("pi_mock_", "")
         amount_paise = payment_entity.get("amount", 0)
 
         if event_type == "payment.captured":
@@ -534,6 +581,7 @@ class RazorpayProvider(BasePaymentProvider):
     def clear(self):
         self._merchant_configs.clear()
         self._orders.clear()
+        self._payment_intents.clear()
         self._refunds.clear()
 
 

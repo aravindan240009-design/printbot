@@ -86,8 +86,8 @@ class StudioService:
         according to its verified color status in Indian paise.
         """
         cfg = shop_customization_service.get_config(req.shop_id)
-        bw_rate = cfg.pricing_rates_paise.get("bw_single", 200)       # e.g. ₹2.00
-        color_rate = cfg.pricing_rates_paise.get("color_single", 1000) # e.g. ₹10.00
+        bw_rate = cfg.pricing_rates_paise.get("bw_per_side_paise", 150)
+        color_rate = cfg.pricing_rates_paise.get("color_per_side_paise", 1000)
 
         # Count color vs B&W pages from the breakdown
         color_count = sum(1 for p in req.page_breakdown if p.is_color)

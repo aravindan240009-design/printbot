@@ -74,7 +74,7 @@ Shop: ${order.shopName}
 Address: ${order.shopAddress || 'Local Print Counter'}
 Placed At: ${order.placedAt}
 Payment: ${order.paymentMethod === 'upi' ? 'UPI Online' : 'Cash at Counter'} (${order.paymentStatus})
-Total Paid: INR ${order.totalRupees.toFixed(2)}
+Total ${order.paymentStatus === 'paid' ? 'Paid' : 'Due'}: INR ${order.totalRupees.toFixed(2)}
 Total Physical Sheets: ${order.totalSheets}
 Total Logical Pages: ${order.totalLogicalPages}
 ========================================
@@ -253,7 +253,9 @@ Your files are purged from server memory after printing.
         <div>
           <span style={{ fontSize: '0.78rem', color: 'var(--pb-muted)', display: 'block' }}>Payment Method</span>
           <strong style={{ fontSize: '0.92rem' }}>
-            {order.paymentMethod === 'upi' ? 'Instant UPI QR (Paid)' : 'Pay Cash at Counter (Pending)'}
+            {order.paymentMethod === 'upi'
+              ? order.paymentStatus === 'paid' ? 'UPI Payment Verified' : 'UPI Payment Verification Pending'
+              : 'Pay Cash at Counter (Pending)'}
           </strong>
         </div>
         <strong

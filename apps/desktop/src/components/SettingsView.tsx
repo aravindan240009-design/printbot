@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Settings,
   Building,
   MapPin,
   Phone,
   Radio,
+  AlertTriangle,
   Sparkles,
   ShieldCheck,
   Cpu,
@@ -36,6 +37,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onSaveSettings,
   onNavigateToServices,
 }) => {
+  const [pendingOrderMode, setPendingOrderMode] = useState<'MANUAL_APPROVAL' | 'FULL_AUTOMATIC' | null>(null);
+
+  const confirmOrderModeChange = () => {
+    if (pendingOrderMode) {
+      setSetupOrderMode(pendingOrderMode);
+      setPendingOrderMode(null);
+    }
+  };
+
   return (
     <div className="pb-view">
       {/* Header */}
@@ -112,18 +122,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <select
                 className="pb-select"
                 value={setupOrderMode}
-                onChange={(e) => setSetupOrderMode(e.target.value as 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC')}
+                onChange={(e) => {
+                  const selectedMode = e.target.value;
+                  if (selectedMode === 'MANUAL_APPROVAL' || selectedMode === 'FULL_AUTOMATIC') {
+                    if (selectedMode !== setupOrderMode) setPendingOrderMode(selectedMode);
+                  }
+                }}
                 style={{ width: '100%' }}
               >
                 <option value="MANUAL_APPROVAL">
                   Manual Approval (Operator reviews &amp; approves before printing)
                 </option>
                 <option value="FULL_AUTOMATIC">
-                  Full Automatic (Directly prints once customer UPI payment is verified)
+                  Full Automatic (Automatically queues after verified payment)
                 </option>
               </select>
               <span className="pb-form-hint">
-                Switch anytime based on your counter rush. Manual approval allows previewing and approving each file.
+                Full Automatic sends eligible queued orders to the connected printer without order-by-order approval.
               </span>
             </div>
 
@@ -213,6 +228,63 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </div>
       </div>
+
+      {pendingOrderMode && (
+        <div className="pb-modal-backdrop" onClick={() => setPendingOrderMode(null)}>
+          <div
+            className="pb-modal pb-modal-md"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dispatch-mode-confirm-title"
+            aria-describedby="dispatch-mode-confirm-description"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="pb-modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div
+                  className="pb-badge-icon"
+                  style={{
+                    background: pendingOrderMode === 'FULL_AUTOMATIC' ? 'var(--pb-desk-warning-subtle)' : 'var(--pb-desk-accent-subtle)',
+                    color: pendingOrderMode === 'FULL_AUTOMATIC' ? 'var(--pb-desk-warning)' : 'var(--pb-desk-accent)',
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '6px',
+                    display: 'grid',
+                    placeItems: 'center',
+                  }}
+                >
+                  <AlertTriangle size={15} />
+                </div>
+                <h3 className="pb-modal-title" id="dispatch-mode-confirm-title">Confirm Dispatch Mode Change</h3>
+              </div>
+            </div>
+
+            <div className="pb-modal-body" id="dispatch-mode-confirm-description">
+              {pendingOrderMode === 'FULL_AUTOMATIC' ? (
+                <p style={{ margin: 0 }}>
+                  Switch to Full Automatic? Eligible orders will be queued after payment verification without manual approval.
+                  The workstation will send queued jobs to an online printer automatically. If the printer is unavailable
+                  or printing fails, the job will remain in the queue for attention. Save Settings after confirming to apply the change.
+                </p>
+              ) : (
+                <p style={{ margin: 0 }}>
+                  Switch to Manual Approval? New orders will wait for an operator to review and approve them before they
+                  enter the print queue. Save Settings after confirming to apply the change.
+                </p>
+              )}
+            </div>
+
+            <div className="pb-modal-footer">
+              <button type="button" className="pb-btn pb-btn-secondary" onClick={() => setPendingOrderMode(null)}>
+                Cancel
+              </button>
+              <button type="button" className="pb-btn pb-btn-primary" onClick={confirmOrderModeChange}>
+                Confirm Change
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

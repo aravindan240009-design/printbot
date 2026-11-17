@@ -284,7 +284,12 @@ export const QueueView: React.FC<QueueViewProps> = ({
           </div>
         ) : (
           <div className="pb-jobs-list">
-            {filteredJobs.map((job) => (
+            {filteredJobs.map((job) => {
+              const paymentVerificationPending =
+                job.payment_method === 'upi' &&
+                !['verified', 'paid'].includes((job.payment_status || '').toLowerCase());
+
+              return (
               <div key={job.id} className="pb-job-card">
                 <div className="pb-job-file-avatar">
                   <span className="pb-file-ext-tag">{getFileExtension(job.file_name)}</span>
@@ -342,7 +347,13 @@ export const QueueView: React.FC<QueueViewProps> = ({
                     )}
                   </div>
 
-                  {job.status === 'PENDING_APPROVAL' && (
+                  {job.status === 'PENDING_APPROVAL' && paymentVerificationPending && (
+                    <p className="pb-form-hint" role="status">
+                      Waiting for the payment provider to verify this UPI payment. Printing is locked until verification completes.
+                    </p>
+                  )}
+
+                  {job.status === 'PENDING_APPROVAL' && !paymentVerificationPending && (
                     <div className="pb-job-action-row">
                       <button
                         type="button"
@@ -434,11 +445,16 @@ export const QueueView: React.FC<QueueViewProps> = ({
                     ₹{job.calculated_price_rupees.toFixed(2)}
                   </div>
                   <div className="pb-job-price-badge">
-                    {job.payment_method === 'cash' ? 'Cash at Counter' : 'Instant UPI Paid'}
+                    {job.payment_method === 'cash'
+                      ? 'Cash at Counter'
+                      : paymentVerificationPending
+                        ? 'UPI Verification Pending'
+                        : 'UPI Payment Verified'}
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

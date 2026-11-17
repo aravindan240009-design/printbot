@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { DocumentItem, ServerQuote, ShopSession } from '../../types';
 import { TranslationKeys } from '../../locales';
+import type { PaymentIntent } from '../../api';
 
 function loadRazorpayScript(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -32,13 +33,21 @@ function loadRazorpayScript(): Promise<boolean> {
 interface CheckoutViewProps {
   files: DocumentItem[];
   quote: ServerQuote | null;
+  quoteStatus: 'idle' | 'loading' | 'ready' | 'error';
+  quoteError: string;
   session: ShopSession;
+  onPreparePaymentOrder: (customerDetails: {
+    customerName: string;
+    customerPhone: string;
+    notes: string;
+  }) => Promise<PaymentIntent>;
   onConfirmOrder: (orderDetails: {
     customerName: string;
     customerPhone: string;
     notes: string;
     paymentMethod: 'upi' | 'cash';
     paymentId?: string;
+    orderId?: string;
   }) => void;
   onBack: () => void;
   t: TranslationKeys;
@@ -47,7 +56,10 @@ interface CheckoutViewProps {
 export const CheckoutView: React.FC<CheckoutViewProps> = ({
   files,
   quote,
+  quoteStatus,
+  quoteError,
   session,
+  onPreparePaymentOrder,
   onConfirmOrder,
   onBack,
   t,
@@ -58,10 +70,13 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   const [notes, setNotes] = useState('');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
-  const amount = quote ? quote.total_rupees.toFixed(2) : '0.00';
-  const razorpayKeyId = (import.meta as any).env?.VITE_RAZORPAY_KEY_ID || 'rzp_test_Ts9MJsdti9RG2c';
+  const amount = quote ? quote.total_rupees.toFixed(2) : '--';
 
   const handleRazorpayCheckout = async () => {
+    if (files.length !== 1 || quoteStatus !== 'ready' || !quote) {
+      alert('Wait for a server price and checkout one document at a time.');
+      return;
+    }
     setIsProcessingPayment(true);
     const loaded = await loadRazorpayScript();
     if (!loaded) {
@@ -70,12 +85,25 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
       return;
     }
 
-    const paise = quote ? Math.round(quote.total_rupees * 100) : Math.round(Number(amount) * 100);
+    let paymentIntent: PaymentIntent;
+    try {
+      paymentIntent = await onPreparePaymentOrder({
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        notes: notes.trim(),
+      });
+    } catch (error) {
+      console.error('Unable to prepare server-verified payment:', error);
+      alert(error instanceof Error ? error.message : 'Unable to prepare secure payment. Please try again.');
+      setIsProcessingPayment(false);
+      return;
+    }
 
     const options = {
-      key: razorpayKeyId,
-      amount: paise,
-      currency: 'INR',
+      key: paymentIntent.client_secret,
+      order_id: paymentIntent.payment_intent_id,
+      amount: paymentIntent.amount_paise,
+      currency: paymentIntent.currency,
       name: session.shop_name || 'Print Bot',
       description: `Print Order (${quote?.total_physical_sheets || 1} Sheets / ₹${amount})`,
       image: '/favicon.svg',
@@ -87,6 +115,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           notes: notes.trim(),
           paymentMethod: 'upi',
           paymentId: response.razorpay_payment_id,
+          orderId: paymentIntent.order_id,
         });
       },
       prefill: {
@@ -96,6 +125,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
       notes: {
         shop_id: session.shop_id,
         shop_slug: session.shop_slug,
+        order_id: paymentIntent.order_id,
       },
       theme: {
         color: '#2563eb',
@@ -122,6 +152,10 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   };
 
   const handleSubmit = () => {
+    if (files.length !== 1 || quoteStatus !== 'ready' || !quote) {
+      alert('Wait for a server price and checkout one document at a time.');
+      return;
+    }
     if (paymentMethod === 'upi') {
       handleRazorpayCheckout();
     } else {
@@ -144,6 +178,18 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           Finalize your order for immediate dispatch to <strong>{session.shop_name}</strong>.
         </p>
       </div>
+
+      {quoteStatus === 'loading' && (
+        <p role="status" style={{ color: 'var(--pb-muted)' }}>
+          Getting the current price from the shop server...
+        </p>
+      )}
+      {quoteStatus === 'error' && <p role="alert" style={{ color: 'var(--pb-danger)' }}>{quoteError}</p>}
+      {files.length !== 1 && (
+        <p role="alert" style={{ color: 'var(--pb-danger)' }}>
+          Checkout currently accepts one document per order. Remove the other documents and checkout them separately.
+        </p>
+      )}
 
       {/* Destination & Order Summary Ribbon */}
       <div
@@ -374,7 +420,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               <button
                 type="button"
                 onClick={handleRazorpayCheckout}
-                disabled={isProcessingPayment}
+                disabled={isProcessingPayment || quoteStatus !== 'ready' || !quote || files.length !== 1}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -453,7 +499,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           className="pb-btn-primary"
           style={{ flex: 1, minHeight: '52px', minWidth: '240px', fontSize: '1rem' }}
           onClick={handleSubmit}
-          disabled={isProcessingPayment}
+          disabled={isProcessingPayment || quoteStatus !== 'ready' || !quote || files.length !== 1}
         >
           {isProcessingPayment ? (
             <>

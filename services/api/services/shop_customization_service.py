@@ -50,10 +50,12 @@ class ShopCustomizationConfig(BaseModel):
     allowed_duplex_modes: List[str] = Field(default_factory=lambda: ["simplex", "duplex_long", "duplex_short"])
     pricing_rates_paise: Dict[str, int] = Field(
         default_factory=lambda: {
-            "bw_single": 200,      # ₹2.00
-            "bw_duplex": 300,      # ₹3.00
-            "color_single": 1000,  # ₹10.00
-            "color_duplex": 1500,  # ₹15.00
+            "bw_per_side_paise": 150,
+            "color_per_side_paise": 1000,
+            "duplex_discount_percent": 15,
+            "staple_paise": 500,
+            "spiral_paise": 4000,
+            "hard_bind_paise": 15000,
         }
     )
     customer_notifications: Dict[str, bool] = Field(
@@ -111,7 +113,30 @@ class ShopCustomizationService:
         if "allowed_file_types" in updates:
             config.allowed_file_types = updates["allowed_file_types"]
         if "pricing_rates_paise" in updates:
-            config.pricing_rates_paise = updates["pricing_rates_paise"]
+            pricing_rates = updates["pricing_rates_paise"]
+            allowed_rate_keys = set(config.pricing_rates_paise)
+            if set(pricing_rates) - allowed_rate_keys:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Pricing update contains an unsupported rate.",
+                )
+            if any(type(value) is not int or value < 0 for value in pricing_rates.values()):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Pricing rates must be non-negative integer paise values.",
+                )
+            if pricing_rates.get(
+                "duplex_discount_percent",
+                config.pricing_rates_paise["duplex_discount_percent"],
+            ) > 100:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Duplex discount cannot exceed 100 percent.",
+                )
+            config.pricing_rates_paise = {
+                **config.pricing_rates_paise,
+                **pricing_rates,
+            }
         if "customer_notifications" in updates:
             config.customer_notifications = updates["customer_notifications"]
         if "order_timeout_minutes" in updates:

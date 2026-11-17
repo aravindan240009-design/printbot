@@ -1,28 +1,62 @@
+import hashlib
+import json
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Request, Header, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from packages.contracts.models import (
     PrintJobCreateRequest,
     PrintJobResponse,
     PrintOptions,
     JobStatus,
+    PaymentProviderType,
 )
-from services.api.services.pricing import pricing_engine
+from services.api.services.accounting_engine import accounting_engine
 from services.api.services.job_service import job_service
 from services.api.core.idempotency import idempotency_store
+from services.api.services.payment_provider import get_payment_provider
+from services.api.services.shop_customization_service import shop_customization_service
 
 router = APIRouter(prefix="/orders", tags=["Orders & Pricing"])
 
 
 class QuoteRequest(BaseModel):
-    page_count: int
+    page_count: int = Field(ge=1, le=5000)
     options: PrintOptions
 
 
 @router.post("/quote")
-def calculate_quote(req: QuoteRequest):
-    """Calculates instantaneous live quote breakdown."""
-    return pricing_engine.calculate(req.page_count, req.options)
+def calculate_quote(req: QuoteRequest, request: Request):
+    """Calculates a shop-priced quote using the same rules as order creation."""
+    tenant_id: str = getattr(request.state, "tenant_id", "default-tenant")
+    pricing_rates = shop_customization_service.get_config(tenant_id).pricing_rates_paise
+    item = accounting_engine.calculate_file_accounting(
+        file_id="quote",
+        file_name="quote",
+        total_file_pages=req.page_count,
+        options=req.options,
+        pricing_rates_paise=pricing_rates,
+    )
+    quote_payload = {
+        "shop_id": tenant_id,
+        "page_count": req.page_count,
+        "options": req.options.model_dump(mode="json"),
+        "pricing_rates_paise": pricing_rates,
+        "total_paise": item.cost_paise,
+    }
+    quote_hash = hashlib.sha256(
+        json.dumps(quote_payload, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    return {
+        "total_paise": item.cost_paise,
+        "total_rupees": item.cost_rupees,
+        "total_logical_pages": item.logical_pages * req.options.copies,
+        "total_rendered_sides": item.rendered_sides,
+        "total_physical_sheets": item.physical_sheets,
+        "currency": "INR",
+        "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat(),
+        "quote_hash": quote_hash,
+    }
 
 
 @router.post("", response_model=PrintJobResponse, status_code=status.HTTP_201_CREATED)
@@ -55,6 +89,26 @@ def create_print_order(
         idempotency_store.complete(tenant_id, idempotency_key, 201, job_dict)
 
     return job
+
+
+@router.post("/{job_id}/payment-intent")
+def create_order_payment_intent(job_id: str, request: Request):
+    """Creates a gateway order tied to a server-priced print job."""
+    tenant_id: str = getattr(request.state, "tenant_id", "default-tenant")
+    job = job_service.get_job(tenant_id, job_id)
+    if job.status != JobStatus.PENDING_PAYMENT:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A payment order can only be created for an unpaid print job.",
+        )
+
+    provider = get_payment_provider(PaymentProviderType.RAZORPAY)
+    return provider.create_payment_intent(
+        shop_id=tenant_id,
+        order_id=job.id,
+        amount_paise=job.total_paise,
+        currency=job.currency,
+    )
 
 
 @router.get("/{job_id}", response_model=PrintJobResponse)

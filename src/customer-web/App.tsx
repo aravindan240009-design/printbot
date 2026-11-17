@@ -32,7 +32,6 @@ import { CheckoutView } from './components/checkout/CheckoutView';
 import { OrderTracker } from './components/tracking/OrderTracker';
 import { CustomerDashboard } from './components/dashboard/CustomerDashboard';
 import { PasswordUnlockModal } from './components/common/PasswordUnlockModal';
-import { calculateDocumentQuote } from './utils/pricing';
 import {
   getStoredLanguage,
   setStoredLanguage,
@@ -40,7 +39,16 @@ import {
   saveOrderToStorage,
   updateStoredOrderStatus,
 } from './utils/storage';
-import { openShopSession, scanFile, createOrder, fetchOrderStatus, isApiConfigured, type CreateOrderPayload } from './api';
+import {
+  openShopSession,
+  scanFile,
+  quoteOrder,
+  createOrder,
+  createPaymentIntent,
+  fetchOrderStatus,
+  isApiConfigured,
+  type CreateOrderPayload,
+} from './api';
 import { supabase } from './supabase';
 import {
   resolveShopSlugFromUrl,
@@ -97,6 +105,9 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
   const [orders, setOrders] = useState<PlacedOrder[]>([]);
   const [activeOrder, setActiveOrder] = useState<PlacedOrder | null>(null);
   const [unlockingFileId, setUnlockingFileId] = useState<string | null>(null);
+  const [quote, setQuote] = useState<ServerQuote | null>(null);
+  const [quoteStatus, setQuoteStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [quoteError, setQuoteError] = useState('');
 
   const t = getTranslation(lang);
 
@@ -164,11 +175,71 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
       });
   }, [resolvedSlug]);
 
-  // Compute live quote based on files & shop's customized pricing rates
-  const quote = useMemo(() => {
-    if (files.length === 0) return null;
-    return calculateDocumentQuote(files, session.rates);
-  }, [files, session.rates]);
+  useEffect(() => {
+    if (files.length === 0) {
+      setQuote(null);
+      setQuoteStatus('idle');
+      setQuoteError('');
+      return;
+    }
+
+    setQuote(null);
+    setQuoteStatus('loading');
+    setQuoteError('');
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      const calculateServerQuote = async () => {
+        try {
+          if (!isApiConfigured) {
+            throw new Error('Shop server pricing is unavailable. Please try again later.');
+          }
+          const fileQuotes = await Promise.all(files.map((file) => quoteOrder(
+            file.pageCount || 1,
+            {
+              copies: file.options.copies,
+              color_mode: file.options.colorMode,
+              paper_size: file.options.paperSize,
+              duplex_mode: file.options.duplex,
+              paper_gsm: Number(file.options.paperGsm),
+              binding: file.options.finishing,
+              page_range: file.options.pageRange,
+              pages_per_sheet: file.options.nup,
+              orientation: file.options.orientation,
+            },
+            session.session_token,
+            session.shop_id,
+          )));
+          if (cancelled) return;
+
+          const totalPaise = fileQuotes.reduce((sum, item) => sum + item.total_paise, 0);
+          setQuote({
+            total_paise: totalPaise,
+            total_rupees: totalPaise / 100,
+            total_logical_pages: fileQuotes.reduce((sum, item) => sum + item.total_logical_pages, 0),
+            total_rendered_sides: fileQuotes.reduce((sum, item) => sum + item.total_rendered_sides, 0),
+            total_physical_sheets: fileQuotes.reduce((sum, item) => sum + item.total_physical_sheets, 0),
+            expires_at: fileQuotes.reduce(
+              (earliest, item) => Date.parse(item.expires_at) < Date.parse(earliest) ? item.expires_at : earliest,
+              fileQuotes[0].expires_at,
+            ),
+            quote_hash: fileQuotes.map((item) => item.quote_hash).join(':'),
+          });
+          setQuoteStatus('ready');
+        } catch (error) {
+          if (cancelled) return;
+          setQuote(null);
+          setQuoteStatus('error');
+          setQuoteError(error instanceof Error ? error.message : 'Could not get a price from the shop server.');
+        }
+      };
+      void calculateServerQuote();
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [files, session.session_token, session.shop_id]);
 
   const activeFile = files.find((f) => f.id === activeFileId) || files[0];
 
@@ -224,17 +295,81 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
     );
   }, []);
 
+  const handlePreparePaymentOrder = async (customerDetails: {
+    customerName: string;
+    customerPhone: string;
+    notes: string;
+  }) => {
+    if (quoteStatus !== 'ready' || !quote) {
+      throw new Error('Wait for the shop server to confirm the order price before paying.');
+    }
+    if (!isApiConfigured) {
+      throw new Error('Secure online payment is unavailable because the Print Bot API is not configured.');
+    }
+    if (!files.length) {
+      throw new Error('Add a document before starting payment.');
+    }
+    if (files.length !== 1) {
+      throw new Error('Secure online checkout currently supports one document per order. Please checkout each document separately.');
+    }
+
+    const firstFile = files[0];
+    const extension = firstFile.name.split('.').pop()?.toLowerCase();
+    const fileSize = firstFile.source?.size || firstFile.sizeBytes || 0;
+    if (!['pdf', 'jpg', 'jpeg', 'png'].includes(extension || '')) {
+      throw new Error('Automatic printing currently supports PDF, JPG, and PNG files only.');
+    }
+    if (!fileSize || fileSize > 2.5 * 1024 * 1024) {
+      throw new Error('Automatic printing currently supports files up to 2.5 MB. No payment was started.');
+    }
+    const cleanPhone = customerDetails.customerPhone.replace(/[^0-9]/g, '');
+    const customerEmail = cleanPhone ? `${cleanPhone}@walkin.customer.in` : 'customer@walkin.in';
+    const createPayload: CreateOrderPayload = {
+      customer_email: customerEmail,
+      customer_phone: customerDetails.customerPhone || undefined,
+      file_name: firstFile.name,
+      file_size_bytes: firstFile.sizeBytes || firstFile.source?.size || 1024,
+      page_count: firstFile.pageCount || 1,
+      options: {
+        copies: firstFile.options.copies || 1,
+        color_mode: firstFile.options.colorMode === 'color' ? 'color' : firstFile.options.colorMode === 'grayscale' ? 'grayscale' : 'bw',
+        paper_size: firstFile.options.paperSize || 'A4',
+        duplex_mode: firstFile.options.duplex === 'simplex' ? 'simplex' : firstFile.options.duplex === 'duplex_short' ? 'duplex_short' : 'duplex_long',
+        paper_gsm: parseInt(firstFile.options.paperGsm || '75', 10) || 75,
+        binding: firstFile.options.finishing || 'none',
+        page_range: firstFile.options.pageRange || 'all',
+        pages_per_sheet: firstFile.options.nup || 1,
+      },
+    };
+
+    const serverJob = await createOrder(createPayload, session.session_token, session.shop_id);
+    if (typeof serverJob?.id !== 'string' || !serverJob.id) {
+      throw new Error('The server did not create a print order. No payment was started.');
+    }
+    if (
+      !Number.isSafeInteger(serverJob.total_paise) ||
+      serverJob.total_paise !== quote.total_paise
+    ) {
+      throw new Error('The server price does not match the amount shown. No payment was started; please contact the shop to update its pricing.');
+    }
+    return createPaymentIntent(serverJob.id, session.session_token, session.shop_id);
+  };
+
   const handleConfirmOrder = async (details: {
     customerName: string;
     customerPhone: string;
     notes: string;
     paymentMethod: 'upi' | 'cash';
     paymentId?: string;
+    orderId?: string;
   }) => {
-    if (!quote || files.length === 0) return;
+    if (!quote || quoteStatus !== 'ready' || files.length !== 1) {
+      alert('Wait for a server price and checkout one document at a time.');
+      return;
+    }
 
     const randomPin = String(Math.floor(1000 + Math.random() * 9000));
-    let assignedOrderId = 'PB-' + Math.floor(10000 + Math.random() * 90000);
+    let assignedOrderId = details.orderId || 'PB-' + Math.floor(10000 + Math.random() * 90000);
 
     const firstFile = files[0];
     const cleanPhone = details.customerPhone ? details.customerPhone.replace(/[^0-9]/g, '') : '';
@@ -278,7 +413,7 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
       totalSheets: quote.total_physical_sheets,
       totalLogicalPages: quote.total_logical_pages,
       paymentMethod: details.paymentMethod,
-      paymentStatus: details.paymentMethod === 'upi' ? 'paid' : 'pending_cash',
+      paymentStatus: details.paymentMethod === 'upi' ? 'pending_verification' : 'pending_cash',
       paymentId: details.paymentId || null,
       notes: details.notes || '',
       status: 'PENDING_APPROVAL',
@@ -308,10 +443,11 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
         paper_gsm: parseInt(firstFile.options.paperGsm || '75', 10) || 75,
         binding: firstFile.options.finishing || 'none',
         page_range: firstFile.options.pageRange || 'all',
+        pages_per_sheet: firstFile.options.nup || 1,
       },
     };
 
-    if (isApiConfigured) {
+    if (isApiConfigured && !details.orderId) {
       try {
         const serverJob = await createOrder(createPayload, session.session_token, session.shop_id);
         if (serverJob && serverJob.id) {
@@ -357,9 +493,9 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
       totalSheets: quote.total_physical_sheets,
       totalLogicalPages: quote.total_logical_pages,
       paymentMethod: details.paymentMethod,
-      paymentStatus: details.paymentMethod === 'upi' ? 'paid' : 'pending_cash',
+      paymentStatus: details.paymentMethod === 'upi' ? 'pending_verification' : 'pending_cash',
       paymentId: details.paymentId,
-      status: 'ORDER_RECEIVED',
+      status: details.paymentMethod === 'upi' ? 'PENDING_PAYMENT' : 'ORDER_RECEIVED',
       placedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       items: files.map((f) => ({
         name: f.name,
@@ -402,7 +538,18 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
             const mapped = mapLiveStatusToClient(newStatus);
             if (mapped) {
               updateStoredOrderStatus(newOrder.shopId, assignedOrderId, mapped);
-              setActiveOrder((curr) => (curr && curr.orderId === assignedOrderId ? { ...curr, status: mapped } : curr));
+              setActiveOrder((curr) => (
+                curr && curr.orderId === assignedOrderId
+                  ? {
+                      ...curr,
+                      status: mapped,
+                      paymentStatus:
+                        newOrder.paymentMethod === 'upi' && ['SPOOLING', 'PRINTING', 'READY_FOR_PICKUP'].includes(mapped)
+                          ? 'paid'
+                          : curr.paymentStatus,
+                    }
+                  : curr
+              ));
             }
           }
         }
@@ -426,7 +573,18 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
           const mapped = mapLiveStatusToClient(liveRow.status);
           if (mapped) {
             updateStoredOrderStatus(newOrder.shopId, assignedOrderId, mapped);
-            setActiveOrder((curr) => (curr && curr.orderId === assignedOrderId ? { ...curr, status: mapped } : curr));
+            setActiveOrder((curr) => (
+              curr && curr.orderId === assignedOrderId
+                ? {
+                    ...curr,
+                    status: mapped,
+                    paymentStatus:
+                      newOrder.paymentMethod === 'upi' && ['SPOOLING', 'PRINTING', 'READY_FOR_PICKUP'].includes(mapped)
+                        ? 'paid'
+                        : curr.paymentStatus,
+                  }
+                : curr
+            ));
             if (mapped === 'READY_FOR_PICKUP' || mapped === 'CANCELLED') {
               clearInterval(pollInterval);
               supabase.removeChannel(statusChannel);
@@ -653,6 +811,8 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
 
                     <LivePriceBreakdown
                       quote={quote}
+                      quoteStatus={quoteStatus}
+                      quoteError={quoteError}
                       fileCount={files.length}
                       onProceed={() => setActiveView('checkout')}
                       t={t}
@@ -682,6 +842,8 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
             <CartView
               files={files}
               quote={quote}
+              quoteStatus={quoteStatus}
+              quoteError={quoteError}
               onRemoveFile={handleRemoveFile}
               onClearCart={() => setFiles([])}
               onAddMoreFiles={() => {
@@ -698,7 +860,10 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
             <CheckoutView
               files={files}
               quote={quote}
+              quoteStatus={quoteStatus}
+              quoteError={quoteError}
               session={session}
+              onPreparePaymentOrder={handlePreparePaymentOrder}
               onConfirmOrder={handleConfirmOrder}
               onBack={() => {
                 setActiveView('print');
