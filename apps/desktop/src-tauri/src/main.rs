@@ -330,10 +330,27 @@ fn print_to_native_hardware(
         .map_err(|e| e.to_string())?
         .clone()
         .ok_or_else(|| "workstation is not paired to a shop".to_string())?;
-    let printer = discover_printers(&bound_shop_id)?
-        .into_iter()
-        .find(|printer| printer.name == payload.printer_name)
-        .ok_or_else(|| "requested printer was not discovered for this workstation".to_string())?;
+    let all_printers = discover_printers(&bound_shop_id)?;
+    if all_printers.is_empty() {
+        return Err("No printers are discovered or installed on this Windows workstation.".to_string());
+    }
+
+    let req_clean = payload.printer_name.trim().to_lowercase();
+    let printer = all_printers
+        .iter()
+        .find(|p| {
+            let p_clean = p.name.trim().to_lowercase();
+            p_clean == req_clean
+                || p_clean.contains(&req_clean)
+                || req_clean.contains(&p_clean)
+                || (req_clean.contains("4004") && p_clean.contains("4004"))
+                || (req_clean.contains("laserjet") && p_clean.contains("laserjet"))
+        })
+        .or_else(|| all_printers.iter().find(|p| p.is_default))
+        .or_else(|| all_printers.first())
+        .ok_or_else(|| "requested printer was not discovered for this workstation".to_string())?
+        .clone();
+
     if !printer.is_online {
         return Err(format!(
             "Printer '{}' is offline ({}). Bring it online in Windows, then retry.",
@@ -359,7 +376,7 @@ fn print_to_native_hardware(
     )?;
 
     let spooler_job_id = submit_rendered_pages_to_windows_printer(
-        &payload.printer_name,
+        &printer.name,
         &format!("PrintBot - {}", payload.file_name),
         &payload.rendered_pages,
         copies,

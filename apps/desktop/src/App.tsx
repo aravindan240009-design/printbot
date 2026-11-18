@@ -2200,7 +2200,12 @@ function ProductionApp() {
     );
 
     const shopId = currentShop?.username || activeSession?.username || 'shop';
-    const targetPrinter = selectedPrinterName || nativePrinters?.[0]?.name || 'HP758E10 (HP LaserJet Pro 4004)';
+    const targetPrinter =
+      selectedPrinterName ||
+      nativePrinters?.find((p) => p.is_online)?.name ||
+      nativePrinters?.find((p) => p.is_default)?.name ||
+      nativePrinters?.[0]?.name ||
+      '';
 
     let printableBytes: number[] | null = null;
     try {
@@ -2288,7 +2293,13 @@ function ProductionApp() {
   const handleDirectPrint = async (jobId: string, automatic = false, printerOverride?: string) => {
     const targetJob = jobs.find((j) => j.id === jobId);
     if (!targetJob) return;
-    const targetPrinter = printerOverride || selectedPrinterName || nativePrinters?.[0]?.name || 'HP758E10 (HP LaserJet Pro 4004)';
+    const targetPrinter =
+      printerOverride ||
+      selectedPrinterName ||
+      nativePrinters?.find((p) => p.is_online)?.name ||
+      nativePrinters?.find((p) => p.is_default)?.name ||
+      nativePrinters?.[0]?.name ||
+      '';
 
     let result: Awaited<ReturnType<typeof printToHardware>>;
     try {
