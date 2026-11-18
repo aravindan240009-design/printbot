@@ -10,7 +10,6 @@ import {
   Clipboard,
   Cpu,
   Printer,
-  Sparkles,
 } from 'lucide-react';
 
 interface LockScreenProps {
@@ -44,11 +43,6 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   lockoutUntil,
   onUnifiedLogin,
 }) => {
-  const [activeMode, setActiveMode] = useState<'OPERATOR' | 'ADMIN'>(
-    loginUsername.trim().toLowerCase() === 'admin' || loginUsername.trim().toLowerCase().endsWith('@printbot.in')
-      ? 'ADMIN'
-      : 'OPERATOR'
-  );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isLocked = Boolean(lockoutUntil && new Date() < lockoutUntil);
@@ -58,35 +52,9 @@ export const LockScreen: React.FC<LockScreenProps> = ({
     try {
       const text = await navigator.clipboard.readText();
       if (text) {
-        if (activeMode === 'ADMIN') {
-          setLoginKey(text.trim());
-        } else {
-          handleKeyChange(text.trim());
-        }
+        handleKeyChange(text.trim());
       }
     } catch {}
-  };
-
-  const switchMode = (mode: 'OPERATOR' | 'ADMIN') => {
-    setActiveMode(mode);
-    if (mode === 'ADMIN') {
-      if (!loginUsername || loginUsername.trim() === '') {
-        setLoginUsername('admin');
-      }
-    } else {
-      if (loginUsername.trim().toLowerCase() === 'admin') {
-        setLoginUsername('');
-      }
-    }
-  };
-
-  const handleKeyInputChange = (val: string) => {
-    if (activeMode === 'ADMIN') {
-      // In Admin mode, NEVER format or uppercase the password!
-      setLoginKey(val);
-    } else {
-      handleKeyChange(val);
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -112,26 +80,6 @@ export const LockScreen: React.FC<LockScreenProps> = ({
           </p>
         </div>
 
-        {/* Role Selector Tabs */}
-        <div className="pb-lockscreen-tabs">
-          <button
-            type="button"
-            className={`pb-lockscreen-tab ${activeMode === 'OPERATOR' ? 'active' : ''}`}
-            onClick={() => switchMode('OPERATOR')}
-          >
-            <KeyRound size={14} />
-            <span>Shop Operator</span>
-          </button>
-          <button
-            type="button"
-            className={`pb-lockscreen-tab ${activeMode === 'ADMIN' ? 'active' : ''}`}
-            onClick={() => switchMode('ADMIN')}
-          >
-            <ShieldCheck size={14} />
-            <span>Platform Admin</span>
-          </button>
-        </div>
-
         {/* Error Alert */}
         {loginError && (
           <div className="pb-alert pb-alert-error" style={{ marginBottom: '16px' }}>
@@ -148,19 +96,20 @@ export const LockScreen: React.FC<LockScreenProps> = ({
           </div>
         )}
 
-        {/* Login Form */}
+        {/* Unified Login Form */}
         <form onSubmit={handleSubmit} className="pb-lockscreen-form">
           <div className="pb-form-group">
             <label className="pb-form-label">
-              {activeMode === 'ADMIN' ? 'Administrator Account / Email' : 'Counter Station Username'}
+              Username or Account ID
             </label>
             <input
               type="text"
               className="pb-input"
-              placeholder={activeMode === 'ADMIN' ? 'admin or admin@printbot.in' : 'Enter shop username'}
+              placeholder="e.g. dummy (Shop) or admin (Platform Admin)"
               value={loginUsername}
               onChange={(e) => setLoginUsername(e.target.value)}
-              autoFocus={activeMode === 'ADMIN'}
+              disabled={isLocked}
+              autoFocus
               required
             />
           </div>
@@ -168,29 +117,27 @@ export const LockScreen: React.FC<LockScreenProps> = ({
           <div className="pb-form-group">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <label className="pb-form-label" style={{ margin: 0 }}>
-                {activeMode === 'ADMIN' ? 'Admin Master Password' : 'Station License Key'}
+                License Key or Admin Password
               </label>
-              {activeMode === 'OPERATOR' && (
-                <button
-                  type="button"
-                  className="pb-btn-link"
-                  onClick={handlePasteKey}
-                  style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '3px', background: 'transparent', border: 0, color: 'var(--pb-desk-accent)', cursor: 'pointer', padding: 0 }}
-                >
-                  <Clipboard size={11} /> Paste Key
-                </button>
-              )}
+              <button
+                type="button"
+                className="pb-btn-link"
+                onClick={handlePasteKey}
+                style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '3px', background: 'transparent', border: 0, color: 'var(--pb-desk-accent)', cursor: 'pointer', padding: 0 }}
+              >
+                <Clipboard size={11} /> Paste Key
+              </button>
             </div>
 
             <div style={{ position: 'relative' }}>
               <input
                 type={showPassword ? 'text' : 'password'}
                 className="pb-input"
-                placeholder={activeMode === 'ADMIN' ? 'Enter Super Admin password' : 'Enter station license key'}
+                placeholder="Enter license key (PB-KEY-...) or admin password"
                 value={loginKey}
-                onChange={(e) => handleKeyInputChange(e.target.value)}
+                onChange={(e) => handleKeyChange(e.target.value)}
                 disabled={isLocked}
-                style={{ paddingRight: '42px', fontFamily: activeMode === 'OPERATOR' ? 'var(--pb-font-mono)' : 'inherit' }}
+                style={{ paddingRight: '42px' }}
                 required
               />
               <button
@@ -213,19 +160,13 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                 {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
             </div>
-            {activeMode === 'OPERATOR' ? (
-              <span className="pb-form-hint">
-                Format: <code>PB-KEY-YEAR-TOKEN</code> (auto-capitalized on typing)
-              </span>
-            ) : (
-              <span className="pb-form-hint">
-                Sign in with your configured Super Admin credentials.
-              </span>
-            )}
+            <span className="pb-form-hint">
+              Shop Owners: Enter username &amp; key • Platform Admins: Enter admin username &amp; password
+            </span>
           </div>
 
           {/* MFA TOTP code if required for admin */}
-          {isMfaRequired && activeMode === 'ADMIN' && (
+          {isMfaRequired && (
             <div className="pb-form-group">
               <label className="pb-form-label" style={{ color: 'var(--pb-desk-warning)' }}>
                 Authenticator TOTP Code (6 Digits)
@@ -249,13 +190,11 @@ export const LockScreen: React.FC<LockScreenProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
               <Cpu size={14} color="var(--pb-desk-accent)" />
               <strong style={{ fontSize: '11px', color: 'var(--pb-desk-text)' }}>
-                Hardware Node Protection
+                Unified Hardware Node &amp; Cloud Security
               </strong>
             </div>
             <p style={{ margin: 0, fontSize: '11px', color: 'var(--pb-desk-text-dim)', lineHeight: 1.5 }}>
-              {activeMode === 'OPERATOR'
-                ? 'Your license key is cryptographically bound to this physical workstation. Spooler commands execute with local Win32 privileges.'
-                : 'Super administrative access with cloud management, licensing control, and platform configuration.'}
+              Enter your Counter Station license or Super Administrator credentials. Authenticated sessions execute with local Win32 spooler privileges.
             </p>
           </div>
 
@@ -267,11 +206,11 @@ export const LockScreen: React.FC<LockScreenProps> = ({
             style={{ width: '100%', marginTop: '6px' }}
           >
             {isSubmitting ? (
-              <span>Authenticating with Supabase...</span>
+              <span>Authenticating...</span>
             ) : (
               <>
                 <Unlock size={16} />
-                <span>{activeMode === 'OPERATOR' ? 'Unlock Counter Station' : 'Authenticate Admin Session'}</span>
+                <span>Sign In / Unlock Station</span>
               </>
             )}
           </button>
@@ -286,4 +225,3 @@ export const LockScreen: React.FC<LockScreenProps> = ({
     </div>
   );
 };
-

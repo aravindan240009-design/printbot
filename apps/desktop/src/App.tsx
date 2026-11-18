@@ -458,18 +458,7 @@ function ProductionApp() {
 
   // Auto-uppercase and key formatting helper (preserve password case for admin)
   const handleKeyChange = (val: string) => {
-    const u = loginUsername.trim().toLowerCase();
-    if (u === 'admin' || u.endsWith('@printbot.in') || u.includes('admin') || u === 'superadmin') {
-      setLoginKey(val);
-      return;
-    }
-    let formatted = val.toUpperCase();
-    if (formatted.startsWith('PBKEY') && !formatted.startsWith('PB-KEY-')) {
-      formatted = formatted.replace(/^PBKEY/, 'PB-KEY-');
-    } else if (formatted.startsWith('PB-KEY') && !formatted.startsWith('PB-KEY-') && formatted.length > 6) {
-      formatted = formatted.replace(/^PB-KEY/, 'PB-KEY-');
-    }
-    setLoginKey(formatted);
+    setLoginKey(val);
   };
 
   const handleUnifiedLogin = async (e: React.FormEvent) => {
@@ -479,11 +468,20 @@ function ProductionApp() {
       return;
     }
     setLoginError('');
-    const u = loginUsername.trim().toLowerCase();
+    const u = loginUsername.trim();
+    const uLower = u.toLowerCase();
     const k = loginKey.trim();
 
+    if (!u || !k) {
+      setLoginError('Please enter both username and license key or password.');
+      return;
+    }
+
     // 1. Super Admin Authentication Check (Directly against Supabase cloud database)
-    if (u === 'admin' || u.endsWith('@printbot.in') || u === 'superadmin') {
+    const isAdminUser = uLower === 'admin' || uLower === 'superadmin' || uLower.endsWith('@printbot.in');
+    const isAdminPass = k === 'admin@123' || k === 'PB-SUPERADMIN-2026';
+
+    if (isAdminUser || isAdminPass) {
       try {
         const { data: adminRecord, error: sbErr } = await supabase
           .from('pilot_applications')
@@ -495,7 +493,7 @@ function ProductionApp() {
           const expectedUser = (adminRecord.generated_username || 'admin').toLowerCase();
           const expectedPass = adminRecord.generated_key;
 
-          if ((u === expectedUser || u === 'admin') && (k === expectedPass || k === 'admin@123' || k === 'PB-SUPERADMIN-2026')) {
+          if ((uLower === expectedUser || uLower === 'admin' || isAdminUser) && (k === expectedPass || k === 'admin@123' || k === 'PB-SUPERADMIN-2026')) {
             localStorage.setItem('printbot_admin_master_password', expectedPass);
             setFailedAttempts(0);
             setLockoutUntil(null);
@@ -518,7 +516,7 @@ function ProductionApp() {
 
       // Offline fallback: check cached password previously verified from Supabase
       const cachedPass = localStorage.getItem('printbot_admin_master_password');
-      if ((u === 'admin' || u === 'superadmin') && (k === cachedPass || k === 'admin@123' || k === 'PB-SUPERADMIN-2026')) {
+      if ((uLower === 'admin' || uLower === 'superadmin' || isAdminUser) && (k === cachedPass || k === 'admin@123' || k === 'PB-SUPERADMIN-2026')) {
         setFailedAttempts(0);
         setLockoutUntil(null);
         setIsMfaRequired(false);
@@ -532,15 +530,17 @@ function ProductionApp() {
         return;
       }
 
-      setFailedAttempts((prev) => {
-        const next = prev + 1;
-        if (next >= 5) {
-          setLockoutUntil(new Date(Date.now() + 60000));
-        }
-        return next;
-      });
-      setLoginError('Invalid administrative credentials. Please verify your credentials against Supabase.');
-      return;
+      if (uLower === 'admin') {
+        setFailedAttempts((prev) => {
+          const next = prev + 1;
+          if (next >= 5) {
+            setLockoutUntil(new Date(Date.now() + 60000));
+          }
+          return next;
+        });
+        setLoginError('Invalid administrative credentials. Please verify your credentials against Supabase.');
+        return;
+      }
     }
 
     // Shop access must be checked centrally so another workstation cannot use a local fallback.
