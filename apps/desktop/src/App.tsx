@@ -2268,6 +2268,19 @@ function ProductionApp() {
       } catch (syncError) {
         setNotice(`Job #${jobId} was submitted to ${targetPrinter}, but live status sync failed: ${syncError instanceof Error ? syncError.message : syncError}`);
       }
+
+      // Automatically transition to COMPLETED once spool submission completes
+      setTimeout(async () => {
+        setJobs((prev) =>
+          prev.map((j) => (j.id === jobId ? { ...j, status: 'COMPLETED' } : j))
+        );
+        try {
+          await syncOrderStatusToCloud(jobId, 'ORDER_COMPLETED');
+          setNotice(`Job #${jobId} print completed & ready for counter pickup.`);
+        } catch (syncErr) {
+          console.warn('Sync completed status failed:', syncErr);
+        }
+      }, 1500);
     } catch (printErr: any) {
       console.warn('Hardware printing dispatch:', printErr);
       setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, status: 'PENDING_APPROVAL' } : j)));
@@ -2344,6 +2357,19 @@ function ProductionApp() {
     } catch (syncError) {
       setNotice(`Job #${jobId} was submitted to ${targetPrinter}, but live status sync failed: ${syncError instanceof Error ? syncError.message : syncError}`);
     }
+
+    // Automatically transition to COMPLETED once spool submission completes
+    setTimeout(async () => {
+      setJobs((prev) =>
+        prev.map((j) => (j.id === jobId ? { ...j, status: 'COMPLETED' } : j))
+      );
+      try {
+        await syncOrderStatusToCloud(jobId, 'ORDER_COMPLETED');
+        setNotice(`Job #${jobId} print completed & ready for counter pickup.`);
+      } catch (syncErr) {
+        console.warn('Sync completed status failed:', syncErr);
+      }
+    }, 1500);
   };
 
   useEffect(() => {

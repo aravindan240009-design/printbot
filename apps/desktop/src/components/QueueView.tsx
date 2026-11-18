@@ -98,7 +98,7 @@ export const QueueView: React.FC<QueueViewProps> = ({
       case 'PRINTING':
         return <span className="pb-badge pb-badge-accent">Spooling...</span>;
       case 'COMPLETED':
-        return <span className="pb-badge pb-badge-success">Printed</span>;
+        return <span className="pb-badge pb-badge-success">Completed</span>;
       case 'REJECTED':
         return <span className="pb-badge pb-badge-danger">Rejected</span>;
       case 'COMPLETION_UNKNOWN':
@@ -369,6 +369,29 @@ export const QueueView: React.FC<QueueViewProps> = ({
                         onClick={() => onRejectJob(job.id)}
                       >
                         <XCircle size={13} /> Reject Order
+                      </button>
+                      {job.file_data && (
+                        <a
+                          href={getFileViewUrl(job.file_data, job.file_name)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="pb-btn pb-btn-secondary pb-btn-sm"
+                          style={{ textDecoration: 'none' }}
+                        >
+                          <FileText size={13} /> View File
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  {job.status === 'PRINTING' && (
+                    <div className="pb-job-action-row">
+                      <button
+                        type="button"
+                        className="pb-btn pb-btn-success pb-btn-sm"
+                        onClick={() => onCompleteJob && onCompleteJob(job.id)}
+                      >
+                        <CheckCircle2 size={13} /> Mark Completed
                       </button>
                       {job.file_data && (
                         <a
