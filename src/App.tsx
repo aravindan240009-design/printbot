@@ -90,6 +90,16 @@ export const App: React.FC = () => {
     }
   }, [shouldRenderCustomerWeb]);
 
+  if (import.meta.env.VITE_PRINTBOT_TEST_MODE === 'true') {
+    return (
+      <Suspense fallback={<div role="status">Loading isolated test checkout…</div>}>
+        <CustomerWebApp
+          initialShopId={String(import.meta.env.VITE_PRINTBOT_TEST_SHOP_SLUG || 'test-print-shop')}
+        />
+      </Suspense>
+    );
+  }
+
   // Render Customer Web Platform if visiting a shop URL path or customer path
   if (shouldRenderCustomerWeb) {
     return (

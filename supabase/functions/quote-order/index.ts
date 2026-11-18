@@ -2,7 +2,7 @@ import {
   calculateQuote,
   normalizeQuoteOptions,
   type PricingRatesPaise,
-} from "./pricing.ts";
+} from "../_shared/pricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

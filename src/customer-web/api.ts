@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase, TEST_MODE } from './supabase';
 
 export interface ShopSession {
   session_token: string;
@@ -114,6 +114,169 @@ export interface PaymentIntent {
   amount_paise: number;
   currency: string;
   client_secret: string;
+  test_mode?: boolean;
+  customer_token?: string;
+}
+
+async function throwFunctionError(error: { message: string; context?: unknown }, operation: string): Promise<never> {
+  const response = error.context;
+  if (response instanceof Response) {
+    const body = await response.clone().json().catch(() => null) as { detail?: unknown } | null;
+    if (typeof body?.detail === 'string') throw new Error(body.detail);
+  }
+  throw new Error(`${operation}: ${error.message}`);
+}
+
+export async function createTestPaymentIntent(input: {
+  shopSlug: string;
+  file: File;
+  pageCount: number;
+  options: CreateOrderPayload['options'];
+  expectedTotalPaise: number;
+}): Promise<PaymentIntent> {
+  if (!TEST_MODE) throw new Error('Test payment checkout is disabled in this build.');
+  if (!input.file || input.file.size < 1 || input.file.size > 2_621_440) {
+    throw new Error('Test documents must be no larger than 2.5 MB.');
+  }
+  const extension = input.file.name.split('.').pop()?.toLowerCase();
+  const mimeType = input.file.type || (
+    extension === 'pdf' ? 'application/pdf' :
+      extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' :
+        extension === 'png' ? 'image/png' : ''
+  );
+  if (!['application/pdf', 'image/jpeg', 'image/png'].includes(mimeType)) {
+    throw new Error('Only PDF, JPG, and PNG test documents are supported.');
+  }
+
+  const customerToken = `${crypto.randomUUID()}${crypto.randomUUID()}`;
+  const { data: createdOrder, error: createError } = await supabase.functions.invoke<{
+    order_id: string;
+    customer_token: string;
+    document_path: string;
+    upload_token: string;
+    amount_paise: number;
+    currency: string;
+  }>('test-create-order', {
+    body: {
+      shop_slug: input.shopSlug,
+      idempotency_key: crypto.randomUUID(),
+      customer_token: customerToken,
+      file_name: input.file.name,
+      file_mime_type: mimeType,
+      file_size_bytes: input.file.size,
+      page_count: input.pageCount,
+      options: input.options,
+    },
+  });
+  if (createError) await throwFunctionError(createError, 'Could not create the test order');
+  if (
+    !createdOrder ||
+    !createdOrder.order_id ||
+    !createdOrder.document_path ||
+    !createdOrder.upload_token ||
+    !Number.isSafeInteger(createdOrder.amount_paise)
+  ) {
+    throw new Error('The staging backend returned an invalid test order.');
+  }
+  if (createdOrder.amount_paise !== input.expectedTotalPaise) {
+    throw new Error('The server price changed. No payment was started; please refresh the price and try again.');
+  }
+
+  const { error: uploadError } = await supabase.storage
+    .from('printbot-test-documents')
+    .uploadToSignedUrl(createdOrder.document_path, createdOrder.upload_token, input.file, {
+      contentType: mimeType,
+      upsert: false,
+    });
+  if (uploadError) throw new Error(`Could not upload the private test document: ${uploadError.message}`);
+
+  const { error: confirmError } = await supabase.functions.invoke('test-confirm-upload', {
+    body: { order_id: createdOrder.order_id, customer_token: customerToken },
+  });
+  if (confirmError) await throwFunctionError(confirmError, 'Could not confirm the test document');
+
+  const { data: paymentOrder, error: paymentOrderError } = await supabase.functions.invoke<{
+    key_id: string;
+    razorpay_order_id: string;
+    amount_paise: number;
+    currency: string;
+    test_mode: true;
+  }>('test-create-payment-order', {
+    body: { order_id: createdOrder.order_id, customer_token: customerToken },
+  });
+  if (paymentOrderError) await throwFunctionError(paymentOrderError, 'Could not prepare Razorpay Test Mode');
+  if (
+    !paymentOrder ||
+    paymentOrder.test_mode !== true ||
+    typeof paymentOrder.key_id !== 'string' ||
+    !paymentOrder.key_id.startsWith('rzp_test_') ||
+    typeof paymentOrder.razorpay_order_id !== 'string' ||
+    !paymentOrder.razorpay_order_id ||
+    paymentOrder.amount_paise !== createdOrder.amount_paise ||
+    paymentOrder.currency !== createdOrder.currency
+  ) {
+    throw new Error('The staging backend returned an invalid Razorpay test order.');
+  }
+
+  return {
+    provider: 'RAZORPAY',
+    payment_intent_id: paymentOrder.razorpay_order_id,
+    order_id: createdOrder.order_id,
+    shop_id: input.shopSlug,
+    amount_paise: paymentOrder.amount_paise,
+    currency: paymentOrder.currency,
+    client_secret: paymentOrder.key_id,
+    test_mode: true,
+    customer_token: customerToken,
+  };
+}
+
+export async function verifyTestPayment(
+  intent: PaymentIntent,
+  payment: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string },
+): Promise<void> {
+  if (!TEST_MODE || intent.test_mode !== true || !intent.customer_token) {
+    throw new Error('This payment is not associated with the isolated test checkout.');
+  }
+  const { data, error } = await supabase.functions.invoke<{ order_id: string; status: string }>(
+    'test-verify-payment',
+    {
+      body: {
+        order_id: intent.order_id,
+        customer_token: intent.customer_token,
+        ...payment,
+      },
+    },
+  );
+  if (error) await throwFunctionError(error, 'Razorpay test payment could not be verified');
+  if (!data || data.order_id !== intent.order_id || data.status !== 'PAID') {
+    throw new Error('The server has not confirmed this Razorpay test payment.');
+  }
+}
+
+export async function getTestShopProfile(shopSlug: string): Promise<{
+  id: string;
+  slug: string;
+  name: string;
+  city: string;
+  contact_phone: string;
+  rates: Record<string, unknown>;
+}> {
+  if (!TEST_MODE) throw new Error('Test shop profiles are unavailable in this build.');
+  const { data, error } = await supabase.functions.invoke<{
+    id: string;
+    slug: string;
+    name: string;
+    city: string;
+    contact_phone: string;
+    rates: Record<string, unknown>;
+    test_mode: boolean;
+  }>(`test-shop-profile?slug=${encodeURIComponent(shopSlug)}`, { method: 'GET' });
+  if (error) await throwFunctionError(error, 'Could not load the test shop');
+  if (!data || data.test_mode !== true || data.slug !== shopSlug || !data.id) {
+    throw new Error('The staging backend returned an invalid test shop profile.');
+  }
+  return data;
 }
 
 export async function createOrder(payload: CreateOrderPayload, token?: string, shopId?: string): Promise<any> {

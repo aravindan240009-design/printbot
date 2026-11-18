@@ -16,8 +16,10 @@ playwright-report/
 out/
 build/
 dist/
+dist-staging/
 dist-ssr/
 target/
+apps/desktop/dist-test/
 .tools/
 .phase0-local/
 .local-evidence/

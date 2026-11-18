@@ -7,15 +7,20 @@ use sha2::{Digest, Sha256};
 use tauri::{Manager, State};
 
 mod journal;
+#[cfg(not(feature = "test-mode"))]
 mod printers;
 mod workstation;
 
 use journal::SpoolJournal;
+#[cfg(not(feature = "test-mode"))]
 use printers::{
     discover_printers, prepare_spool_job, submit_rendered_pages_to_windows_printer, DuplexMode,
     SpoolReceipt,
 };
-use workstation::{JournalEntry, PrintRequest, PrinterInfo};
+use workstation::PrinterInfo;
+use workstation::JournalEntry;
+#[cfg(not(feature = "test-mode"))]
+use workstation::PrintRequest;
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 pub struct DeviceTokenClaims {
@@ -113,6 +118,7 @@ struct WorkstationState {
     journal: Arc<SpoolJournal>,
 }
 
+#[cfg(not(feature = "test-mode"))]
 #[tauri::command]
 fn get_system_printers(state: State<'_, WorkstationState>) -> Result<Vec<PrinterInfo>, String> {
     let bound = state.bound_shop_id.lock().map_err(|e| e.to_string())?;
@@ -177,6 +183,7 @@ fn bind_workstation(
     Ok(format!("Workstation successfully verified and bound to shop {shop_id} for device {device_id}"))
 }
 
+#[cfg(not(feature = "test-mode"))]
 #[tauri::command]
 fn prepare_print_job(
     request: PrintRequest,
@@ -237,6 +244,7 @@ fn mark_spool_unknown(
     state.journal.mark_unknown(&job_id, &reason)
 }
 
+#[cfg(not(feature = "test-mode"))]
 #[derive(serde::Deserialize)]
 pub struct NativePrintPayload {
     pub job_id: String,
@@ -250,6 +258,7 @@ pub struct NativePrintPayload {
     pub duplex_mode: DuplexMode,
 }
 
+#[cfg(not(feature = "test-mode"))]
 #[derive(serde::Serialize)]
 pub struct NativePrintResult {
     pub success: bool,
@@ -258,6 +267,7 @@ pub struct NativePrintResult {
     pub message: String,
 }
 
+#[cfg(not(feature = "test-mode"))]
 fn document_file_extension(file_bytes: &[u8]) -> Option<&'static str> {
     if file_bytes.starts_with(b"%PDF-") {
         Some("pdf")
@@ -270,6 +280,7 @@ fn document_file_extension(file_bytes: &[u8]) -> Option<&'static str> {
     }
 }
 
+#[cfg(not(feature = "test-mode"))]
 fn validate_native_print_payload(
     file_bytes: &[u8],
     rendered_pages: &[Vec<u8>],
@@ -296,6 +307,7 @@ fn validate_native_print_payload(
     Ok(())
 }
 
+#[cfg(not(feature = "test-mode"))]
 fn validate_duplex_support(duplex_mode: DuplexMode, supports_duplex: bool) -> Result<(), String> {
     if duplex_mode != DuplexMode::Simplex && !supports_duplex {
         return Err(
@@ -306,6 +318,7 @@ fn validate_duplex_support(duplex_mode: DuplexMode, supports_duplex: bool) -> Re
     Ok(())
 }
 
+#[cfg(not(feature = "test-mode"))]
 #[tauri::command]
 fn print_to_native_hardware(
     payload: NativePrintPayload,
@@ -368,6 +381,19 @@ fn print_to_native_hardware(
     })
 }
 
+#[cfg(feature = "test-mode")]
+#[tauri::command]
+fn get_system_printers() -> Result<Vec<PrinterInfo>, String> {
+    Err("Printer discovery is disabled in this test build.".into())
+}
+
+#[cfg(feature = "test-mode")]
+#[tauri::command]
+fn print_to_native_hardware(_payload: serde_json::Value) -> Result<(), String> {
+    Err("Printing is disabled in this test build.".into())
+}
+
+#[cfg(not(feature = "test-mode"))]
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
@@ -400,7 +426,18 @@ fn main() {
         .expect("error while running tauri application");
 }
 
-#[cfg(test)]
+#[cfg(feature = "test-mode")]
+fn main() {
+    tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![
+            get_system_printers,
+            print_to_native_hardware
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running test workstation");
+}
+
+#[cfg(all(test, not(feature = "test-mode")))]
 mod tests {
     use super::{document_file_extension, validate_duplex_support, validate_native_print_payload};
     use crate::printers::DuplexMode;
@@ -463,5 +500,20 @@ mod tests {
             serde_json::from_str::<DuplexMode>("\"duplex\"").unwrap(),
             DuplexMode::DuplexLong
         );
+    }
+}
+
+#[cfg(all(test, feature = "test-mode"))]
+mod test_mode_tests {
+    use super::{get_system_printers, print_to_native_hardware};
+
+    #[test]
+    fn printer_discovery_is_disabled() {
+        assert!(get_system_printers().is_err());
+    }
+
+    #[test]
+    fn native_printing_is_disabled() {
+        assert!(print_to_native_hardware(serde_json::Value::Null).is_err());
     }
 }

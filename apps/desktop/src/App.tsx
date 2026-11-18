@@ -48,7 +48,8 @@ import {
 } from 'lucide-react';
 import { ThemeProvider, ThemeSwitch, MotionSurface, PaperScene, PrinterScene, useGsapStagger } from '@xerox/ui';
 import { discoverPrinters, bindWorkstation, getWorkstationDeviceIdentity, printToHardware, readSpoolFile, type NativePrinterInfo, type WorkstationDeviceIdentity } from './native';
-import { supabase } from './supabase';
+import { supabase, TEST_MODE } from './supabase';
+import TestWorkstation from './TestWorkstation';
 import QRCode from 'qrcode';
 import { DesktopShell, type Tab } from './components/DesktopShell';
 import { LockScreen } from './components/LockScreen';
@@ -329,7 +330,7 @@ function Dialog({
   );
 }
 
-export default function App() {
+function ProductionApp() {
   const [deviceIdentity, setDeviceIdentity] = useState<WorkstationDeviceIdentity | null>(null);
 
   useEffect(() => {
@@ -877,6 +878,7 @@ export default function App() {
               !a.shopName?.includes('Balaji Photocopy')
           );
         }
+
       }
     } catch {}
     return [];
@@ -2856,4 +2858,8 @@ export default function App() {
       )}
     </DesktopShell>
   );
+}
+
+export default function App() {
+  return TEST_MODE ? <TestWorkstation /> : <ProductionApp />;
 }

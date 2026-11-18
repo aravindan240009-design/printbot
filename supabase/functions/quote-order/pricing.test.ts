@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateQuote, normalizeQuoteOptions, type PricingRatesPaise } from "./pricing.ts";
+import { calculateQuote, normalizeQuoteOptions, type PricingRatesPaise } from "../_shared/pricing.ts";
 
 const defaultRates: PricingRatesPaise = {
   bw_per_side_paise: 150,

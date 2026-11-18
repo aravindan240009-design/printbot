@@ -13,6 +13,7 @@ interface FileUploadZoneProps {
   onReorderFiles: (fromIndex: number, toIndex: number) => void;
   onClearAll: () => void;
   onPromptPasswordUnlock: (fileId: string) => void;
+  testMode?: boolean;
   t: TranslationKeys;
 }
 
@@ -25,6 +26,7 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
   onReorderFiles,
   onClearAll,
   onPromptPasswordUnlock,
+  testMode = false,
   t,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -37,10 +39,11 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
     setIsProcessing(true);
 
     const accepted: DocumentItem[] = [];
-    const validExtensions = /\.(pdf|png|jpe?g|docx|xlsx|pptx)$/i;
+    const validExtensions = testMode ? /\.(pdf|png|jpe?g)$/i : /\.(pdf|png|jpe?g|docx|xlsx|pptx)$/i;
 
     for (const file of Array.from(fileList)) {
-      if (!validExtensions.test(file.name) || file.size > 100 * 1024 * 1024 || file.size === 0) {
+      const maxBytes = testMode ? 2_621_440 : 100 * 1024 * 1024;
+      if (!validExtensions.test(file.name) || file.size > maxBytes || file.size === 0) {
         continue;
       }
 

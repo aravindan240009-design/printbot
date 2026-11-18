@@ -4,6 +4,10 @@ version = "1.0.0"
 description = "Print Bot Multi-Tenant Print Shop SaaS Windows Desktop Workstation"
 edition = "2021"
 
+[features]
+default = []
+test-mode = []
+
 [[bin]]
 name = "print-bot"
 path = "src/main.rs"

@@ -1,0 +1,31 @@
+project_id = "smlgvtplfifnryhkqspv"
+
+[functions.quote-order]
+verify_jwt = true
+
+[functions.test-shop-profile]
+verify_jwt = true
+
+[functions.test-create-order]
+verify_jwt = true
+
+[functions.test-confirm-upload]
+verify_jwt = true
+
+[functions.test-create-payment-order]
+verify_jwt = true
+
+[functions.test-verify-payment]
+verify_jwt = true
+
+[functions.test-razorpay-webhook]
+verify_jwt = false
+
+[functions.test-workstation-orders]
+verify_jwt = true
+
+[functions.test-workstation-document]
+verify_jwt = true
+
+[functions.test-cleanup]
+verify_jwt = true

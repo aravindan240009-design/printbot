@@ -1,3 +1,4 @@
+// Shared calculation contract for the existing quote function and isolated test checkout.
 export interface QuoteOptions {
   copies: number;
   color_mode: "bw" | "color" | "grayscale";

@@ -41,6 +41,11 @@ interface CheckoutViewProps {
     customerPhone: string;
     notes: string;
   }) => Promise<PaymentIntent>;
+  onVerifyTestPayment: (
+    intent: PaymentIntent,
+    payment: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string },
+  ) => Promise<void>;
+  testMode: boolean;
   onConfirmOrder: (orderDetails: {
     customerName: string;
     customerPhone: string;
@@ -60,6 +65,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   quoteError,
   session,
   onPreparePaymentOrder,
+  onVerifyTestPayment,
+  testMode,
   onConfirmOrder,
   onBack,
   t,
@@ -108,15 +115,31 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
       description: `Print Order (${quote?.total_physical_sheets || 1} Sheets / ₹${amount})`,
       image: '/favicon.svg',
       handler: function (response: any) {
-        setIsProcessingPayment(false);
-        onConfirmOrder({
-          customerName: customerName.trim(),
-          customerPhone: customerPhone.trim(),
-          notes: notes.trim(),
-          paymentMethod: 'upi',
-          paymentId: response.razorpay_payment_id,
-          orderId: paymentIntent.order_id,
-        });
+        void (async () => {
+          if (paymentIntent.test_mode) {
+            try {
+              await onVerifyTestPayment(paymentIntent, {
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+              });
+            } catch (error) {
+              console.error('Razorpay test payment verification failed:', error);
+              alert(error instanceof Error ? error.message : 'The server could not verify this test payment.');
+              setIsProcessingPayment(false);
+              return;
+            }
+          }
+          setIsProcessingPayment(false);
+          onConfirmOrder({
+            customerName: customerName.trim(),
+            customerPhone: customerPhone.trim(),
+            notes: notes.trim(),
+            paymentMethod: 'upi',
+            paymentId: response.razorpay_payment_id,
+            orderId: paymentIntent.order_id,
+          });
+        })();
       },
       prefill: {
         name: customerName.trim() || undefined,
@@ -185,6 +208,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
         </p>
       )}
       {quoteStatus === 'error' && <p role="alert" style={{ color: 'var(--pb-danger)' }}>{quoteError}</p>}
+      {testMode && (
+        <p role="status" style={{ padding: '12px 16px', background: '#fff7ed', color: '#9a3412', borderRadius: 10 }}>
+          TEST MODE — Razorpay test payments only. Orders are visible only in the isolated test workstation; printing is disabled.
+        </p>
+      )}
       {files.length !== 1 && (
         <p role="alert" style={{ color: 'var(--pb-danger)' }}>
           Checkout currently accepts one document per order. Remove the other documents and checkout them separately.
@@ -328,7 +356,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
             </span>
           </button>
 
-          <button
+          {!testMode && <button
             type="button"
             className={`pb-pill-choice ${paymentMethod === 'cash' ? 'active' : ''}`}
             onClick={() => setPaymentMethod('cash')}
@@ -341,7 +369,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
             <span className="pb-pill-subtext" style={{ textAlign: 'left', marginTop: '4px' }}>
               {t.payCashSubtitle}
             </span>
-          </button>
+          </button>}
         </div>
 
         {/* Razorpay Online Gateway Card (QR Completely Removed) */}
@@ -395,7 +423,9 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                 lineHeight: 1.5,
               }}
             >
-              Fast and automated verification. Instant dispatch to workstation queue with live progress tracking.
+              {testMode
+                ? 'Razorpay Test Mode only. The server verifies payment before the order appears in the test workstation. Printing is disabled.'
+                : 'Fast and automated verification. Instant dispatch to workstation queue with live progress tracking.'}
             </p>
 
             <div
