@@ -88,20 +88,8 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
 
   // Dynamically resolve shop slug from props, URL path route, or query parameter
   const resolvedSlug = useMemo(() => initialShopId?.trim().toLowerCase() || resolveShopSlugFromUrl(), [initialShopId]);
-  const [session, setSession] = useState<ShopSession>(() => {
-    if (resolvedSlug) {
-      const clean = resolvedSlug.toLowerCase();
-      const fallbackTitle =
-        clean.charAt(0).toUpperCase() + clean.slice(1) + ' Print & Xerox Stand';
-      return {
-        ...defaultShopSession,
-        shop_id: clean,
-        shop_slug: clean,
-        shop_name: fallbackTitle,
-      };
-    }
-    return defaultShopSession;
-  });
+  const [session, setSession] = useState<ShopSession>(defaultShopSession);
+  const [isResolvingShop, setIsResolvingShop] = useState<boolean>(Boolean(resolvedSlug));
   const [orders, setOrders] = useState<PlacedOrder[]>([]);
   const [activeOrder, setActiveOrder] = useState<PlacedOrder | null>(null);
   const [unlockingFileId, setUnlockingFileId] = useState<string | null>(null);
@@ -141,7 +129,17 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
     let unsubRealtime: (() => void) | undefined;
 
     loadShopProfile(resolvedSlug).then((profile) => {
+      if (!profile) {
+        // Active shop does not exist in Supabase!
+        // Immediately reload/redirect to main commercial website as requested
+        if (onBackToHome) {
+          onBackToHome();
+        }
+        window.location.replace('/');
+        return;
+      }
       setSession(profile);
+      setIsResolvingShop(false);
       document.title = `${profile.shop_name} • Touchless Print Counter`;
     });
 
@@ -615,6 +613,39 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
   };
 
   const unlockingFile = files.find((f) => f.id === unlockingFileId);
+
+  if (isResolvingShop) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '14px',
+          background: '#f8fafc',
+          color: '#64748b',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+        }}
+      >
+        <div
+          style={{
+            width: '34px',
+            height: '34px',
+            border: '3px solid #e2e8f0',
+            borderTopColor: '#2563eb',
+            borderRadius: '50%',
+            animation: 'pbSpin 0.75s linear infinite',
+          }}
+        />
+        <span style={{ fontSize: '13.5px', fontWeight: 650, color: '#334155' }}>
+          Verifying Active Shop Station...
+        </span>
+        <style>{`@keyframes pbSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
   return (
     <div className="pb-app-shell">

@@ -72,7 +72,7 @@ export const App: React.FC = () => {
     currentPath.startsWith('/s/');
 
   const shouldRenderCustomerWeb = Boolean(detectedShopSlug) || isCustomerExplicitPath;
-  const activeShopSlug = detectedShopSlug || 'testcase';
+  const activeShopSlug = detectedShopSlug || '';
   const mainRef = useRef<HTMLElement>(null);
   const enablePageReveals = !shouldRenderCustomerWeb && currentPath !== '/';
   useScrollReveal(mainRef, currentPath, enablePageReveals, enablePageReveals);

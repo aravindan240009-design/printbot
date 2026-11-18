@@ -165,8 +165,10 @@ interface StationLicenseMutationResult {
 export interface PilotApplication {
   id: string;
   shopName: string;
+  ownerName?: string;
   city: string;
   contactNumber: string;
+  email?: string;
   plan: '1 Month' | '1 Year' | 'Lifetime Commercial' | string;
   appliedAt: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -177,11 +179,19 @@ export interface PilotApplication {
 }
 
 export function mapSupabaseRowToApp(row: any): PilotApplication {
+  let parsedNotes: any = {};
+  if (row.notes) {
+    try {
+      parsedNotes = typeof row.notes === 'string' ? JSON.parse(row.notes) : row.notes;
+    } catch {}
+  }
   return {
     id: row.id,
     shopName: row.shop_name || 'Unnamed Shop',
+    ownerName: parsedNotes.ownerName || undefined,
     city: row.city || '',
     contactNumber: row.contact_number || '',
+    email: parsedNotes.email || undefined,
     plan: row.plan || '1 Year',
     appliedAt: row.applied_at || new Date().toISOString(),
     status: (row.status as 'PENDING' | 'APPROVED' | 'REJECTED') || 'PENDING',

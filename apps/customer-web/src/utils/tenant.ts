@@ -67,36 +67,16 @@ export function resolveShopSlugFromUrl(): string | null {
  * Loads customized shop details, rates, and operating settings from Supabase.
  * If the shop cannot be found or the network is offline, generates a clean fallback.
  */
-export async function loadShopProfile(slug: string): Promise<ShopSession> {
+export async function loadShopProfile(slug: string): Promise<ShopSession | null> {
   const cleanId = slug.toLowerCase().trim();
 
-  // Fallback defaults
-  const fallbackName =
-    cleanId.charAt(0).toUpperCase() + cleanId.slice(1) + ' Print & Xerox Stand';
-
-  const defaultResult: ShopSession = {
-    session_token: `sess_${cleanId}_${Date.now()}`,
-    shop_id: cleanId,
-    shop_name: fallbackName,
-    shop_slug: cleanId,
-    shop_address: 'Local Counter Stand',
-    shop_phone: '',
-    operating_hours: '08:00 AM – 09:30 PM (Mon–Sat)',
-    rates: {
-      bwPerSideRupees: 1.5,
-      colorPerSideRupees: 10.0,
-      duplexDiscountPercent: 15,
-    },
-    orderMode: 'FULL_AUTOMATIC',
-    expires_at: new Date(Date.now() + 86400000).toISOString(),
-  };
-
   try {
-    // 1. Direct match by generated_username or shop_name in Supabase pilot_applications
+    // 1. Direct match by generated_username or shop_name in Supabase pilot_applications (Only APPROVED & active shops)
     const { data, error } = await supabase
       .from('pilot_applications')
       .select('id, shop_name, city, contact_number, plan, notes, generated_username, status')
       .or(`generated_username.ilike.${cleanId},shop_name.ilike.${cleanId}`)
+      .eq('status', 'APPROVED')
       .maybeSingle();
 
     let appData = data;
@@ -122,7 +102,7 @@ export async function loadShopProfile(slug: string): Promise<ShopSession> {
       }
     }
 
-    if (appData) {
+    if (appData && appData.status === 'APPROVED') {
       let customBw = 1.5;
       let customColor = 10.0;
       let customDuplex = 15;
@@ -159,7 +139,7 @@ export async function loadShopProfile(slug: string): Promise<ShopSession> {
       return {
         session_token: `sess_${appData.generated_username || cleanId}`,
         shop_id: appData.id || appData.generated_username || cleanId,
-        shop_name: appData.shop_name || fallbackName,
+        shop_name: appData.shop_name || cleanId,
         shop_slug: cleanId,
         shop_address: appData.city ? `${appData.city} Counter Stand` : 'Local Counter Station',
         shop_phone: appData.contact_number || '',
@@ -183,7 +163,8 @@ export async function loadShopProfile(slug: string): Promise<ShopSession> {
     console.warn(`Could not load cloud profile for shop ${slug}:`, err);
   }
 
-  return defaultResult;
+  // Not an active approved shop in Supabase!
+  return null;
 }
 
 /**

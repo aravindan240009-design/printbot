@@ -335,6 +335,7 @@ interface IssuedCredsModalProps {
     username: string;
     key: string;
     phone: string;
+    email?: string;
     duration: string;
     expiry: string;
   };
@@ -347,8 +348,10 @@ export const IssuedCredsModal: React.FC<IssuedCredsModalProps> = ({
   onClose,
   onCopyNotice,
 }) => {
-  const whatsappUrl = `https://wa.me/91${data.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
-    `Hello *${data.shopName}*! 👋\n\nYour Print Bot Workstation access is approved.\n\n*Your Login Credentials:*\n🔑 *Username:* ${data.username}\n🛡️ *License Key:* ${data.key}\n📅 *Plan:* ${data.duration} (Unlimited Connected Printers)\n\nLaunch Print Bot Workstation software and enter your Username & Key to get started!`
+  const mailtoUrl = `mailto:${data.email || ''}?subject=${encodeURIComponent(
+    `Your Print Bot Workstation Credentials - ${data.shopName}`
+  )}&body=${encodeURIComponent(
+    `Hello ${data.shopName}!\n\nYour Print Bot Workstation access is approved.\n\nHere are your workstation credentials:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Username: ${data.username}\n🔑 License Key: ${data.key}\n📅 Plan: ${data.duration}\n📅 Valid Until: ${data.expiry}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nHow to get started:\n1. Open Print Bot on your counter PC.\n2. Enter your Username & License Key.\n3. Your workstation will automatically pair to your printer fleet!\n\nSupport: support@printbot.in`
   )}`;
 
   const fullText = `Print Bot Workstation Access Approved\nShop: ${data.shopName}\nUsername: ${data.username}\nLicense Key: ${data.key}\nPlan: ${data.duration}\nValid until: ${data.expiry}`;
@@ -412,13 +415,11 @@ export const IssuedCredsModal: React.FC<IssuedCredsModalProps> = ({
 
         <div className="pb-modal-footer">
           <a
-            href={whatsappUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+            href={mailtoUrl}
             className="pb-btn pb-btn-primary"
-            style={{ textDecoration: 'none' }}
+            style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
           >
-            <Send size={14} /> Send WhatsApp (+91 {data.phone})
+            <Mail size={14} /> Send Credentials to Email
           </a>
           <button
             type="button"

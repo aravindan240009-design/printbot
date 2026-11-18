@@ -42,8 +42,10 @@ import { type PrintJob } from '../App';
 export interface PilotApplication {
   id: string;
   shopName: string;
+  ownerName?: string;
   city: string;
   contactNumber: string;
+  email?: string;
   plan: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   appliedAt: string;
@@ -571,7 +573,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  {filteredApplications.map((app) => (
+                  {filteredApplications.map((app) => {
+                    const parsedNotes = (() => {
+                      try {
+                        return app.notes ? (typeof app.notes === 'string' ? JSON.parse(app.notes) : app.notes) : {};
+                      } catch {
+                        return {};
+                      }
+                    })();
+                    const appEmail = app.email || parsedNotes.email || (app.generatedUsername ? licenses[app.generatedUsername]?.email : '') || '';
+
+                    return (
                     <div
                       key={app.id}
                       className={`pb-admin-card ${app.status === 'PENDING' ? 'pb-admin-card-pending' : ''}`}
@@ -654,17 +666,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                             <Phone size={13} color="#2563eb" />
                             <span>{app.contactNumber || 'Contact not specified'}</span>
                           </div>
-                          {app.contactNumber && (
-                            <a
-                              href={`https://wa.me/91${app.contactNumber.replace(/^\+?91\s*/, '').replace(/\D/g, '')}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="pb-btn pb-btn-secondary pb-btn-sm"
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', marginTop: '4px', textDecoration: 'none' }}
-                            >
-                              <Send size={12} color="#16a34a" />
-                              <span>Chat on WhatsApp</span>
-                            </a>
+                          {appEmail && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
+                              <Mail size={13} color="#059669" />
+                              <span style={{ color: '#0f172a', fontWeight: 600 }}>{appEmail}</span>
+                            </div>
                           )}
                         </div>
 
@@ -720,19 +726,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                                   </button>
                                 </div>
                               </div>
-                              {app.contactNumber && (
-                                <a
-                                  href={`https://wa.me/91${app.contactNumber.replace(/^\+?91\s*/, '').replace(/\D/g, '')}?text=${encodeURIComponent(
-                                    `Hello *${app.shopName}*! 🎉\n\nYour Print Bot Workstation access is approved.\n\n*Your Credentials:*\n👤 Username: ${app.generatedUsername}\n🔑 License Key: ${app.generatedKey}\n📅 Plan: ${app.plan}\n\nOpen Print Bot software on your counter PC and enter these credentials to start printing!`
-                                  )}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="pb-btn pb-btn-primary pb-btn-sm"
-                                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '11.5px', marginTop: '6px', textDecoration: 'none' }}
-                                >
-                                  <Send size={12} /> Send Credentials on WhatsApp
-                                </a>
-                              )}
+                              <a
+                                href={`mailto:${appEmail}?subject=${encodeURIComponent(
+                                  `Your Print Bot Workstation Credentials - ${app.shopName}`
+                                )}&body=${encodeURIComponent(
+                                  `Hello ${app.shopName}!\n\nYour Print Bot Workstation access is approved.\n\nHere are your workstation credentials:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Username: ${app.generatedUsername}\n🔑 License Key: ${app.generatedKey}\n📅 Plan: ${app.plan}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nHow to get started:\n1. Open Print Bot software on your counter PC.\n2. Enter your Username & License Key.\n3. Your workstation will automatically pair to your connected printers!\n\nSupport: support@printbot.in`
+                                )}`}
+                                className="pb-btn pb-btn-primary pb-btn-sm"
+                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '11.5px', marginTop: '6px', textDecoration: 'none' }}
+                              >
+                                <Mail size={12} /> Send Credentials to Email
+                              </a>
                             </>
                           ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -757,7 +761,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1870,19 +1875,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {issuedCredsModal.phone && (
-                <a
-                  href={`https://wa.me/91${issuedCredsModal.phone.replace(/^\+?91\s*/, '').replace(/\D/g, '')}?text=${encodeURIComponent(
-                    `Hello *${issuedCredsModal.shopName}*! 🎉\n\nYour Print Bot Workstation access is approved.\n\n*Your Login Credentials:*\n👤 *Username:* ${issuedCredsModal.username}\n🔑 *License Key:* ${issuedCredsModal.key}\n📅 *Plan:* ${issuedCredsModal.duration}\n\nLaunch Print Bot Workstation software and enter your Username & Key to unlock your counter!`
-                  )}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="pb-btn pb-btn-primary"
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', textDecoration: 'none', height: '40px', fontSize: '13px' }}
-                >
-                  <Send size={15} /> Send Credentials via WhatsApp
-                </a>
-              )}
+              <a
+                href={`mailto:${issuedCredsModal.email || ''}?subject=${encodeURIComponent(
+                  `Your Print Bot Workstation Credentials - ${issuedCredsModal.shopName}`
+                )}&body=${encodeURIComponent(
+                  `Hello ${issuedCredsModal.shopName}!\n\nYour Print Bot Workstation access is approved.\n\nHere are your workstation credentials:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Username: ${issuedCredsModal.username}\n🔑 License Key: ${issuedCredsModal.key}\n📅 Plan: ${issuedCredsModal.duration}\n📅 Valid Until: ${issuedCredsModal.expiry}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nHow to get started:\n1. Open Print Bot software on your counter PC.\n2. Enter your Username & License Key.\n3. Your workstation will automatically pair to your connected printers!\n\nSupport: support@printbot.in`
+                )}`}
+                className="pb-btn pb-btn-primary"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', textDecoration: 'none', height: '40px', fontSize: '13px' }}
+              >
+                <Mail size={15} /> Send Credentials to Email
+              </a>
 
               <button
                 type="button"
