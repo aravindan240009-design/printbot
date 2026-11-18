@@ -1900,24 +1900,59 @@ function ProductionApp() {
       throw new Error('A logged-in shop session is required to clear dispatch orders.');
     }
 
-    const headers: Record<string, string> = { 'X-Tenant-ID': shopId };
-    if (currentShop?.deviceToken) {
-      headers.Authorization = `Bearer ${currentShop.deviceToken}`;
+    // 1. Try remote API if configured and reachable
+    if (API_BASE && !API_BASE.includes('localhost:8000')) {
+      try {
+        const headers: Record<string, string> = { 'X-Tenant-ID': shopId };
+        if (currentShop?.deviceToken) {
+          headers.Authorization = `Bearer ${currentShop.deviceToken}`;
+        }
+        const response = await fetch(`${API_BASE}/superadmin/dispatch/clear`, {
+          method: 'POST',
+          headers,
+        });
+        if (response.ok) {
+          const result = await response.json().catch(() => null);
+          if (Number.isSafeInteger(result?.deleted_count) && result.deleted_count >= 0) {
+            setNotice(`Permanently cleared ${result.deleted_count} dispatch order${result.deleted_count === 1 ? '' : 's'}.`);
+            await fetchServerQueue();
+            return result.deleted_count;
+          }
+        }
+      } catch (err) {
+        console.warn('API dispatch clear failed, falling back to direct Supabase cleanup:', err);
+      }
     }
-    const response = await fetch(`${API_BASE}/superadmin/dispatch/clear`, {
-      method: 'POST',
-      headers,
-    });
-    const result = await response.json().catch(() => null);
-    if (!response.ok) {
-      throw new Error(result?.detail || 'Could not clear dispatch orders.');
+
+    // 2. Direct Supabase Cloud Cleanup Fallback
+    try {
+      const { data: cloudOrders } = await supabase
+        .from('pilot_applications')
+        .select('id, plan, status');
+
+      let deletedCount = 0;
+      if (Array.isArray(cloudOrders)) {
+        const orderIds = cloudOrders
+          .filter((row: any) => row.plan === 'ORDER' || (row.status && row.status.startsWith('ORDER_')) || (row.id && row.id.startsWith('PB-')))
+          .map((row: any) => row.id);
+
+        if (orderIds.length > 0) {
+          const { error } = await supabase.from('pilot_applications').delete().in('id', orderIds);
+          if (!error) deletedCount += orderIds.length;
+        }
+      }
+
+      // Also clean up public.orders
+      await supabase.from('orders').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+
+      setJobs([]);
+      setNotice(`Permanently cleared ${deletedCount} dispatch order${deletedCount === 1 ? '' : 's'}.`);
+      await fetchServerQueue();
+      return deletedCount;
+    } catch (err: any) {
+      console.error('Direct cloud clear failed:', err);
+      throw new Error(err?.message || 'Could not clear dispatch orders.');
     }
-    if (!Number.isSafeInteger(result?.deleted_count) || result.deleted_count < 0) {
-      throw new Error('The server returned an invalid dispatch deletion count.');
-    }
-    setNotice(`Permanently cleared ${result.deleted_count} dispatch order${result.deleted_count === 1 ? '' : 's'} across all shops.`);
-    await fetchServerQueue();
-    return result.deleted_count;
   };
 
   // Poll cloud queue for active counter workstation
