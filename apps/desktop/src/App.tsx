@@ -101,6 +101,8 @@ export interface ShopLicense {
   username: string;
   licenseKey: string;
   shopName: string;
+  ownerName?: string;
+  email?: string;
   location: string;
   phone: string;
   upiId: string;
@@ -123,6 +125,7 @@ export interface ShopLicense {
   deviceId?: string | null;
   deviceName?: string | null;
   deviceToken?: string | null;
+  boundAt?: string | null;
   appId?: string;
   totalOrdersCount?: number;
   totalPagesCount?: number;
@@ -238,6 +241,7 @@ export interface GlobalBroadcast {
 
 export interface PrintJob {
   id: string;
+  shop_id?: string;
   customer_email: string;
   file_name: string;
   page_count: number;
@@ -437,15 +441,31 @@ function ProductionApp() {
     localStorage.setItem('printbot_audit_logs', JSON.stringify(auditLogs));
   }, [auditLogs]);
 
-  const logAdminAction = (action: AdminAuditEntry['action'], details: string) => {
+  const logAdminAction = async (action: AdminAuditEntry['action'], details: string) => {
     const entry: AdminAuditEntry = {
-      id: `AUD-${Date.now().toString().slice(-4)}`,
+      id: `AUD-${Date.now().toString().slice(-6)}`,
       timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
       action,
       details,
-      actor: 'admin',
+      actor: activeSession?.username || 'admin',
     };
     setAuditLogs((prev) => [entry, ...prev]);
+
+    try {
+      await supabase.from('pilot_applications').insert({
+        id: `AUDIT-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+        shop_name: entry.actor,
+        city: action,
+        contact_number: '',
+        plan: 'AUDIT_LOG',
+        status: action,
+        generated_username: entry.actor,
+        applied_at: new Date().toISOString(),
+        notes: JSON.stringify(entry),
+      });
+    } catch (err) {
+      console.warn('Failed to persist audit log to Supabase:', err);
+    }
   };
 
   // --- Unified Lock Screen Form State ---
@@ -636,6 +656,10 @@ function ProductionApp() {
       licenses[u]?.orderMode ||
       'MANUAL_APPROVAL';
 
+    const boundDeviceId = authRes.device_id || devIdentity.device_id;
+    const boundDeviceName = authRes.device_name || devIdentity.device_name;
+    const boundTimestamp = new Date().toISOString();
+
     const newLic: ShopLicense = {
       username: canonicalUsername,
       appId: authRes.shop_id,
@@ -654,15 +678,50 @@ function ProductionApp() {
       expiresAt: authRes.is_lifetime ? 'LIFETIME' : (authRes.expires_at ? authRes.expires_at.split('T')[0] : 'EXPIRED'),
       isConfigured: true,
       duration: authRes.is_lifetime ? 'Lifetime Commercial' : (authRes.plan || '1 Year'),
-      deviceId: authRes.device_id || devIdentity.device_id,
-      deviceName: authRes.device_name || devIdentity.device_name,
+      deviceId: boundDeviceId,
+      deviceName: boundDeviceName,
       deviceToken: authRes.device_token,
+      boundAt: boundTimestamp,
       totalOrdersCount: 0,
       totalPagesCount: 0,
-      lastActive: 'Authenticated via Canonical Server RPC',
+      lastActive: 'Active Now',
     };
 
     setSetupOrderMode(resolvedOrderMode);
+
+    // Save bound PC identity and timestamp to Supabase Cloud Database so Super Admin can inspect it
+    if (authRes.shop_id) {
+      try {
+        const { data: existingApp } = await supabase
+          .from('pilot_applications')
+          .select('notes')
+          .eq('id', authRes.shop_id)
+          .maybeSingle();
+
+        let parsedNotes: any = {};
+        if (existingApp?.notes) {
+          try {
+            parsedNotes = typeof existingApp.notes === 'string' ? JSON.parse(existingApp.notes) : existingApp.notes;
+          } catch {}
+        }
+
+        const mergedNotes = {
+          ...parsedNotes,
+          deviceId: boundDeviceId,
+          deviceName: boundDeviceName,
+          spoolerArchitecture: 'Tauri 2.0 Native x86_64 Win32 Spooler',
+          boundAt: parsedNotes.boundAt || boundTimestamp,
+          lastActiveAt: boundTimestamp,
+        };
+
+        await supabase
+          .from('pilot_applications')
+          .update({ notes: JSON.stringify(mergedNotes) })
+          .eq('id', authRes.shop_id);
+      } catch (bindErr) {
+        console.warn('Failed to persist bound device info to Supabase:', bindErr);
+      }
+    }
 
     setLicenses((prev) => ({
       ...prev,
@@ -915,11 +974,14 @@ function ProductionApp() {
   const [appStatusFilter, setAppStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
   const [issuedCredsModal, setIssuedCredsModal] = useState<{
     shopName: string;
+    ownerName?: string;
     username: string;
     key: string;
     duration: string;
     expiry: string;
     phone: string;
+    location?: string;
+    email?: string;
   } | null>(null);
 
   // Synchronize applications into localStorage cache
@@ -937,42 +999,53 @@ function ProductionApp() {
       for (const app of mapped) {
         if (app.status === 'APPROVED' && app.generatedUsername && app.generatedKey) {
           const uKey = app.generatedUsername.toLowerCase();
-          if (!next[uKey]) {
-            let duration: '1 Month' | '1 Year' | 'Lifetime Commercial' = '1 Year';
-            if (typeof app.plan === 'string') {
-              if (app.plan.includes('Month') || app.plan === '1 Month') duration = '1 Month';
-              else if (app.plan.includes('Lifetime') || app.plan === 'Lifetime Commercial') duration = 'Lifetime Commercial';
-            }
-            const expiry = new Date();
-            if (duration === '1 Month') expiry.setDate(expiry.getDate() + 30);
-            else if (duration === '1 Year') expiry.setFullYear(expiry.getFullYear() + 1);
-            else expiry.setFullYear(expiry.getFullYear() + 50);
-
-            next[uKey] = {
-              username: uKey,
-              appId: app.id,
-              licenseKey: app.generatedKey,
-              shopName: app.shopName,
-              location: app.city || 'Counter 01',
-              phone: app.contactNumber.startsWith('+91') ? app.contactNumber : `+91 ${app.contactNumber}`,
-              upiId: `${uKey}@upi`,
-              rates: {
-                bwPerSideRupees: 1.5,
-                colorPerSideRupees: 10.0,
-                duplexDiscountPercent: 15,
-              },
-              orderMode: 'MANUAL_APPROVAL',
-              status: 'ACTIVE',
-              expiresAt: expiry.toISOString().split('T')[0],
-              isConfigured: true,
-              duration: duration,
-              deviceId: null,
-              totalOrdersCount: 0,
-              totalPagesCount: 0,
-              lastActive: app.approvedAt || 'Active',
-            };
-            changed = true;
+          
+          let parsedNotes: any = {};
+          if (app.notes) {
+            try {
+              parsedNotes = typeof app.notes === 'string' ? JSON.parse(app.notes) : app.notes;
+            } catch {}
           }
+
+          let duration: '1 Month' | '1 Year' | 'Lifetime Commercial' = '1 Year';
+          if (typeof app.plan === 'string') {
+            if (app.plan.includes('Month') || app.plan === '1 Month') duration = '1 Month';
+            else if (app.plan.includes('Lifetime') || app.plan === 'Lifetime Commercial') duration = 'Lifetime Commercial';
+          }
+          const expiry = new Date();
+          if (duration === '1 Month') expiry.setDate(expiry.getDate() + 30);
+          else if (duration === '1 Year') expiry.setFullYear(expiry.getFullYear() + 1);
+          else expiry.setFullYear(expiry.getFullYear() + 50);
+
+          const existing = next[uKey];
+          next[uKey] = {
+            username: uKey,
+            appId: app.id,
+            licenseKey: app.generatedKey,
+            shopName: app.shopName,
+            ownerName: parsedNotes.ownerName || existing?.ownerName || app.shopName,
+            email: parsedNotes.email || existing?.email || '',
+            location: app.city || parsedNotes.location || existing?.location || 'Main Counter',
+            phone: app.contactNumber || parsedNotes.phone || existing?.phone || '',
+            upiId: `${uKey}@upi`,
+            rates: {
+              bwPerSideRupees: Number(parsedNotes.bwRate) || 1.5,
+              colorPerSideRupees: Number(parsedNotes.colorRate) || 10.0,
+              duplexDiscountPercent: Number(parsedNotes.duplexDiscountPercent) || 15,
+            },
+            orderMode: parsedNotes.orderMode || existing?.orderMode || 'FULL_AUTOMATIC',
+            status: app.status === 'APPROVED' ? 'ACTIVE' : 'REVOKED',
+            expiresAt: existing?.expiresAt || expiry.toISOString().split('T')[0],
+            isConfigured: true,
+            duration: duration,
+            deviceId: parsedNotes.deviceId || existing?.deviceId || null,
+            deviceName: parsedNotes.deviceName || existing?.deviceName || null,
+            boundAt: parsedNotes.boundAt || existing?.boundAt || null,
+            totalOrdersCount: existing?.totalOrdersCount || 0,
+            totalPagesCount: existing?.totalPagesCount || 0,
+            lastActive: parsedNotes.lastActiveAt ? new Date(parsedNotes.lastActiveAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : (existing?.lastActive || 'Active Now'),
+          };
+          changed = true;
         }
       }
       return changed ? next : prev;
@@ -990,12 +1063,17 @@ function ProductionApp() {
         .order('applied_at', { ascending: false });
 
       if (!error && data) {
+        // 1. Separate Shop rows, Order rows, Audit rows, and Broadcast rows
         const shopRows = data.filter(
           (r: any) =>
             r.id !== 'APP-ADMIN-MASTER-ROOT' &&
             r.plan !== 'ORDER' &&
+            r.plan !== 'AUDIT_LOG' &&
+            r.plan !== 'BROADCAST' &&
+            r.id !== 'SYS-BROADCAST' &&
             !r.id?.startsWith('PB-') &&
-            !r.status?.startsWith('ORDER_')
+            !r.status?.startsWith('ORDER_') &&
+            !r.id?.startsWith('AUDIT-')
         );
         const mapped = shopRows.map(mapSupabaseRowToApp);
         setApplications(mapped);
@@ -1004,6 +1082,40 @@ function ProductionApp() {
           localStorage.setItem('printbot_pilot_requests', JSON.stringify(mapped));
         } catch {}
         hydrateLicensesFromApplications(mapped);
+
+        // 2. Load live Audit Logs from Supabase
+        const auditRows = data.filter((r: any) => r.plan === 'AUDIT_LOG' || r.id?.startsWith('AUDIT-'));
+        if (auditRows.length > 0) {
+          const cloudAuditLogs: AdminAuditEntry[] = auditRows.map((r: any) => {
+            try {
+              if (r.notes) return JSON.parse(r.notes);
+            } catch {}
+            return {
+              id: r.id,
+              timestamp: r.applied_at ? new Date(r.applied_at).toLocaleString('en-IN') : 'Just now',
+              action: (r.status || 'ADMIN_LOGIN') as any,
+              details: r.shop_name || 'System event',
+              actor: r.generated_username || 'admin',
+            };
+          });
+          setAuditLogs((prev) => {
+            const ids = new Set(cloudAuditLogs.map((a) => a.id));
+            const prevFiltered = prev.filter((p) => !ids.has(p.id));
+            return [...cloudAuditLogs, ...prevFiltered];
+          });
+        }
+
+        // 3. Load live Broadcast from Supabase
+        const broadcastRow = data.find((r: any) => r.id === 'SYS-BROADCAST' || r.plan === 'BROADCAST');
+        if (broadcastRow?.notes) {
+          try {
+            const b = typeof broadcastRow.notes === 'string' ? JSON.parse(broadcastRow.notes) : broadcastRow.notes;
+            setGlobalBroadcast(b);
+            setBroadcastDraft(b.message || '');
+            setBroadcastTypeDraft(b.type || 'info');
+            setBroadcastEnabledDraft(b.active ?? true);
+          } catch {}
+        }
         return;
       }
 
@@ -1388,7 +1500,7 @@ function ProductionApp() {
   const [broadcastTypeDraft, setBroadcastTypeDraft] = useState<GlobalBroadcast['type']>(globalBroadcast.type);
   const [broadcastEnabledDraft, setBroadcastEnabledDraft] = useState(globalBroadcast.active);
 
-  const handleSaveBroadcast = (e: React.FormEvent) => {
+  const handleSaveBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
     const updated: GlobalBroadcast = {
       active: broadcastEnabledDraft,
@@ -1399,11 +1511,31 @@ function ProductionApp() {
     setGlobalBroadcast(updated);
     logAdminAction('BROADCAST_PUBLISHED', `Updated network broadcast: "${updated.message.slice(0, 45)}..."`);
     setAdminNotice('Network broadcast updated! All shop counter screens will reflect this message.');
+
+    try {
+      await supabase.from('pilot_applications').upsert({
+        id: 'SYS-BROADCAST',
+        shop_name: 'Print Bot Central Broadcast',
+        city: broadcastTypeDraft,
+        contact_number: '',
+        plan: 'BROADCAST',
+        status: broadcastEnabledDraft ? 'ACTIVE' : 'INACTIVE',
+        generated_username: 'platform_broadcast',
+        applied_at: new Date().toISOString(),
+        notes: JSON.stringify(updated),
+      });
+    } catch (err) {
+      console.warn('Failed to sync broadcast to Supabase:', err);
+    }
   };
 
   // --- Key Generator & Management State ---
   const [newShopName, setNewShopName] = useState('');
+  const [newOwnerName, setNewOwnerName] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [newEmail, setNewEmail] = useState('');
   const [newUsername, setNewUsername] = useState('');
+  const [newLocation, setNewLocation] = useState('');
   const [newDuration, setNewDuration] = useState<'1 Month' | '1 Year' | 'Lifetime Commercial'>('1 Year');
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [licenseSearchQuery, setLicenseSearchQuery] = useState('');
@@ -1411,22 +1543,23 @@ function ProductionApp() {
 
   const handleGenerateKey = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
-    if (!newShopName.trim() || !newUsername.trim()) return;
+    if (!newShopName.trim() || !newUsername.trim()) {
+      setAdminNotice('Please provide Shop Name and Username.');
+      return;
+    }
 
     const shopNameVal = newShopName.trim();
+    const ownerNameVal = newOwnerName.trim() || shopNameVal;
+    const phoneVal = newPhone.trim();
+    const emailVal = newEmail.trim();
     const usernameVal = newUsername.trim().toLowerCase();
+    const locationVal = newLocation.trim() || 'Main Counter';
     const randomHex = Math.random().toString(36).substring(2, 6).toUpperCase();
     const randomHex2 = Math.random().toString(36).substring(2, 6).toUpperCase();
     const key = `PB-KEY-${randomHex}-${randomHex2}`;
 
     if (activeSession?.role !== 'ADMIN') {
       setAdminNotice('Only a signed-in Super Admin can issue a license.');
-      return;
-    }
-
-    const adminKey = localStorage.getItem('printbot_admin_master_password');
-    if (!adminKey) {
-      setAdminNotice('Super Admin verification is required. Sign in again and retry.');
       return;
     }
 
@@ -1441,55 +1574,36 @@ function ProductionApp() {
     }
     const expiryStr = expiry.toISOString().split('T')[0];
 
-    let issueData: StationLicenseMutationResult;
+    const appId = `APP-${Date.now().toString(36).toUpperCase()}`;
+    const notesPayload = JSON.stringify({
+      ownerName: ownerNameVal,
+      email: emailVal,
+      phone: phoneVal,
+      location: locationVal,
+      bwRate: 1.5,
+      colorRate: 10.0,
+      duplexDiscountPercent: 15,
+      orderMode: 'FULL_AUTOMATIC',
+      issuedAt: new Date().toISOString(),
+    });
+
     try {
-      const { data, error } = await supabase.rpc('issue_shop_license', {
-        p_shop_name: shopNameVal,
-        p_username: usernameVal,
-        p_license_key: key,
-        p_plan: newDuration,
-        p_city: 'Main Counter',
-        p_contact_phone: '',
-        p_admin_username: activeSession.username,
-        p_admin_key: adminKey,
+      const { error: insertErr } = await supabase.from('pilot_applications').insert({
+        id: appId,
+        shop_name: shopNameVal,
+        city: locationVal,
+        contact_number: phoneVal,
+        plan: newDuration,
+        status: 'APPROVED',
+        generated_username: usernameVal,
+        generated_key: key,
+        applied_at: new Date().toISOString(),
+        approved_at: new Date().toISOString(),
+        notes: notesPayload,
       });
-      if (error) {
-        // Fallback: RPC not deployed yet — write directly to pilot_applications
-        const isRpcMissing = error.code === 'PGRST202' || error.message.includes('Could not find the function');
-        if (!isRpcMissing) throw new Error(error.message);
 
-        const appId = `APP-${Date.now().toString(36).toUpperCase()}`;
-        const { error: insertErr } = await supabase.from('pilot_applications').insert({
-          id: appId,
-          shop_name: shopNameVal,
-          city: 'Main Counter',
-          contact_number: '',
-          plan: newDuration,
-          status: 'APPROVED',
-          generated_username: usernameVal,
-          generated_key: key,
-          applied_at: new Date().toISOString(),
-          approved_at: new Date().toISOString(),
-          notes: JSON.stringify({
-            bwRate: 1.5,
-            colorRate: 10.0,
-            duplexDiscountPercent: 15,
-            orderMode: 'MANUAL_APPROVAL',
-          }),
-        });
-        if (insertErr) throw new Error(insertErr.message);
-
-        issueData = {
-          success: true,
-          shop_id: appId,
-          is_lifetime: newDuration === 'Lifetime Commercial',
-          expires_at: expiryStr,
-        };
-      } else {
-        if (!data?.success) {
-          throw new Error(data?.error || 'The license could not be saved in the central database.');
-        }
-        issueData = data as StationLicenseMutationResult;
+      if (insertErr) {
+        throw new Error(insertErr.message);
       }
     } catch (error) {
       console.error('Unable to issue central shop license:', error);
@@ -1499,35 +1613,57 @@ function ProductionApp() {
 
     const newLicense: ShopLicense = {
       username: usernameVal,
-      appId: issueData.shop_id,
+      appId,
       licenseKey: key,
       shopName: shopNameVal,
-      location: 'Main Counter',
-      phone: '',
+      ownerName: ownerNameVal,
+      email: emailVal,
+      location: locationVal,
+      phone: phoneVal,
       upiId: `${usernameVal}@upi`,
       rates: {
         bwPerSideRupees: 1.5,
         colorPerSideRupees: 10.0,
         duplexDiscountPercent: 15,
       },
-      orderMode: 'MANUAL_APPROVAL',
+      orderMode: 'FULL_AUTOMATIC',
       status: 'ACTIVE',
-      expiresAt: issueData.expires_at ? issueData.expires_at.split('T')[0] : expiryStr,
+      expiresAt: expiryStr,
       isConfigured: true,
       duration: newDuration,
       deviceId: null,
+      deviceName: null,
+      boundAt: null,
       totalOrdersCount: 0,
       totalPagesCount: 0,
-      lastActive: 'Just now',
+      lastActive: 'Newly Issued',
     };
 
     setLicenses((prev) => ({ ...prev, [usernameVal]: newLicense }));
     setGeneratedKey(key);
-    logAdminAction('KEY_ISSUED', `Issued ${newDuration} license to ${shopNameVal} (${usernameVal})`);
-    setAdminNotice(`Generated new license key for ${shopNameVal}!`);
-    setNewShopName('');
-    setNewUsername('');
+    logAdminAction('KEY_ISSUED', `Issued ${newDuration} license to ${shopNameVal} (${usernameVal}) - Phone: ${phoneVal || 'N/A'}`);
+    setAdminNotice(`Generated new license key ${key} for ${shopNameVal}!`);
 
+    setIssuedCredsModal({
+      shopName: shopNameVal,
+      ownerName: ownerNameVal,
+      username: usernameVal,
+      key,
+      duration: newDuration,
+      expiry: expiryStr,
+      phone: phoneVal,
+      location: locationVal,
+      email: emailVal,
+    });
+
+    setNewShopName('');
+    setNewOwnerName('');
+    setNewPhone('');
+    setNewEmail('');
+    setNewUsername('');
+    setNewLocation('');
+
+    await fetchApplicationsFromCloud();
   };
 
   const handleRevokeKey = (username: string) => {
@@ -1798,9 +1934,11 @@ function ProductionApp() {
         }
         const isFullAuto = liveOrderMode === 'FULL_AUTOMATIC';
 
+        const isAdmin = activeSession?.role === 'ADMIN' || shopId === 'admin';
         const matchingRows = cloudOrders.filter((row: any) => {
           const isOrder = row.plan === 'ORDER' || (row.status && row.status.startsWith('ORDER_')) || (row.id && row.id.startsWith('PB-'));
           if (!isOrder) return false;
+          if (isAdmin) return true;
           const rowShop = (row.generated_username || row.shop_name || '').toLowerCase();
           return rowShop.includes(shopId) || shopId.includes(rowShop);
         });
@@ -1854,6 +1992,7 @@ function ProductionApp() {
 
               return {
                 id: row.id,
+                shop_id: (row.generated_username || row.shop_name || meta.shopId || meta.shopName || '').toLowerCase(),
                 customer_email: meta.customerEmail || (meta.customerPhone ? `${meta.customerPhone}` : 'Walk-in Customer'),
                 file_name: meta.fileName || row.city || 'Document.pdf',
                 page_count: pageCount,
@@ -2597,10 +2736,19 @@ function ProductionApp() {
         handleDeleteApp={handleDeleteApp}
         newShopName={newShopName}
         setNewShopName={setNewShopName}
+        newOwnerName={newOwnerName}
+        setNewOwnerName={setNewOwnerName}
+        newPhone={newPhone}
+        setNewPhone={setNewPhone}
+        newEmail={newEmail}
+        setNewEmail={setNewEmail}
         newUsername={newUsername}
         setNewUsername={setNewUsername}
+        newLocation={newLocation}
+        setNewLocation={setNewLocation}
         newDuration={newDuration}
         setNewDuration={setNewDuration}
+        jobs={jobs}
         handleGenerateKey={handleGenerateKey}
         generatedKey={generatedKey}
         handleRevokeKey={handleRevokeKey}
@@ -2821,6 +2969,7 @@ function ProductionApp() {
       cloudSyncStatus="CONNECTED"
       notice={notice}
       onDismissNotice={() => setNotice(null)}
+      globalBroadcast={globalBroadcast}
     >
       {activeTab === 'queue' && (
         <QueueView

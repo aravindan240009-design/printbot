@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   RotateCcw,
+  Megaphone,
 } from 'lucide-react';
 import { type ShopLicense } from '../App';
 
@@ -38,6 +39,7 @@ interface DesktopShellProps {
   cloudSyncStatus: 'CONNECTED' | 'OFFLINE';
   notice: string | null;
   onDismissNotice: () => void;
+  globalBroadcast?: { active: boolean; message: string; type: 'info' | 'warning' | 'urgent' };
   children: React.ReactNode;
 }
 
@@ -58,6 +60,7 @@ export const DesktopShell: React.FC<DesktopShellProps> = ({
   cloudSyncStatus,
   notice,
   onDismissNotice,
+  globalBroadcast,
   children,
 }) => {
   return (
@@ -217,6 +220,44 @@ export const DesktopShell: React.FC<DesktopShellProps> = ({
 
         {/* Main Content Area */}
         <main className="pb-desktop-main">
+          {/* Network Broadcast Announcement */}
+          {globalBroadcast?.active && globalBroadcast?.message && (
+            <div
+              style={{
+                padding: '10px 20px',
+                background:
+                  globalBroadcast.type === 'urgent'
+                    ? '#fef2f2'
+                    : globalBroadcast.type === 'warning'
+                      ? '#fffbeb'
+                      : '#eff6ff',
+                borderBottom: `1px solid ${
+                  globalBroadcast.type === 'urgent'
+                    ? '#fecaca'
+                    : globalBroadcast.type === 'warning'
+                      ? '#fde68a'
+                      : '#bfdbfe'
+                }`,
+                color:
+                  globalBroadcast.type === 'urgent'
+                    ? '#b91c1c'
+                    : globalBroadcast.type === 'warning'
+                      ? '#b45309'
+                      : '#1d4ed8',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                fontSize: '12.5px',
+                fontWeight: 700,
+              }}
+            >
+              <Megaphone size={16} style={{ flexShrink: 0 }} />
+              <span>
+                <strong>Network Announcement:</strong> {globalBroadcast.message}
+              </span>
+            </div>
+          )}
+
           {/* Notification Banner if active */}
           {notice && (
             <div style={{
