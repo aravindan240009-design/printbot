@@ -86,8 +86,8 @@ class JobService:
                     detail="Quote verification failed: line items, pricing rules, or totals have been modified.",
                 )
 
-        # Resolve shop's current order_mode and freeze it on the order
-        shop_mode = req.order_mode or shop_service.get_settings(tenant_id).order_mode
+        # Freeze the shop's configured mode; the customer cannot choose fulfillment policy.
+        shop_mode = shop_service.get_settings(tenant_id).order_mode
         booking_st = req.booking_state or BookingState.NONE
 
         job_id = str(uuid.uuid4())
@@ -158,25 +158,39 @@ class JobService:
            - Otherwise: enters PAID_HELD with honest customer reason.
         """
         job = self.get_job(tenant_id, job_id)
-        if job.status in (
-            JobStatus.QUEUED,
-            JobStatus.SPOOLING,
-            JobStatus.LEASED,
-            JobStatus.SPOOL_SUBMITTED,
-            JobStatus.PRINTING,
-            JobStatus.PRINT_CONFIRMED,
-            JobStatus.READY_FOR_PICKUP,
-            JobStatus.COLLECTED,
-        ):
-            # Idempotent replay
-            return job
-
         effective_paise = job.total_paise if amount_paise is None else amount_paise
         if effective_paise != job.total_paise:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Verified payment amount does not match the print order total.",
             )
+
+        if job.payment_intent_id:
+            if job.payment_intent_id == payment_intent_id:
+                return job
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A different payment is already recorded for this order.",
+            )
+
+        late_payment_statuses = {
+            JobStatus.CANCELLED,
+            JobStatus.REJECTED,
+            JobStatus.REFUND_PENDING,
+            JobStatus.REFUNDED,
+            JobStatus.EXPIRED,
+        }
+        payable_statuses = {
+            JobStatus.PENDING_PAYMENT,
+            JobStatus.AWAITING_PAYMENT,
+            JobStatus.PAYMENT_VERIFYING,
+        }
+        if job.status not in late_payment_statuses and job.status not in payable_statuses:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Order in status '{job.status.value}' cannot accept a payment.",
+            )
+
         job.payment_intent_id = payment_intent_id
 
         # Record payment in financial ledger
@@ -190,8 +204,19 @@ class JobService:
             idempotency_key=f"pay_{job_id}_{payment_intent_id}",
         )
 
+        if job.status in late_payment_statuses:
+            job.status = JobStatus.PAID_HELD
+            job.hold_reason = (
+                "Verified payment arrived for a cancelled or closed order; "
+                "owner review is required before any print or refund."
+            )
+            outbox_service.emit_event(
+                shop_id=tenant_id,
+                event_type="ORDER_PAYMENT_REVIEW_REQUIRED",
+                payload={"order_id": job_id, "amount_paise": effective_paise},
+            )
         # Evaluate shop mode fulfillment
-        if job.order_mode == OrderMode.MANUAL_APPROVAL:
+        elif job.order_mode == OrderMode.MANUAL_APPROVAL:
             # Must wait for staff review
             job.status = JobStatus.AWAITING_APPROVAL
             job.hold_reason = "Waiting for shop staff approval."
@@ -253,6 +278,62 @@ class JobService:
         job.updated_at = datetime.utcnow()
         return job
 
+    def require_payment_reconciliation(
+        self,
+        tenant_id: str,
+        job_id: str,
+        payment_reference: str,
+    ) -> PrintJobResponse:
+        """Hold an order when a delayed payment event needs provider reconciliation."""
+        job = self.get_job(tenant_id, job_id)
+        if job.payment_intent_id:
+            if job.payment_intent_id == payment_reference:
+                return job
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A different payment is already recorded for this order.",
+            )
+        if job.status == JobStatus.PAYMENT_VERIFYING:
+            return job
+        reviewable_statuses = {
+            JobStatus.PENDING_PAYMENT,
+            JobStatus.AWAITING_PAYMENT,
+            JobStatus.PAYMENT_VERIFYING,
+            JobStatus.CANCELLED,
+            JobStatus.REJECTED,
+            JobStatus.REFUND_PENDING,
+            JobStatus.REFUNDED,
+            JobStatus.EXPIRED,
+        }
+        if job.status not in reviewable_statuses:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Order in status '{job.status.value}' requires manual payment review.",
+            )
+
+        job.status = JobStatus.PAYMENT_VERIFYING
+        job.hold_reason = (
+            "A delayed payment event needs provider reconciliation. "
+            "Printing is blocked until the payment is confirmed."
+        )
+        job.version += 1
+        job.updated_at = datetime.utcnow()
+        audit_service.record_event(
+            shop_id=tenant_id,
+            actor_type="SYSTEM",
+            actor_id="razorpay-webhook",
+            action="PAYMENT_RECONCILIATION_REQUIRED",
+            resource_type="JOB",
+            resource_id=job_id,
+            metadata={"payment_reference": payment_reference},
+        )
+        outbox_service.emit_event(
+            shop_id=tenant_id,
+            event_type="ORDER_PAYMENT_RECONCILIATION_REQUIRED",
+            payload={"order_id": job_id, "status": job.status.value},
+        )
+        return job
+
     def record_cash_payment(
         self,
         tenant_id: str,
@@ -262,7 +343,18 @@ class JobService:
     ) -> PrintJobResponse:
         """Staff confirms in-person cash receipt at counter."""
         job = self.get_job(tenant_id, job_id)
-        effective_paise = amount_paise or job.total_paise
+        if job.status not in (JobStatus.PENDING_PAYMENT, JobStatus.AWAITING_PAYMENT):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cash can only be recorded for an unpaid order.",
+            )
+
+        effective_paise = job.total_paise if amount_paise is None else amount_paise
+        if effective_paise != job.total_paise:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cash amount must match the order total.",
+            )
 
         ledger_service.record_cash_collection(
             shop_id=tenant_id,
@@ -298,6 +390,14 @@ class JobService:
     def approve_job(self, tenant_id: str, job_id: str, staff_email: str = "staff@shop.com") -> PrintJobResponse:
         """Staff manually approves job for printing in MANUAL_APPROVAL mode."""
         job = self.get_job(tenant_id, job_id)
+        if job.status == JobStatus.QUEUED:
+            return job
+        if job.status != JobStatus.AWAITING_APPROVAL:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Only a verified paid order awaiting approval can be queued for printing.",
+            )
+
         job.status = JobStatus.QUEUED
         job.hold_reason = None
         job.version += 1

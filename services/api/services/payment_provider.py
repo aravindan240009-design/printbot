@@ -5,7 +5,7 @@ Implements:
 2. MockPaymentProvider: Fully local, free, open-source mock provider for simulated payments,
    replays, negative callbacks, and refunds.
 3. RazorpayProvider: Optional integration for production gateway, with HMAC verification,
-   per-merchant independent credentials, anti-replay windows, and amount/shop correlation.
+   per-merchant credentials, and fail-closed gateway-order correlation.
 Inviolable Rule: Browser success callbacks are NEVER proof of payment. Only server-verified
 webhooks or direct server-to-server capture checks can mark an order paid.
 """
@@ -361,17 +361,12 @@ class RazorpayProvider(BasePaymentProvider):
 
     def _get_credentials(self, shop_id: str) -> MerchantCredentials:
         creds = self._merchant_configs.get(shop_id)
-        if creds:
-            return creds
-        # Fallback to platform sandbox credentials
-        return MerchantCredentials(
-            shop_id=shop_id,
-            provider=PaymentProviderType.RAZORPAY,
-            key_id=settings.RAZORPAY_KEY_ID,
-            key_secret=settings.RAZORPAY_KEY_SECRET,
-            webhook_secret=settings.RAZORPAY_WEBHOOK_SECRET,
-            is_active=True,
-        )
+        if not creds or not creds.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Razorpay credentials are not configured for this shop.",
+            )
+        return creds
 
     def create_payment_intent(
         self,
@@ -470,41 +465,60 @@ class RazorpayProvider(BasePaymentProvider):
 
         try:
             data = json.loads(raw_body.decode("utf-8"))
-        except Exception as e:
+        except (UnicodeDecodeError, json.JSONDecodeError) as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Malformed Razorpay webhook body: {str(e)}",
             )
 
+        if not isinstance(data, dict):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Malformed Razorpay webhook body.",
+            )
+
         created_at = data.get("created_at")
-        if created_at is None:
+        if created_at is None or isinstance(created_at, bool):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Razorpay webhook timestamp is required.")
         try:
-            if abs(int(time.time()) - int(created_at)) > 300:
+            timestamp = int(created_at)
+            if timestamp > int(time.time()) + 300:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Razorpay webhook timestamp outside the valid replay window.",
+                    detail="Razorpay webhook timestamp is in the future.",
                 )
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Razorpay webhook timestamp.")
 
         payload_obj = data.get("payload", {})
-        payment_entity = payload_obj.get("payment", {}).get("entity", {})
-        notes = payment_entity.get("notes", {})
-        gateway_order_id = payment_entity.get("order_id", "")
-        created_order = self._orders.get(gateway_order_id, {})
-        shop_id = notes.get("shop_id") or data.get("shop_id") or created_order.get("shop_id")
+        if not isinstance(payload_obj, dict):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Malformed Razorpay webhook payload.")
+        payment_obj = payload_obj.get("payment", {})
+        if not isinstance(payment_obj, dict):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Malformed Razorpay payment payload.")
+        payment_entity = payment_obj.get("entity", {})
+        if not isinstance(payment_entity, dict):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Malformed Razorpay payment entity.")
 
-        if not shop_id:
-            # Fallback to inspecting expected_shop_id
-            shop_id = expected_shop_id or "default-shop"
-
-        if expected_shop_id and shop_id != expected_shop_id:
+        gateway_order_id = payment_entity.get("order_id")
+        if not isinstance(gateway_order_id, str) or not gateway_order_id:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Cross-tenant Razorpay account mismatch. Shop '{shop_id}' != expected '{expected_shop_id}'.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Razorpay payment is missing its gateway order ID.",
             )
-
+        created_order = self._orders.get(gateway_order_id)
+        if not created_order:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Razorpay order is not associated with a known payment attempt.",
+            )
+        shop_id = created_order.get("shop_id")
+        order_id = created_order.get("order_id")
+        if not isinstance(shop_id, str) or not shop_id or not isinstance(order_id, str) or not order_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Stored Razorpay order mapping is invalid.",
+            )
         creds = self._get_credentials(shop_id)
         # Compute HMAC SHA256 of raw_body using merchant's webhook_secret
         expected_sig = hmac.new(
@@ -517,13 +531,42 @@ class RazorpayProvider(BasePaymentProvider):
                 detail="Invalid Razorpay webhook HMAC signature. Secret mismatch or body tampered.",
             )
 
-        event_id = data.get("event_id") or data.get("id") or f"rzp_evt_{uuid.uuid4().hex[:12]}"
-        event_type = data.get("event", "payment.captured")
+        if expected_shop_id and shop_id != expected_shop_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Razorpay merchant does not match the requested shop.",
+            )
+
+        event_type = data.get("event")
+        if not isinstance(event_type, str) or not event_type:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Razorpay webhook event type is missing.",
+            )
         payment_intent_id = gateway_order_id
-        order_id = notes.get("order_id") or created_order.get("order_id") or payment_intent_id.replace("pi_mock_", "")
         amount_paise = payment_entity.get("amount", 0)
+        currency = payment_entity.get("currency", "INR")
+        if type(amount_paise) is not int or amount_paise < 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Razorpay payment amount is invalid.",
+            )
+        if not isinstance(currency, str) or not currency:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Razorpay payment currency is invalid.",
+            )
 
         if event_type == "payment.captured":
+            if (
+                type(amount_paise) is not int
+                or amount_paise != created_order.get("amount")
+                or currency != created_order.get("currency")
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Captured payment does not match the stored order amount and currency.",
+                )
             norm_status = "PAID"
         elif event_type == "payment.failed":
             norm_status = "FAILED"
@@ -532,6 +575,10 @@ class RazorpayProvider(BasePaymentProvider):
         else:
             norm_status = "UNKNOWN"
 
+        body_hash = hashlib.sha256(raw_body).hexdigest()
+        signed_event_id = data.get("id") or data.get("event_id")
+        event_id = signed_event_id if isinstance(signed_event_id, str) and signed_event_id else body_hash
+
         return VerifiedWebhookEvent(
             event_id=event_id,
             event_type=event_type,
@@ -539,11 +586,11 @@ class RazorpayProvider(BasePaymentProvider):
             order_id=order_id,
             payment_intent_id=payment_intent_id,
             amount_paise=amount_paise,
-            currency=payment_entity.get("currency", "INR"),
+            currency=currency,
             status=norm_status,
-            idempotency_key=event_id,
+            idempotency_key=body_hash,
             raw_payload=data,
-            timestamp=int(data.get("created_at", time.time())),
+            timestamp=timestamp,
         )
 
     def process_refund(

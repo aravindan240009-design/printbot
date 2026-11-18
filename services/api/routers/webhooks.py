@@ -1,4 +1,5 @@
 import json
+import time
 from typing import Optional
 from fastapi import APIRouter, Request, Header, HTTPException, status
 from packages.contracts.models import PaymentWebhookPayload
@@ -102,9 +103,9 @@ async def handle_razorpay_webhook(
 ):
     """
     Razorpay Webhook Receiver with Strict Per-Merchant Credential Verification.
-    1. Validates HMAC SHA-256 signature using merchant's independent webhook secret.
-    2. Enforces idempotency via event_id.
-    3. Handles payment.captured, payment.failed, and refund.processed.
+    1. Selects the merchant only through the saved gateway-order mapping.
+    2. Validates HMAC SHA-256 and captured amount/currency.
+    3. Defers delayed payment events to reconciliation instead of releasing jobs.
     """
     from services.api.services.payment_provider import razorpay_provider
 
@@ -120,7 +121,7 @@ async def handle_razorpay_webhook(
     # Check idempotency
     matches, cached_resp, _ = idempotency_store.check(
         tenant_id=verified_event.shop_id,
-        idempotency_key=verified_event.event_id,
+        idempotency_key=verified_event.idempotency_key,
         payload=verified_event.raw_payload,
     )
     if matches and cached_resp:
@@ -128,11 +129,26 @@ async def handle_razorpay_webhook(
 
     idempotency_store.start(
         tenant_id=verified_event.shop_id,
-        idempotency_key=verified_event.event_id,
+        idempotency_key=verified_event.idempotency_key,
         payload=verified_event.raw_payload,
     )
 
-    if verified_event.status == "PAID":
+    if (
+        verified_event.status in ("PAID", "FAILED")
+        and verified_event.timestamp < int(time.time()) - 300
+    ):
+        updated_job = job_service.require_payment_reconciliation(
+            tenant_id=verified_event.shop_id,
+            job_id=verified_event.order_id,
+            payment_reference=verified_event.payment_intent_id,
+        )
+        result = {
+            "status": "reconciliation_required",
+            "event_id": verified_event.event_id,
+            "order_id": updated_job.id,
+            "new_status": updated_job.status,
+        }
+    elif verified_event.status == "PAID":
         updated_job = job_service.mark_paid(
             tenant_id=verified_event.shop_id,
             job_id=verified_event.order_id,
@@ -155,7 +171,7 @@ async def handle_razorpay_webhook(
 
     idempotency_store.complete(
         tenant_id=verified_event.shop_id,
-        idempotency_key=verified_event.event_id,
+        idempotency_key=verified_event.idempotency_key,
         status_code=200,
         response=result,
     )

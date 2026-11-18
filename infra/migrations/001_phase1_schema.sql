@@ -22,16 +22,6 @@ BEGIN
 END
 $$;
 
--- Ensure auth schema and auth.jwt() exist for standalone/local PostgreSQL environments
-CREATE SCHEMA IF NOT EXISTS auth;
-CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb
-LANGUAGE sql STABLE AS $$
-    SELECT coalesce(
-        nullif(current_setting('request.jwt.claims', true), '')::jsonb,
-        '{}'::jsonb
-    );
-$$;
-
 -- ------------------------------------------------------------------------------
 -- 1. Standardized Licence Pepper Secret Retrieval & Hash Calculation
 -- ------------------------------------------------------------------------------
@@ -423,32 +413,80 @@ BEGIN
             );
         END LOOP;
 
-        -- 10. Safely archive legacy table
-        ALTER TABLE public.pilot_applications RENAME TO pilot_applications_historical_archive;
+        -- Keep public.pilot_applications as a writable table. The website and
+        -- workstation still insert/select this relation directly (anon key).
     END IF;
 END $$;
 
 -- ------------------------------------------------------------------------------
--- 5. Backward-Compatibility View (Omits Plaintext Keys & Secrets)
+-- 5. Restore writable pilot_applications for current Vite/desktop clients
 -- ------------------------------------------------------------------------------
-CREATE OR REPLACE VIEW public.pilot_applications AS
-SELECT 
-    s.id::text AS id,
-    s.name AS shop_name,
-    s.city,
-    s.contact_phone AS contact_number,
-    sl.plan,
-    sl.starts_at AS applied_at,
-    CASE WHEN s.status = 'ACTIVE' AND NOT sl.is_revoked THEN 'APPROVED' ELSE 'REJECTED' END AS status,
-    s.slug AS generated_username,
-    sl.starts_at AS approved_at,
-    jsonb_build_object(
-        'bwRate', (s.rates->>'bwRate')::numeric,
-        'colorRate', (s.rates->>'colorRate')::numeric,
-        'orderMode', s.order_mode
-    )::text AS notes
-FROM public.shops s
-JOIN public.shop_licenses sl ON s.id = sl.shop_id;
+-- A previous revision of this file replaced the table with a shops join view.
+-- Anon had no GRANT on that view, so the admin portal reported Cloud Offline.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.views
+        WHERE table_schema = 'public' AND table_name = 'pilot_applications'
+    ) THEN
+        DROP VIEW public.pilot_applications;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'pilot_applications_historical_archive'
+          AND table_type = 'BASE TABLE'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'pilot_applications'
+          AND table_type = 'BASE TABLE'
+    ) THEN
+        ALTER TABLE public.pilot_applications_historical_archive
+            RENAME TO pilot_applications;
+    END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS public.pilot_applications (
+    id TEXT PRIMARY KEY,
+    shop_name TEXT,
+    city TEXT,
+    contact_number TEXT,
+    plan TEXT,
+    status TEXT,
+    applied_at TIMESTAMPTZ,
+    generated_username TEXT,
+    generated_key TEXT,
+    approved_at TIMESTAMPTZ,
+    notes TEXT
+);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.pilot_applications TO anon, authenticated;
+GRANT ALL ON TABLE public.pilot_applications TO service_role;
+
+ALTER TABLE public.pilot_applications ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "printbot_clients_pilot_applications" ON public.pilot_applications;
+CREATE POLICY "printbot_clients_pilot_applications"
+ON public.pilot_applications
+FOR ALL
+TO anon, authenticated
+USING (true)
+WITH CHECK (true);
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables
+        WHERE pubname = 'supabase_realtime' AND tablename = 'pilot_applications'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.pilot_applications;
+    END IF;
+EXCEPTION WHEN OTHERS THEN
+    NULL;
+END $$;
 
 -- ------------------------------------------------------------------------------
 -- 6. Constant-Time Server-Side Licence Validation RPC
@@ -679,10 +717,17 @@ ON public.shops FOR SELECT USING (status = 'ACTIVE');
 DROP POLICY IF EXISTS "Workstation and Owner view shop jobs" ON public.print_jobs;
 CREATE POLICY "Workstation and Owner view shop jobs"
 ON public.print_jobs FOR SELECT TO authenticated
-USING ((auth.jwt() ->> 'shop_id')::uuid = shop_id);
+USING (
+    (COALESCE(NULLIF(current_setting('request.jwt.claims', true), ''), '{}')::jsonb ->> 'shop_id')::uuid = shop_id
+);
 
 -- Customer access on print_jobs strictly via matching tracking_secret_hash
 DROP POLICY IF EXISTS "Customers track own job via hash" ON public.print_jobs;
 CREATE POLICY "Customers track own job via hash"
 ON public.print_jobs FOR SELECT
-USING (tracking_secret_hash = (auth.jwt() ->> 'tracking_secret_hash'));
+USING (
+    tracking_secret_hash = (
+        COALESCE(NULLIF(current_setting('request.jwt.claims', true), ''), '{}')::jsonb
+        ->> 'tracking_secret_hash'
+    )
+);

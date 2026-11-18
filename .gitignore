@@ -42,6 +42,7 @@ ENV/
 *.db-journal
 *.db-wal
 *.db-shm
+supabase/.temp/
 local_spool/
 temp_uploads/
 
@@ -81,4 +82,3 @@ scratch/
 
 !public/downloads/*.exe
 !public/downloads/*.msi
-.vercel

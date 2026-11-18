@@ -1,7 +1,7 @@
 import hashlib
 import json
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Request, Header, HTTPException, status
 from pydantic import BaseModel, Field
 from packages.contracts.models import (
@@ -14,10 +14,21 @@ from packages.contracts.models import (
 from services.api.services.accounting_engine import accounting_engine
 from services.api.services.job_service import job_service
 from services.api.core.idempotency import idempotency_store
+from services.api.services.auth_service import auth_service
 from services.api.services.payment_provider import get_payment_provider
 from services.api.services.shop_customization_service import shop_customization_service
 
 router = APIRouter(prefix="/orders", tags=["Orders & Pricing"])
+
+
+def require_order_permission(request: Request, permission: str) -> Dict[str, Any]:
+    user = getattr(request.state, "user", None)
+    if not user or not auth_service.check_permission(user, permission):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Authenticated staff permission is required for this order action.",
+        )
+    return user
 
 
 class QuoteRequest(BaseModel):
@@ -139,20 +150,23 @@ class MarkUnknownRequest(BaseModel):
 @router.post("/{job_id}/approve", response_model=PrintJobResponse)
 def approve_order(job_id: str, request: Request):
     """Staff approves an order in MANUAL_APPROVAL mode; transitions to QUEUED."""
+    staff = require_order_permission(request, "orders:approve")
     tenant_id: str = getattr(request.state, "tenant_id", "default-tenant")
-    return job_service.approve_job(tenant_id, job_id)
+    return job_service.approve_job(tenant_id, job_id, staff_email=staff["email"])
 
 
 @router.post("/{job_id}/reject", response_model=PrintJobResponse)
 def reject_order(job_id: str, req: RejectOrderRequest, request: Request):
     """Staff rejects an order; transitions to CANCELLED and blocks printing."""
+    staff = require_order_permission(request, "orders:approve")
     tenant_id: str = getattr(request.state, "tenant_id", "default-tenant")
-    return job_service.reject_job(tenant_id, job_id, req.reason)
+    return job_service.reject_job(tenant_id, job_id, req.reason, staff_email=staff["email"])
 
 
 @router.post("/{job_id}/mark-unknown", response_model=PrintJobResponse)
 def mark_order_unknown(job_id: str, req: MarkUnknownRequest, request: Request):
     """Flags ambiguous job as COMPLETION_UNKNOWN; blocks automatic reprint."""
+    require_order_permission(request, "orders:approve")
     tenant_id: str = getattr(request.state, "tenant_id", "default-tenant")
     return job_service.mark_completion_unknown(tenant_id, job_id, req.reason)
 
@@ -178,11 +192,12 @@ def record_cash_received(job_id: str, req: CashReceivedRequest, request: Request
     In MANUAL_APPROVAL mode, transitions to AWAITING_APPROVAL.
     In FULL_AUTOMATIC mode, dispatches to QUEUED if hardware is online.
     """
+    staff = require_order_permission(request, "orders:approve")
     tenant_id: str = getattr(request.state, "tenant_id", "default-tenant")
     return job_service.record_cash_payment(
         tenant_id=tenant_id,
         job_id=job_id,
-        staff_email=req.staff_email,
+        staff_email=staff["email"],
         amount_paise=req.amount_paise,
     )
 
@@ -209,12 +224,13 @@ def supervise_unknown_order(job_id: str, req: SupervisedReconcileRequest, reques
     Actions: CONFIRM_PRINTED, REPRINT, or REFUND.
     Strict Invariant: Automatic reprint is blocked; only human supervisor can authorize reprint.
     """
+    staff = require_order_permission(request, "orders:approve")
     tenant_id: str = getattr(request.state, "tenant_id", "default-tenant")
     return job_service.supervised_reconcile_unknown(
         tenant_id=tenant_id,
         job_id=job_id,
         action=req.action,
-        staff_email=req.staff_email,
+        staff_email=staff["email"],
     )
 
 
@@ -224,6 +240,7 @@ def purge_order_documents(job_id: str, request: Request):
     Customer privacy right to erasure: purges document files & metadata for a job.
     Preserves financial ledger and audit logs while shredding customer data.
     """
+    require_order_permission(request, "orders:delete")
     tenant_id: str = getattr(request.state, "tenant_id", "default-tenant")
     return job_service.purge_job_documents(tenant_id, job_id)
 

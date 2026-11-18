@@ -11,9 +11,11 @@ workstation. The workstation is built with Tauri 2 + Rust so printer discovery,
 local files, spool journals, and future Windows spooler submission remain
 outside the React UI.
 
-> Current status: the customer flow, shop portals, API security hardening,
-> Rust journal, native printer boundary, and release compilation are
-> implemented. Physical printing, authenticated device pairing, real-printer
+> Current status: the customer flow, shop portals, API security controls,
+> Rust journal, native printer boundary, and Windows release compilation are
+> implemented. The API's order, payment, merchant-credential, and idempotency
+> stores are still process-local; this build is not ready to accept live orders.
+> Durable production storage, authenticated device pairing, physical-print
 > validation, and signed installer distribution remain release gates.
 
 ## Product flows
@@ -147,13 +149,12 @@ assume one folder is simply nested inside or built from the other.
 - `index.html`, `src/main.tsx`, and `vite.config.ts` are the root website
   entry and build configuration. `tsconfig*.json`, `tailwind.config.js`, and
   `postcss.config.js` configure its frontend toolchain.
-- `vercel.json` and `.vercelignore` configure root website deployment;
-  `Launch-PrintBot-Workstation.bat` is a Windows workstation launch helper.
+- `Launch-PrintBot-Workstation.bat` is a Windows workstation launch helper.
 
 ### App entry points and configuration
 
-- `apps/customer-web/package.json`, `index.html`, `vite.config.ts`, and
-  `vercel.json` configure and deploy the standalone customer app.
+- `apps/customer-web/package.json`, `index.html`, and `vite.config.ts`
+  configure the standalone customer app.
 - `apps/desktop/package.json` and `vite.config.ts` configure the desktop UI;
   `apps/desktop/src-tauri/tauri.conf.json` and `Cargo.toml` configure its
   native Tauri application.
