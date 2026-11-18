@@ -43,7 +43,7 @@ not by the browser or the optional Print Bot API. Deploy it to the configured
 Supabase project with:
 
 ```powershell
-supabase functions deploy quote-order --project-ref kiseniigikzncpzczurp
+supabase functions deploy quote-order --project-ref ygwkvylthtzuoygkhmeu
 ```
 
 The function reads active shop rates from `pilot_applications.notes` (or the
