@@ -106,9 +106,9 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
       return;
     }
 
-    const options = {
+    const options: any = {
       key: paymentIntent.client_secret,
-      order_id: paymentIntent.payment_intent_id,
+      ...(paymentIntent.payment_intent_id ? { order_id: paymentIntent.payment_intent_id } : {}),
       amount: paymentIntent.amount_paise,
       currency: paymentIntent.currency,
       name: session.shop_name || 'Print Bot',

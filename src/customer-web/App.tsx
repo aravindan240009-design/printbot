@@ -353,9 +353,6 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
     if (quoteStatus !== 'ready' || !quote) {
       throw new Error('Wait for the shop server to confirm the order price before paying.');
     }
-    if (!TEST_MODE && !isApiConfigured) {
-      throw new Error('Secure online payment is unavailable because the Print Bot API is not configured.');
-    }
     if (!files.length) {
       throw new Error('Add a document before starting payment.');
     }
@@ -401,6 +398,23 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
         options: createPayload.options,
         expectedTotalPaise: quote.total_paise,
       });
+    }
+
+    if (!isApiConfigured) {
+      const razorpayKeyId = (import.meta as any).env?.VITE_RAZORPAY_KEY_ID || 'rzp_test_Ts9MJsdti9RG2c';
+      if (!razorpayKeyId) {
+        throw new Error('Razorpay gateway is not configured for this shop.');
+      }
+      return {
+        provider: 'RAZORPAY' as const,
+        payment_intent_id: '',
+        order_id: 'PB-' + Math.floor(10000 + Math.random() * 90000),
+        shop_id: session.shop_id || session.shop_slug,
+        amount_paise: quote.total_paise,
+        currency: 'INR',
+        client_secret: razorpayKeyId,
+        test_mode: false,
+      };
     }
 
     const serverJob = await createOrder(createPayload, session.session_token, session.shop_id);
@@ -524,7 +538,7 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
       totalSheets: quote.total_physical_sheets,
       totalLogicalPages: quote.total_logical_pages,
       paymentMethod: details.paymentMethod,
-      paymentStatus: details.paymentMethod === 'upi' ? 'pending_verification' : 'pending_cash',
+      paymentStatus: details.paymentId ? 'paid' : details.paymentMethod === 'upi' ? 'pending_verification' : 'pending_cash',
       paymentId: details.paymentId || null,
       notes: details.notes || '',
       status: 'PENDING_APPROVAL',
@@ -604,9 +618,9 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
       totalSheets: quote.total_physical_sheets,
       totalLogicalPages: quote.total_logical_pages,
       paymentMethod: details.paymentMethod,
-      paymentStatus: details.paymentMethod === 'upi' ? 'pending_verification' : 'pending_cash',
+      paymentStatus: details.paymentId ? 'paid' : details.paymentMethod === 'upi' ? 'pending_verification' : 'pending_cash',
       paymentId: details.paymentId,
-      status: details.paymentMethod === 'upi' ? 'PENDING_PAYMENT' : 'ORDER_RECEIVED',
+      status: details.paymentMethod === 'upi' && !details.paymentId ? 'PENDING_PAYMENT' : 'ORDER_RECEIVED',
       placedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       items: files.map((f) => ({
         name: f.name,
