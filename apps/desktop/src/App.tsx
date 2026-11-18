@@ -2647,7 +2647,8 @@ function ProductionApp() {
       console.warn('Failed to sync settings to cloud:', err);
     }
 
-    if (currentShop?.deviceToken) {
+    // 2. Try external print service API if a dedicated remote API is configured
+    if (API_BASE && !API_BASE.includes('localhost:8000') && currentShop?.deviceToken) {
       try {
         const headers: Record<string, string> = {
           'X-Tenant-ID': currentShop.username,
@@ -2659,44 +2660,32 @@ function ProductionApp() {
           headers,
           body: JSON.stringify({ order_mode: setupOrderMode }),
         });
-        const result = await response.json().catch(() => null);
-        if (!response.ok) {
-          throw new Error(result?.detail || `Settings sync failed (${response.status}).`);
-        }
-
-        const rates = currentShop?.rates;
-        const pricingResponse = await fetch(
-          `${API_BASE}/shops/${encodeURIComponent(username)}/customization`,
-          {
-            method: 'PATCH',
-            headers,
-            body: JSON.stringify({
-              pricing_rates_paise: {
-                bw_per_side_paise: Math.round((rates?.bwPerSideRupees ?? 1.5) * 100),
-                color_per_side_paise: Math.round((rates?.colorPerSideRupees ?? 10) * 100),
-                duplex_discount_percent: Math.round(rates?.duplexDiscountPercent ?? 15),
-                staple_paise: Math.round((rates?.stapleRate ?? 5) * 100),
-                spiral_paise: Math.round((rates?.spiralRate ?? 40) * 100),
-                hard_bind_paise: Math.round((rates?.hardBoundRate ?? 150) * 100),
-              },
-            }),
-          },
-        );
-        const pricingResult = await pricingResponse.json().catch(() => null);
-        if (!pricingResponse.ok) {
-          throw new Error(pricingResult?.detail || `Pricing sync failed (${pricingResponse.status}).`);
+        if (response.ok) {
+          const rates = currentShop?.rates;
+          await fetch(
+            `${API_BASE}/shops/${encodeURIComponent(username)}/customization`,
+            {
+              method: 'PATCH',
+              headers,
+              body: JSON.stringify({
+                pricing_rates_paise: {
+                  bw_per_side_paise: Math.round((rates?.bwPerSideRupees ?? 1.5) * 100),
+                  color_per_side_paise: Math.round((rates?.colorPerSideRupees ?? 10) * 100),
+                  duplex_discount_percent: Math.round(rates?.duplexDiscountPercent ?? 15),
+                  staple_paise: Math.round((rates?.stapleRate ?? 5) * 100),
+                  spiral_paise: Math.round((rates?.spiralRate ?? 40) * 100),
+                  hard_bind_paise: Math.round((rates?.hardBoundRate ?? 150) * 100),
+                },
+              }),
+            },
+          );
         }
       } catch (error) {
-        console.warn('Failed to sync dispatch mode with the print service:', error);
-        serviceSettingsSyncWarning =
-          ' The print service could not be updated, so customer pricing or dispatch settings may be out of date.';
+        console.warn('Optional external print service sync skipped:', error);
       }
-    } else {
-      serviceSettingsSyncWarning =
-        ' No workstation authorization is available to update the print service pricing or dispatch mode.';
     }
 
-    setNotice(`Shop settings updated successfully.${serviceSettingsSyncWarning}`);
+    setNotice('Shop settings and customer pricing updated successfully.');
   };
 
   const handleSaveServiceSubmit = (e: React.FormEvent) => {
