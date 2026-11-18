@@ -125,7 +125,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 onChange={(e) => {
                   const selectedMode = e.target.value;
                   if (selectedMode === 'MANUAL_APPROVAL' || selectedMode === 'FULL_AUTOMATIC') {
-                    if (selectedMode !== setupOrderMode) setPendingOrderMode(selectedMode);
+                    setSetupOrderMode(selectedMode);
                   }
                 }}
                 style={{ width: '100%' }}

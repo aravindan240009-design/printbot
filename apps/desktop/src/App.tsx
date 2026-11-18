@@ -611,6 +611,31 @@ function ProductionApp() {
     }
 
     const canonicalUsername = authRes.slug || u;
+
+    let cloudOrderMode: 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC' | undefined = undefined;
+    try {
+      const { data: appRow } = await supabase
+        .from('pilot_applications')
+        .select('notes')
+        .or(`id.eq.${authRes.shop_id},generated_username.ilike.${canonicalUsername}`)
+        .maybeSingle();
+      if (appRow?.notes) {
+        const parsedNotes = typeof appRow.notes === 'string' ? JSON.parse(appRow.notes) : appRow.notes;
+        if (parsedNotes?.orderMode === 'FULL_AUTOMATIC' || parsedNotes?.orderMode === 'MANUAL_APPROVAL') {
+          cloudOrderMode = parsedNotes.orderMode;
+        }
+      }
+    } catch (err) {
+      console.warn('Error reading cloud order mode during unlock:', err);
+    }
+
+    const resolvedOrderMode =
+      cloudOrderMode ||
+      authRes.order_mode ||
+      licenses[canonicalUsername]?.orderMode ||
+      licenses[u]?.orderMode ||
+      'MANUAL_APPROVAL';
+
     const newLic: ShopLicense = {
       username: canonicalUsername,
       appId: authRes.shop_id,
@@ -624,7 +649,7 @@ function ProductionApp() {
         colorPerSideRupees: (authRes.rates && authRes.rates.colorRate) ? Number(authRes.rates.colorRate) : 10.0,
         duplexDiscountPercent: 15,
       },
-      orderMode: authRes.order_mode || 'MANUAL_APPROVAL',
+      orderMode: resolvedOrderMode,
       status: 'ACTIVE',
       expiresAt: authRes.is_lifetime ? 'LIFETIME' : (authRes.expires_at ? authRes.expires_at.split('T')[0] : 'EXPIRED'),
       isConfigured: true,
@@ -636,6 +661,8 @@ function ProductionApp() {
       totalPagesCount: 0,
       lastActive: 'Authenticated via Canonical Server RPC',
     };
+
+    setSetupOrderMode(resolvedOrderMode);
 
     setLicenses((prev) => ({
       ...prev,
@@ -1756,6 +1783,21 @@ function ProductionApp() {
 
       let cloudMapped: PrintJob[] = [];
       if (!sbError && Array.isArray(cloudOrders)) {
+        const shopRow = cloudOrders.find((r: any) =>
+          r.id === currentShop?.appId ||
+          (r.generated_username && r.generated_username.toLowerCase() === shopId)
+        );
+        let liveOrderMode = currentShop?.orderMode || setupOrderMode || 'MANUAL_APPROVAL';
+        if (shopRow?.notes) {
+          try {
+            const parsedShopNotes = typeof shopRow.notes === 'string' ? JSON.parse(shopRow.notes) : shopRow.notes;
+            if (parsedShopNotes?.orderMode === 'FULL_AUTOMATIC' || parsedShopNotes?.orderMode === 'MANUAL_APPROVAL') {
+              liveOrderMode = parsedShopNotes.orderMode;
+            }
+          } catch {}
+        }
+        const isFullAuto = liveOrderMode === 'FULL_AUTOMATIC';
+
         const matchingRows = cloudOrders.filter((row: any) => {
           const isOrder = row.plan === 'ORDER' || (row.status && row.status.startsWith('ORDER_')) || (row.id && row.id.startsWith('PB-'));
           if (!isOrder) return false;
@@ -1793,8 +1835,22 @@ function ProductionApp() {
               } else if (rawStatus === 'ORDER_REJECTED' || rawStatus === 'REJECTED') {
                 mappedStatus = 'REJECTED';
               } else if (rawStatus === 'ORDER_PENDING' || rawStatus === 'PENDING' || rawStatus === 'PENDING_APPROVAL') {
-                mappedStatus = 'PENDING_APPROVAL';
+                mappedStatus = isFullAuto ? 'QUEUED' : 'PENDING_APPROVAL';
+              } else {
+                mappedStatus = isFullAuto ? 'QUEUED' : 'PENDING_APPROVAL';
               }
+
+              const isPaid = Boolean(
+                meta.paymentId ||
+                meta.paymentStatus === 'paid' ||
+                meta.payment_status === 'paid' ||
+                meta.payment_status === 'verified'
+              );
+              const paymentStatus = isPaid
+                ? 'paid'
+                : (meta.paymentMethod === 'cash' || meta.payment_method === 'cash')
+                  ? 'pending_cash'
+                  : (meta.paymentStatus || meta.payment_status || 'unverified');
 
               return {
                 id: row.id,
@@ -1819,8 +1875,9 @@ function ProductionApp() {
                 rejection_reason: meta.rejectionReason || undefined,
                 pickup_pin: row.generated_key || meta.pickupPin || undefined,
                 file_data: meta.fileData || undefined,
-                payment_method: meta.paymentMethod || 'upi',
-                payment_status: meta.paymentMethod === 'cash' ? 'pending_cash' : 'unverified',
+                payment_method: meta.paymentMethod || 'cash',
+                payment_status: paymentStatus,
+                order_mode: isFullAuto ? 'FULL_AUTOMATIC' : 'MANUAL_APPROVAL',
               } as PrintJob;
             } catch (err) {
               console.warn('Error parsing cloud order row:', err);
@@ -1858,7 +1915,7 @@ function ProductionApp() {
                   ? cloudJob.status
                   : 'QUEUED';
               }
-              else if (serverStatus === 'AWAITING_APPROVAL') status = 'PENDING_APPROVAL';
+              else if (serverStatus === 'AWAITING_APPROVAL') status = isFullAuto ? 'QUEUED' : 'PENDING_APPROVAL';
               else if (['LEASED', 'SPOOLING', 'SPOOL_SUBMITTED', 'PRINTING', 'PRINT_CONFIRMED'].includes(serverStatus)) {
                 status = 'PRINTING';
               } else if (['READY_FOR_PICKUP', 'COLLECTED', 'COMPLETED'].includes(serverStatus)) {
@@ -1875,7 +1932,7 @@ function ProductionApp() {
                   : cloudJob.payment_status,
                 order_mode: serverJob.order_mode === 'FULL_AUTOMATIC' || serverJob.order_mode === 'MANUAL_APPROVAL'
                   ? serverJob.order_mode
-                  : undefined,
+                  : cloudJob.order_mode,
               };
             } catch (error) {
               console.warn(`Could not refresh server status for order ${cloudJob.id}:`, error);
@@ -2373,7 +2430,8 @@ function ProductionApp() {
   };
 
   useEffect(() => {
-    if (screen !== 'WORKSTATION' || currentShop?.orderMode !== 'FULL_AUTOMATIC') return;
+    const isFullAuto = (currentShop?.orderMode || setupOrderMode) === 'FULL_AUTOMATIC';
+    if (screen !== 'WORKSTATION' || !isFullAuto) return;
 
     const onlinePrinters = nativePrinters?.filter((printer) => printer.is_online) || [];
     const targetPrinter =
@@ -2384,14 +2442,13 @@ function ProductionApp() {
 
     for (const job of jobs) {
       if (
-        job.status !== 'QUEUED' ||
-        job.order_mode !== 'FULL_AUTOMATIC' ||
+        (job.status !== 'QUEUED' && job.status !== 'PENDING_APPROVAL') ||
         autoPrintAttemptedJobIds.current.has(job.id)
       ) continue;
       autoPrintAttemptedJobIds.current.add(job.id);
       void handleDirectPrint(job.id, true, targetPrinter.name);
     }
-  }, [screen, currentShop?.orderMode, jobs, nativePrinters, selectedPrinterName]);
+  }, [screen, currentShop?.orderMode, setupOrderMode, jobs, nativePrinters, selectedPrinterName]);
 
   const handleCompleteJob = async (jobId: string) => {
     try {
@@ -2599,8 +2656,9 @@ function ProductionApp() {
     let serviceSettingsSyncWarning = '';
 
     setLicenses((prev) => {
+      const baseLicense = prev[u] || prev[username] || currentShop || ({} as ShopLicense);
       const updated = {
-        ...prev[u],
+        ...baseLicense,
         orderMode: setupOrderMode,
       };
       return {
@@ -2608,8 +2666,19 @@ function ProductionApp() {
         [u]: updated,
         ...(currentShop?.username ? { [currentShop.username.toLowerCase()]: updated } : {}),
         ...(currentShop?.shopName ? { [currentShop.shopName.toLowerCase()]: updated } : {}),
+        [username]: updated,
       };
     });
+
+    if (setupOrderMode === 'FULL_AUTOMATIC') {
+      setJobs((prev) =>
+        prev.map((j) =>
+          j.status === 'PENDING_APPROVAL'
+            ? { ...j, status: 'QUEUED', order_mode: 'FULL_AUTOMATIC' }
+            : { ...j, order_mode: 'FULL_AUTOMATIC' }
+        )
+      );
+    }
 
     try {
       const shopName = currentShop?.shopName || setupShopName || u;
@@ -2685,6 +2754,7 @@ function ProductionApp() {
       }
     }
 
+    await fetchServerQueue();
     setNotice('Shop settings and customer pricing updated successfully.');
   };
 
