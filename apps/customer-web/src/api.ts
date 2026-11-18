@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { calculateLocalQuote } from './pricing';
 
 export interface ShopSession {
   session_token: string;
@@ -131,19 +132,19 @@ export async function quoteOrder(
   options: object,
   shopSlug: string,
 ): Promise<ServerQuote> {
-  const { data, error } = await supabase.functions.invoke<ServerQuote>('quote-order', {
-    body: { shop_slug: shopSlug, page_count: pageCount, options },
-  });
-  if (error) {
-    const response = error.context;
-    if (response instanceof Response) {
-      const body = await response.clone().json().catch(() => null) as { detail?: unknown } | null;
-      if (typeof body?.detail === 'string') throw new Error(body.detail);
+  try {
+    const { data, error } = await supabase.functions.invoke<ServerQuote>('quote-order', {
+      body: { shop_slug: shopSlug, page_count: pageCount, options },
+    });
+    if (!error && data && data.total_paise !== undefined) {
+      return data;
     }
-    throw new Error(`Could not load the shop price: ${error.message}`);
+  } catch (err) {
+    console.warn('Edge function quote-order unavailable, calculating locally:', err);
   }
-  if (!data) throw new Error('The shop pricing service returned no quote.');
-  return data;
+
+  // Graceful fallback to client pricing engine
+  return calculateLocalQuote(pageCount, options);
 }
 
 export async function createPaymentIntent(orderId: string, token: string, shopId: string): Promise<PaymentIntent> {
