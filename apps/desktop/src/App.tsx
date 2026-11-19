@@ -127,6 +127,7 @@ export interface ShopLicense {
   services?: ShopServiceItem[];
   orderMode: 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC';
   status: 'ACTIVE' | 'REVOKED';
+  createdAt?: string;
   expiresAt: string;
   isConfigured: boolean;
   duration?: '1 Month' | '1 Year' | 'Lifetime Commercial';
@@ -1109,6 +1110,7 @@ function ProductionApp() {
             },
             orderMode: parsedNotes.orderMode || existing?.orderMode || 'FULL_AUTOMATIC',
             status: app.status === 'APPROVED' ? 'ACTIVE' : 'REVOKED',
+            createdAt: existing?.createdAt || parsedNotes.issuedAt || app.approvedAt || app.appliedAt || new Date().toISOString(),
             expiresAt: existing?.expiresAt || expiry.toISOString().split('T')[0],
             isConfigured: true,
             duration: duration,
@@ -1425,6 +1427,7 @@ function ProductionApp() {
       },
       orderMode: 'MANUAL_APPROVAL',
       status: 'ACTIVE',
+      createdAt: nowIso,
       expiresAt: activationData.expires_at ? activationData.expires_at.split('T')[0] : expiryStr,
       isConfigured: true,
       duration: duration,
@@ -1702,6 +1705,7 @@ function ProductionApp() {
       },
       orderMode: 'FULL_AUTOMATIC',
       status: 'ACTIVE',
+      createdAt: new Date().toISOString(),
       expiresAt: expiryStr,
       isConfigured: true,
       duration: newDuration,

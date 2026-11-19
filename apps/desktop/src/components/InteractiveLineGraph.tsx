@@ -1,16 +1,27 @@
 import React, { useState, useMemo } from 'react';
-import { TrendingUp, BarChart2, Layers, DollarSign, Calendar } from 'lucide-react';
+import { TrendingUp, BarChart2, Layers, DollarSign, Calendar, Sparkles, KeyRound } from 'lucide-react';
 import { type ChartPoint } from '../utils/analyticsUtils';
 
-export type ChartMetric = 'revenue' | 'orders' | 'pages';
+export type ChartMetric = string;
+
+export interface MetricOption {
+  key: string;
+  label: string;
+  color: string;
+  icon?: React.ReactNode;
+  formatValue?: (val: number) => string;
+  getValue: (point: ChartPoint) => number;
+}
 
 interface InteractiveLineGraphProps {
   data: ChartPoint[];
   title?: string;
   subtitle?: string;
   accentColor?: string;
-  defaultMetric?: ChartMetric;
+  defaultMetric?: string;
   height?: number;
+  customMetrics?: MetricOption[];
+  emptyMessage?: string;
 }
 
 export const InteractiveLineGraph: React.FC<InteractiveLineGraphProps> = ({
@@ -20,18 +31,28 @@ export const InteractiveLineGraph: React.FC<InteractiveLineGraphProps> = ({
   accentColor = '#2563eb',
   defaultMetric = 'revenue',
   height = 240,
+  customMetrics,
+  emptyMessage,
 }) => {
-  const [metric, setMetric] = useState<ChartMetric>(defaultMetric);
+  const [metric, setMetric] = useState<string>(defaultMetric);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
+  const activeCustomMetric = useMemo(() => {
+    if (!customMetrics || customMetrics.length === 0) return null;
+    return customMetrics.find((m) => m.key === metric) || customMetrics[0];
+  }, [customMetrics, metric]);
 
   // Extract values based on chosen metric
   const values = useMemo(() => {
+    if (activeCustomMetric) {
+      return data.map((d) => activeCustomMetric.getValue(d));
+    }
     return data.map((d) => {
       if (metric === 'revenue') return d.revenue;
       if (metric === 'orders') return d.orders;
       return d.pages;
     });
-  }, [data, metric]);
+  }, [data, metric, activeCustomMetric]);
 
   const totalValue = useMemo(() => values.reduce((a, b) => a + b, 0), [values]);
   const peakValue = useMemo(() => Math.max(...values, 0), [values]);
@@ -52,10 +73,11 @@ export const InteractiveLineGraph: React.FC<InteractiveLineGraphProps> = ({
 
   // Compute nice Y scale max
   const yMax = useMemo(() => {
-    if (peakValue <= 0) return metric === 'revenue' ? 100 : 10;
-    const factor = metric === 'revenue' ? 1.2 : 1.25;
+    const isRev = activeCustomMetric ? activeCustomMetric.key.toLowerCase().includes('revenue') : metric === 'revenue';
+    if (peakValue <= 0) return isRev ? 100 : 10;
+    const factor = isRev ? 1.2 : 1.25;
     return Math.ceil(peakValue * factor);
-  }, [peakValue, metric]);
+  }, [peakValue, metric, activeCustomMetric]);
 
   // Compute point coordinates
   const coordinates = useMemo(() => {
@@ -117,7 +139,13 @@ export const InteractiveLineGraph: React.FC<InteractiveLineGraphProps> = ({
   const yTicks = [0, yMax * 0.25, yMax * 0.5, yMax * 0.75, yMax];
 
   const formatTick = (val: number) => {
-    if (metric === 'revenue') {
+    if (activeCustomMetric?.formatValue) {
+      if (val >= 1000 && activeCustomMetric.key.toLowerCase().includes('revenue')) {
+        return `₹${(val / 1000).toFixed(1)}k`;
+      }
+      return activeCustomMetric.formatValue(Math.round(val));
+    }
+    if (metric === 'revenue' || metric.toLowerCase().includes('revenue')) {
       if (val >= 1000) return `₹${(val / 1000).toFixed(1)}k`;
       return `₹${Math.round(val)}`;
     }
@@ -128,8 +156,14 @@ export const InteractiveLineGraph: React.FC<InteractiveLineGraphProps> = ({
   const activeCoord = hoveredIdx !== null && coordinates[hoveredIdx] ? coordinates[hoveredIdx] : null;
 
   // Active theme gradient colors
-  const strokeColor = metric === 'revenue' ? '#059669' : metric === 'orders' ? '#2563eb' : '#7c3aed';
-  const gradId = `graph-grad-${metric}-${accentColor.replace('#', '')}`;
+  const strokeColor = activeCustomMetric
+    ? activeCustomMetric.color
+    : metric === 'revenue'
+      ? '#059669'
+      : metric === 'orders'
+        ? '#2563eb'
+        : '#7c3aed';
+  const gradId = `graph-grad-${metric}-${(activeCustomMetric?.color || accentColor).replace('#', '')}`;
 
   return (
     <div
@@ -181,61 +215,94 @@ export const InteractiveLineGraph: React.FC<InteractiveLineGraphProps> = ({
         </div>
 
         {/* Metric Toggles */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f1f5f9', padding: '3px', borderRadius: '8px' }}>
-          <button
-            type="button"
-            onClick={() => setMetric('revenue')}
-            style={{
-              border: 'none',
-              background: metric === 'revenue' ? '#ffffff' : 'transparent',
-              color: metric === 'revenue' ? '#059669' : '#64748b',
-              fontWeight: metric === 'revenue' ? 750 : 600,
-              fontSize: '11.5px',
-              padding: '5px 12px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              boxShadow: metric === 'revenue' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            Revenue (₹)
-          </button>
-          <button
-            type="button"
-            onClick={() => setMetric('orders')}
-            style={{
-              border: 'none',
-              background: metric === 'orders' ? '#ffffff' : 'transparent',
-              color: metric === 'orders' ? '#2563eb' : '#64748b',
-              fontWeight: metric === 'orders' ? 750 : 600,
-              fontSize: '11.5px',
-              padding: '5px 12px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              boxShadow: metric === 'orders' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            Orders Count
-          </button>
-          <button
-            type="button"
-            onClick={() => setMetric('pages')}
-            style={{
-              border: 'none',
-              background: metric === 'pages' ? '#ffffff' : 'transparent',
-              color: metric === 'pages' ? '#7c3aed' : '#64748b',
-              fontWeight: metric === 'pages' ? 750 : 600,
-              fontSize: '11.5px',
-              padding: '5px 12px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              boxShadow: metric === 'pages' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            Pages Spooled
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f1f5f9', padding: '3px', borderRadius: '8px', flexWrap: 'wrap' }}>
+          {customMetrics && customMetrics.length > 0 ? (
+            customMetrics.map((opt) => {
+              const isSelected = opt.key === metric;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setMetric(opt.key)}
+                  style={{
+                    border: 'none',
+                    background: isSelected ? '#ffffff' : 'transparent',
+                    color: isSelected ? opt.color : '#64748b',
+                    fontWeight: isSelected ? 750 : 600,
+                    fontSize: '11.5px',
+                    padding: '5px 12px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    boxShadow: isSelected ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                    transition: 'all 0.15s ease',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                  }}
+                >
+                  {opt.icon}
+                  {opt.label}
+                </button>
+              );
+            })
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setMetric('revenue')}
+                style={{
+                  border: 'none',
+                  background: metric === 'revenue' ? '#ffffff' : 'transparent',
+                  color: metric === 'revenue' ? '#059669' : '#64748b',
+                  fontWeight: metric === 'revenue' ? 750 : 600,
+                  fontSize: '11.5px',
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  boxShadow: metric === 'revenue' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                Revenue (₹)
+              </button>
+              <button
+                type="button"
+                onClick={() => setMetric('orders')}
+                style={{
+                  border: 'none',
+                  background: metric === 'orders' ? '#ffffff' : 'transparent',
+                  color: metric === 'orders' ? '#2563eb' : '#64748b',
+                  fontWeight: metric === 'orders' ? 750 : 600,
+                  fontSize: '11.5px',
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  boxShadow: metric === 'orders' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                Orders Count
+              </button>
+              <button
+                type="button"
+                onClick={() => setMetric('pages')}
+                style={{
+                  border: 'none',
+                  background: metric === 'pages' ? '#ffffff' : 'transparent',
+                  color: metric === 'pages' ? '#7c3aed' : '#64748b',
+                  fontWeight: metric === 'pages' ? 750 : 600,
+                  fontSize: '11.5px',
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  boxShadow: metric === 'pages' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                Pages Spooled
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -258,7 +325,11 @@ export const InteractiveLineGraph: React.FC<InteractiveLineGraphProps> = ({
             Period Total:
           </span>
           <span style={{ fontSize: '15px', fontWeight: 800, color: strokeColor }}>
-            {metric === 'revenue' ? `₹${totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : totalValue.toLocaleString('en-IN')}
+            {activeCustomMetric?.formatValue
+              ? activeCustomMetric.formatValue(totalValue)
+              : metric === 'revenue' || metric.toLowerCase().includes('revenue')
+                ? `₹${totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : totalValue.toLocaleString('en-IN')}
           </span>
         </div>
 
@@ -269,7 +340,11 @@ export const InteractiveLineGraph: React.FC<InteractiveLineGraphProps> = ({
             Peak {data.length <= 12 ? 'Interval' : 'Day'}:
           </span>
           <span style={{ fontSize: '13px', fontWeight: 750, color: '#0f172a' }}>
-            {metric === 'revenue' ? `₹${peakValue.toFixed(2)}` : peakValue}
+            {activeCustomMetric?.formatValue
+              ? activeCustomMetric.formatValue(peakValue)
+              : metric === 'revenue' || metric.toLowerCase().includes('revenue')
+                ? `₹${peakValue.toFixed(2)}`
+                : peakValue}
             {peakIdx >= 0 && <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500, marginLeft: '4px' }}>({data[peakIdx]?.label})</span>}
           </span>
         </div>
@@ -281,7 +356,11 @@ export const InteractiveLineGraph: React.FC<InteractiveLineGraphProps> = ({
             Daily Avg:
           </span>
           <span style={{ fontSize: '13px', fontWeight: 750, color: '#0f172a' }}>
-            {metric === 'revenue' ? `₹${avgValue.toFixed(2)}` : avgValue.toFixed(1)}
+            {activeCustomMetric?.formatValue
+              ? activeCustomMetric.formatValue(avgValue)
+              : metric === 'revenue' || metric.toLowerCase().includes('revenue')
+                ? `₹${avgValue.toFixed(2)}`
+                : avgValue.toFixed(1)}
           </span>
         </div>
       </div>
@@ -458,12 +537,39 @@ export const InteractiveLineGraph: React.FC<InteractiveLineGraphProps> = ({
             <div style={{ fontWeight: 700, color: '#94a3b8', borderBottom: '1px solid #334155', paddingBottom: '4px', marginBottom: '4px' }}>
               {activeCoord.point.fullLabel}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', margin: '2px 0' }}>
-              <span style={{ color: '#cbd5e1' }}>Revenue:</span>
-              <strong style={{ color: '#34d399', fontSize: '12px' }}>
-                ₹{activeCoord.point.revenue.toFixed(2)}
-              </strong>
-            </div>
+            {activeCustomMetric ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', margin: '2px 0' }}>
+                <span style={{ color: '#cbd5e1' }}>{activeCustomMetric.label}:</span>
+                <strong style={{ color: activeCustomMetric.color, fontSize: '12px' }}>
+                  {activeCustomMetric.formatValue ? activeCustomMetric.formatValue(activeCoord.value) : activeCoord.value}
+                </strong>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', margin: '2px 0' }}>
+                <span style={{ color: '#cbd5e1' }}>Revenue:</span>
+                <strong style={{ color: '#34d399', fontSize: '12px' }}>
+                  ₹{activeCoord.point.revenue.toFixed(2)}
+                </strong>
+              </div>
+            )}
+            {activeCoord.point.adminRevenue !== undefined && activeCustomMetric?.key !== 'adminRevenue' && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', margin: '2px 0' }}>
+                <span style={{ color: '#94a3b8' }}>Admin License Fee:</span>
+                <span style={{ color: '#60a5fa', fontWeight: 700 }}>₹{activeCoord.point.adminRevenue.toLocaleString('en-IN')}</span>
+              </div>
+            )}
+            {activeCoord.point.shopRevenue !== undefined && activeCustomMetric?.key !== 'shopRevenue' && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', margin: '2px 0' }}>
+                <span style={{ color: '#94a3b8' }}>Shop Print Turnover:</span>
+                <span style={{ color: '#34d399', fontWeight: 700 }}>₹{activeCoord.point.shopRevenue.toLocaleString('en-IN')}</span>
+              </div>
+            )}
+            {Boolean(activeCoord.point.licensesCount && activeCoord.point.licensesCount > 0) && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', margin: '2px 0' }}>
+                <span style={{ color: '#94a3b8' }}>Licenses Issued:</span>
+                <span style={{ color: '#fbbf24', fontWeight: 700 }}>{activeCoord.point.licensesCount} key{activeCoord.point.licensesCount === 1 ? '' : 's'}</span>
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', margin: '2px 0' }}>
               <span style={{ color: '#cbd5e1' }}>Orders:</span>
               <strong style={{ color: '#60a5fa' }}>{activeCoord.point.orders} completed</strong>
@@ -500,7 +606,7 @@ export const InteractiveLineGraph: React.FC<InteractiveLineGraphProps> = ({
           }}
         >
           <Calendar size={14} color="#94a3b8" />
-          <span>No completed jobs in this selected period yet. Live orders will populate automatically.</span>
+          <span>{emptyMessage || 'No completed jobs in this selected period yet. Live orders will populate automatically.'}</span>
         </div>
       )}
     </div>

@@ -52,6 +52,10 @@ import {
   filterJobsByRange,
   generateChartPoints,
   computeShopAnalytics,
+  getLicenseFee,
+  getLicenseDate,
+  filterLicensesByRange,
+  generateAdminChartPoints,
 } from '../utils/analyticsUtils';
 
 export interface PilotApplication {
@@ -306,6 +310,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     );
   }, [selectedShopUsername, licenses, shopList]);
 
+  // Selected Shop Individual Analytics & Ledger State
+  const [shopDateRange, setShopDateRange] = useState<DateRangeType>('all');
+  const [shopCustomStart, setShopCustomStart] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().split('T')[0];
+  });
+  const [shopCustomEnd, setShopCustomEnd] = useState<string>(() => {
+    return new Date().toISOString().split('T')[0];
+  });
+  const [shopOrderSearch, setShopOrderSearch] = useState('');
+
   // Real Revenue Calculations
   const totalSubscriptionRevenue = shopList.reduce((acc, l) => {
     if (l.duration === '1 Month') return acc + 499;
@@ -323,15 +339,89 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     return getDateRangeBounds(revenueDateRange, revenueCustomStart, revenueCustomEnd);
   }, [revenueDateRange, revenueCustomStart, revenueCustomEnd]);
 
+  // Licenses filtered by selected date range for Admin Revenue
+  const rangeLicenses = useMemo(() => {
+    return filterLicensesByRange(shopList, revenueDateRange, revenueCustomStart, revenueCustomEnd);
+  }, [shopList, revenueDateRange, revenueCustomStart, revenueCustomEnd]);
+
+  const periodAdminRevenue = useMemo(() => {
+    return rangeLicenses.reduce((acc, l) => acc + getLicenseFee(l.duration), 0);
+  }, [rangeLicenses]);
+
   // Jobs filtered by selected date range
   const rangeCompletedJobs = useMemo(() => {
     return filterJobsByRange(jobs, revenueDateRange, revenueCustomStart, revenueCustomEnd);
   }, [jobs, revenueDateRange, revenueCustomStart, revenueCustomEnd]);
 
-  // Chart data points across the selected range
-  const networkChartPoints = useMemo(() => {
-    return generateChartPoints(jobs, revenueDateRange, revenueCustomStart, revenueCustomEnd);
-  }, [jobs, revenueDateRange, revenueCustomStart, revenueCustomEnd]);
+  // Admin Chart data points across the selected range (Tracks Admin SaaS Revenue + Network Volume)
+  const adminChartPoints = useMemo(() => {
+    return generateAdminChartPoints(shopList, jobs, revenueDateRange, revenueCustomStart, revenueCustomEnd);
+  }, [shopList, jobs, revenueDateRange, revenueCustomStart, revenueCustomEnd]);
+
+  // Selected Shop Analytics Computations (Live Shop View)
+  const selectedShopAllJobs = useMemo(() => {
+    if (!selectedShop) return [];
+    const u = (selectedShop.username || '').toLowerCase();
+    const n = (selectedShop.shopName || '').toLowerCase();
+    const appId = (selectedShop.appId || '').toLowerCase();
+    return jobs.filter((j) => {
+      const jShop = ((j as any).shop_id || '').toLowerCase();
+      const jEmail = (j.customer_email || '').toLowerCase();
+      if (shopList.length === 1) return true;
+      if (jShop && (jShop === u || jShop === n || (appId && jShop === appId) || jShop.includes(u) || u.includes(jShop))) return true;
+      if (jEmail && jEmail.includes(u)) return true;
+      return false;
+    });
+  }, [selectedShop, jobs, shopList]);
+
+  const shopBounds = useMemo(() => {
+    return getDateRangeBounds(shopDateRange, shopCustomStart, shopCustomEnd);
+  }, [shopDateRange, shopCustomStart, shopCustomEnd]);
+
+  const shopRangeJobs = useMemo(() => {
+    return filterJobsByRange(selectedShopAllJobs, shopDateRange, shopCustomStart, shopCustomEnd);
+  }, [selectedShopAllJobs, shopDateRange, shopCustomStart, shopCustomEnd]);
+
+  const shopChartPoints = useMemo(() => {
+    return generateChartPoints(selectedShopAllJobs, shopDateRange, shopCustomStart, shopCustomEnd);
+  }, [selectedShopAllJobs, shopDateRange, shopCustomStart, shopCustomEnd]);
+
+  const shopCompletedJobs = useMemo(() => {
+    return shopRangeJobs.filter((j) => j.status === 'COMPLETED');
+  }, [shopRangeJobs]);
+
+  const shopPeriodTurnover = useMemo(() => {
+    return shopCompletedJobs.reduce((acc, j) => acc + (j.calculated_price_rupees || 0), 0);
+  }, [shopCompletedJobs]);
+
+  const shopPeriodOrders = shopCompletedJobs.length;
+
+  const { shopPeriodPages, shopBwPages, shopColorPages } = useMemo(() => {
+    let total = 0;
+    let bw = 0;
+    let col = 0;
+    shopCompletedJobs.forEach((j) => {
+      const count = (j.page_count || 1) * (j.options.copies || 1);
+      total += count;
+      if (j.options.color_mode === 'color') col += count;
+      else bw += count;
+    });
+    return { shopPeriodPages: total, shopBwPages: bw, shopColorPages: col };
+  }, [shopCompletedJobs]);
+
+  const shopAov = shopPeriodOrders > 0 ? shopPeriodTurnover / shopPeriodOrders : 0;
+
+  const shopFilteredOrders = useMemo(() => {
+    if (!shopOrderSearch.trim()) return selectedShopAllJobs;
+    const q = shopOrderSearch.toLowerCase();
+    return selectedShopAllJobs.filter(
+      (j) =>
+        j.id.toLowerCase().includes(q) ||
+        (j.customer_email && j.customer_email.toLowerCase().includes(q)) ||
+        (j.file_name && j.file_name.toLowerCase().includes(q)) ||
+        (j.pickup_pin && j.pickup_pin.toLowerCase().includes(q))
+    );
+  }, [selectedShopAllJobs, shopOrderSearch]);
 
   // Computed & Ranked Shop Analytics (HIGHEST REVENUE ON TOP by default)
   const {
@@ -1666,6 +1756,293 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                             </div>
                           </div>
                         </div>
+
+                        {/* ========================================================= */}
+                        {/* LIVE SHOP REVENUE & ANALYTICS SECTION (INDIVIDUAL SHOP)    */}
+                        {/* ========================================================= */}
+                        <div style={{ marginTop: '28px', borderTop: '2px solid #e2e8f0', paddingTop: '24px' }}>
+                          {/* Section Header with DateRangePicker */}
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              flexWrap: 'wrap',
+                              gap: '12px',
+                              marginBottom: '16px',
+                            }}
+                          >
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div
+                                  style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '8px',
+                                    background: '#ecfdf5',
+                                    color: '#059669',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                  }}
+                                >
+                                  <TrendingUp size={18} />
+                                </div>
+                                <h2 style={{ fontSize: '18px', fontWeight: 850, color: '#0f172a', margin: 0 }}>
+                                  {selectedShop.shopName} • Live Revenue &amp; Spooler Analytics
+                                </h2>
+                              </div>
+                              <p style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 0 40px' }}>
+                                Live customer print turnover, orders trajectory, and spooled documents for this counter station
+                              </p>
+                            </div>
+
+                            {/* Date Range Picker for this shop */}
+                            <div>
+                              <DateRangePicker
+                                rangeType={shopDateRange}
+                                onChangeRange={setShopDateRange}
+                                customStart={shopCustomStart}
+                                customEnd={shopCustomEnd}
+                                onChangeCustomStart={setShopCustomStart}
+                                onChangeCustomEnd={setShopCustomEnd}
+                                activeLabel={shopBounds.label}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Shop Performance KPI Cards */}
+                          <div className="pb-admin-stats-grid" style={{ marginBottom: '22px' }}>
+                            <div className="pb-admin-stat-card">
+                              <div className="pb-admin-stat-label">Period Print Turnover</div>
+                              <div className="pb-admin-stat-val" style={{ color: '#059669' }}>
+                                ₹{shopPeriodTurnover.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="pb-admin-stat-hint">Customer print payments in {shopBounds.label}</div>
+                            </div>
+
+                            <div className="pb-admin-stat-card">
+                              <div className="pb-admin-stat-label">Completed Print Orders</div>
+                              <div className="pb-admin-stat-val" style={{ color: '#2563eb' }}>
+                                {shopPeriodOrders}
+                              </div>
+                              <div className="pb-admin-stat-hint">
+                                Avg Order Value: ₹{shopAov.toFixed(2)}
+                              </div>
+                            </div>
+
+                            <div className="pb-admin-stat-card">
+                              <div className="pb-admin-stat-label">Spooled Print Volume</div>
+                              <div className="pb-admin-stat-val" style={{ color: '#7c3aed' }}>
+                                {shopPeriodPages} <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>pages</span>
+                              </div>
+                              <div className="pb-admin-stat-hint">
+                                {shopBwPages} B&amp;W • {shopColorPages} Color
+                              </div>
+                            </div>
+
+                            <div className="pb-admin-stat-card">
+                              <div className="pb-admin-stat-label">Counter Pricing Rates</div>
+                              <div className="pb-admin-stat-val" style={{ fontSize: '16px', color: '#0f172a' }}>
+                                B&amp;W: ₹{(selectedShop as any).rates?.bwPerSideRupees || '1.5'} / Col: ₹{(selectedShop as any).rates?.colorPerSideRupees || '10'}
+                              </div>
+                              <div className="pb-admin-stat-hint">UPI: {selectedShop.upiId || `${selectedShop.username}@upi`}</div>
+                            </div>
+                          </div>
+
+                          {/* Interactive Line Graph for this Shop */}
+                          <div style={{ marginBottom: '24px' }}>
+                            <InteractiveLineGraph
+                              data={shopChartPoints}
+                              title={`${selectedShop.shopName} • Print Revenue &amp; Volume Trajectory`}
+                              subtitle={`Live hourly / daily print turnover and volume for this workstation in ${shopBounds.label}`}
+                              accentColor="#059669"
+                              defaultMetric="revenue"
+                              height={260}
+                              emptyMessage={`No print jobs recorded for ${selectedShop.shopName} in this period. Live orders will populate automatically when customers scan the counter QR and print.`}
+                              customMetrics={[
+                                {
+                                  key: 'revenue',
+                                  label: 'Print Turnover (₹)',
+                                  color: '#059669',
+                                  formatValue: (v) => `₹${v.toLocaleString('en-IN')}`,
+                                  getValue: (p) => p.revenue,
+                                },
+                                {
+                                  key: 'orders',
+                                  label: 'Completed Orders',
+                                  color: '#2563eb',
+                                  formatValue: (v) => `${v} orders`,
+                                  getValue: (p) => p.orders,
+                                },
+                                {
+                                  key: 'pages',
+                                  label: 'Pages Spooled',
+                                  color: '#7c3aed',
+                                  formatValue: (v) => `${v} pages`,
+                                  getValue: (p) => p.pages,
+                                },
+                              ]}
+                            />
+                          </div>
+
+                          {/* Live Orders & Spool Activity Ledger for this Shop */}
+                          <div className="pb-admin-table-card">
+                            <div
+                              style={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '12px',
+                                marginBottom: '16px',
+                              }}
+                            >
+                              <div>
+                                <h3 style={{ fontSize: '15px', fontWeight: 800, margin: '0 0 2px', color: '#0f172a' }}>
+                                  Live Print Jobs &amp; Spool Ledger ({shopFilteredOrders.length} Records)
+                                </h3>
+                                <div style={{ fontSize: '12px', color: '#64748b' }}>
+                                  All print jobs routed through this specific station counter
+                                </div>
+                              </div>
+
+                              <div style={{ position: 'relative', width: '260px' }}>
+                                <Search
+                                  size={13}
+                                  color="#94a3b8"
+                                  style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }}
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Search Job ID, file, customer email, PIN..."
+                                  value={shopOrderSearch}
+                                  onChange={(e) => setShopOrderSearch(e.target.value)}
+                                  style={{
+                                    width: '100%',
+                                    padding: '5px 8px 5px 28px',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '6px',
+                                    fontSize: '11.5px',
+                                    background: '#f8fafc',
+                                    boxSizing: 'border-box',
+                                  }}
+                                />
+                              </div>
+                            </div>
+
+                            <div style={{ overflowX: 'auto' }}>
+                              <table className="pb-admin-table">
+                                <thead>
+                                  <tr>
+                                    <th>Order / PIN</th>
+                                    <th>Customer</th>
+                                    <th>Document File</th>
+                                    <th>Copies &amp; Mode</th>
+                                    <th>Pages</th>
+                                    <th>Amount (₹)</th>
+                                    <th>Status</th>
+                                    <th>Timestamp</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {shopFilteredOrders.length === 0 ? (
+                                    <tr>
+                                      <td colSpan={8} style={{ textAlign: 'center', color: '#94a3b8', padding: '32px' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                          <FileText size={24} color="#cbd5e1" />
+                                          <div style={{ fontWeight: 650 }}>No print jobs found for this station.</div>
+                                          <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>
+                                            When customers upload documents to print at this counter, their orders and turnover will appear here live in real-time.
+                                          </div>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ) : (
+                                    shopFilteredOrders.map((job) => {
+                                      const isCompleted = job.status === 'COMPLETED';
+                                      const isPrinting = job.status === 'PRINTING';
+                                      const isPending = job.status === 'PENDING_APPROVAL' || job.status === 'QUEUED';
+                                      const statusBg = isCompleted ? '#ecfdf5' : isPrinting ? '#eff6ff' : isPending ? '#fffbeb' : '#fef2f2';
+                                      const statusColor = isCompleted ? '#047857' : isPrinting ? '#1d4ed8' : isPending ? '#b45309' : '#b91c1c';
+
+                                      return (
+                                        <tr key={job.id}>
+                                          <td>
+                                            <div style={{ fontWeight: 750, color: '#0f172a', fontSize: '12.5px' }}>
+                                              {job.pickup_pin ? `PIN: ${job.pickup_pin}` : job.id.slice(0, 8)}
+                                            </div>
+                                            <div style={{ fontSize: '10.5px', color: '#94a3b8' }}>
+                                              <code>{job.id.slice(0, 10)}...</code>
+                                            </div>
+                                          </td>
+                                          <td>
+                                            <div style={{ fontWeight: 600, color: '#334155' }}>
+                                              {job.customer_email || 'Walk-in Customer'}
+                                            </div>
+                                          </td>
+                                          <td>
+                                            <div
+                                              style={{
+                                                maxWidth: '200px',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap',
+                                                fontWeight: 650,
+                                                color: '#0f172a',
+                                              }}
+                                              title={job.file_name}
+                                            >
+                                              {job.file_name}
+                                            </div>
+                                          </td>
+                                          <td>
+                                            <span style={{ fontSize: '11.5px', color: '#475569' }}>
+                                              {job.options.copies || 1} {job.options.copies === 1 ? 'copy' : 'copies'} •{' '}
+                                              <strong style={{ color: job.options.color_mode === 'color' ? '#7c3aed' : '#334155' }}>
+                                                {job.options.color_mode === 'color' ? 'Color' : 'B&W'}
+                                              </strong>
+                                            </span>
+                                          </td>
+                                          <td>
+                                            <strong style={{ fontSize: '12.5px', color: '#0f172a' }}>
+                                              {(job.page_count || 1) * (job.options.copies || 1)}
+                                            </strong>{' '}
+                                            <span style={{ fontSize: '10.5px', color: '#64748b' }}>pgs</span>
+                                          </td>
+                                          <td>
+                                            <strong style={{ fontSize: '13px', color: '#059669', fontWeight: 800 }}>
+                                              ₹{(job.calculated_price_rupees || 0).toFixed(2)}
+                                            </strong>
+                                          </td>
+                                          <td>
+                                            <span
+                                              style={{
+                                                padding: '2px 8px',
+                                                borderRadius: '12px',
+                                                fontSize: '10.5px',
+                                                fontWeight: 750,
+                                                background: statusBg,
+                                                color: statusColor,
+                                              }}
+                                            >
+                                              {job.status}
+                                            </span>
+                                          </td>
+                                          <td style={{ fontSize: '11.5px', color: '#64748b' }}>
+                                            {job.timestamp
+                                              ? new Date(job.timestamp).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })
+                                              : (job as any).created_at || '-'}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     );
                   })()}
@@ -2104,16 +2481,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               {/* Primary High-Impact Stats Grid */}
               <div className="pb-admin-stats-grid">
                 <div className="pb-admin-stat-card">
-                  <div className="pb-admin-stat-label">Period Print Turnover</div>
-                  <div className="pb-admin-stat-val" style={{ color: '#059669' }}>
-                    ₹{totalNetworkTurnover.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <div className="pb-admin-stat-label">Period Admin SaaS Revenue</div>
+                  <div className="pb-admin-stat-val" style={{ color: '#2563eb' }}>
+                    ₹{periodAdminRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
-                  <div className="pb-admin-stat-hint">Customer print payments in {revenueBounds.label}</div>
+                  <div className="pb-admin-stat-hint">
+                    {rangeLicenses.length} license subscription{rangeLicenses.length === 1 ? '' : 's'} in {revenueBounds.label}
+                  </div>
                 </div>
 
                 <div className="pb-admin-stat-card">
-                  <div className="pb-admin-stat-label">Total Subscription Revenue</div>
-                  <div className="pb-admin-stat-val" style={{ color: '#2563eb' }}>
+                  <div className="pb-admin-stat-label">Total Cumulative SaaS Revenue</div>
+                  <div className="pb-admin-stat-val" style={{ color: '#0f172a' }}>
                     ₹{totalSubscriptionRevenue.toLocaleString('en-IN')}
                   </div>
                   <div className="pb-admin-stat-hint">From {shopList.length} subscribed Xerox shops</div>
@@ -2121,34 +2500,76 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
                 <div className="pb-admin-stat-card">
                   <div className="pb-admin-stat-label">Projected Annual ARR</div>
-                  <div className="pb-admin-stat-val" style={{ color: '#0f172a' }}>
+                  <div className="pb-admin-stat-val" style={{ color: '#7c3aed' }}>
                     ₹{(activeCount * 4999).toLocaleString('en-IN')}
                   </div>
                   <div className="pb-admin-stat-hint">Active SaaS subscription run-rate</div>
                 </div>
 
                 <div className="pb-admin-stat-card">
-                  <div className="pb-admin-stat-label">Network Orders Handled</div>
-                  <div className="pb-admin-stat-val">{rangeNetworkOrders}</div>
-                  <div className="pb-admin-stat-hint">Direct customer QR uploads completed</div>
+                  <div className="pb-admin-stat-label">Network Customer Print Turnover</div>
+                  <div className="pb-admin-stat-val" style={{ color: '#059669' }}>
+                    ₹{totalNetworkTurnover.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div className="pb-admin-stat-hint">Customer print payments in {revenueBounds.label}</div>
                 </div>
 
                 <div className="pb-admin-stat-card">
-                  <div className="pb-admin-stat-label">Total Pages Spooled</div>
-                  <div className="pb-admin-stat-val">{rangeNetworkPages}</div>
-                  <div className="pb-admin-stat-hint">Aggregated print volume in period</div>
+                  <div className="pb-admin-stat-label">Network Orders &amp; Volume</div>
+                  <div className="pb-admin-stat-val">
+                    {rangeNetworkOrders} <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>({rangeNetworkPages} pgs)</span>
+                  </div>
+                  <div className="pb-admin-stat-hint">Direct customer uploads completed</div>
                 </div>
               </div>
 
               {/* Interactive Line Graph */}
               <div style={{ marginBottom: '24px' }}>
                 <InteractiveLineGraph
-                  data={networkChartPoints}
-                  title={`Network Revenue Trajectory • ${revenueBounds.label}`}
-                  subtitle="Consolidated daily revenue and print volume across all connected Xerox shops"
+                  data={adminChartPoints}
+                  title={`Admin Platform Revenue Trajectory • ${revenueBounds.label}`}
+                  subtitle="Direct SaaS subscription revenue from Xerox shop licenses and platform transactions"
                   accentColor="#2563eb"
-                  defaultMetric="revenue"
+                  defaultMetric="adminRevenue"
                   height={260}
+                  emptyMessage="No license or print activity recorded in this selected period yet. When new licenses are created, revenue will appear automatically."
+                  customMetrics={[
+                    {
+                      key: 'adminRevenue',
+                      label: 'Admin License Revenue (₹)',
+                      color: '#2563eb',
+                      formatValue: (v) => `₹${v.toLocaleString('en-IN')}`,
+                      getValue: (p) => p.adminRevenue ?? p.revenue,
+                    },
+                    {
+                      key: 'shopRevenue',
+                      label: 'Shop Print Turnover (₹)',
+                      color: '#059669',
+                      formatValue: (v) => `₹${v.toLocaleString('en-IN')}`,
+                      getValue: (p) => p.shopRevenue ?? 0,
+                    },
+                    {
+                      key: 'totalRevenue',
+                      label: 'Combined Total (₹)',
+                      color: '#7c3aed',
+                      formatValue: (v) => `₹${v.toLocaleString('en-IN')}`,
+                      getValue: (p) => (p.adminRevenue ?? p.revenue) + (p.shopRevenue ?? 0),
+                    },
+                    {
+                      key: 'orders',
+                      label: 'Orders Count',
+                      color: '#0891b2',
+                      formatValue: (v) => `${v} orders`,
+                      getValue: (p) => p.orders,
+                    },
+                    {
+                      key: 'pages',
+                      label: 'Pages Spooled',
+                      color: '#d97706',
+                      formatValue: (v) => `${v} pages`,
+                      getValue: (p) => p.pages,
+                    },
+                  ]}
                 />
               </div>
 
@@ -2232,6 +2653,26 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                               </div>
                             </div>
                           </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedShopUsername(shop.username);
+                              setAdminActiveTab('SHOPS_DEVICES');
+                            }}
+                            className="pb-btn pb-btn-secondary pb-btn-sm"
+                            style={{
+                              marginTop: '12px',
+                              width: '100%',
+                              fontSize: '11.5px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                            }}
+                          >
+                            View Live Shop Analytics →
+                          </button>
                         </div>
                       );
                     })}
@@ -2384,12 +2825,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         <th>Avg Order Value</th>
                         <th style={{ width: '120px' }}>Network Share</th>
                         <th>Status</th>
+                        <th style={{ textAlign: 'right' }}>Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {sortedAndFilteredShops.length === 0 ? (
                         <tr>
-                          <td colSpan={9} style={{ textAlign: 'center', color: '#94a3b8', padding: '28px' }}>
+                          <td colSpan={10} style={{ textAlign: 'center', color: '#94a3b8', padding: '28px' }}>
                             No active shops matching criteria.
                           </td>
                         </tr>
@@ -2403,10 +2845,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                           return (
                             <tr
                               key={shop.username}
+                              onClick={() => {
+                                setSelectedShopUsername(shop.username);
+                                setAdminActiveTab('SHOPS_DEVICES');
+                              }}
                               style={{
                                 background: isTop1 ? '#fafdf9' : undefined,
                                 transition: 'background 0.15s ease',
+                                cursor: 'pointer',
                               }}
+                              title={`Click to view live analytics for ${shop.shopName}`}
                             >
                               <td style={{ textAlign: 'center' }}>
                                 <span
@@ -2505,6 +2953,26 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                                 >
                                   {shop.status}
                                 </span>
+                              </td>
+                              <td style={{ textAlign: 'right' }}>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedShopUsername(shop.username);
+                                    setAdminActiveTab('SHOPS_DEVICES');
+                                  }}
+                                  className="pb-btn pb-btn-secondary pb-btn-sm"
+                                  style={{
+                                    fontSize: '11px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    padding: '3px 8px',
+                                  }}
+                                >
+                                  Live Analytics →
+                                </button>
                               </td>
                             </tr>
                           );

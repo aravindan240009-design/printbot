@@ -14,6 +14,10 @@ export interface ChartPoint {
   label: string;     // Short display (e.g. "19 Nov" or "5 PM")
   fullLabel: string; // Detailed tooltip header (e.g. "19 Nov 2026, 5:00 PM")
   revenue: number;   // In Rupees
+  adminRevenue?: number; // Admin License SaaS fee in Rupees
+  shopRevenue?: number;  // Shop print turnover in Rupees
+  totalRevenue?: number; // Combined revenue
+  licensesCount?: number; // Number of licenses created/renewed
   orders: number;    // Completed orders
   pages: number;     // Spooled pages
   bwPages: number;
@@ -68,6 +72,34 @@ export function getJobDate(job: PrintJob): Date {
     }
   }
 
+  return new Date();
+}
+
+/**
+ * Returns the SaaS subscription fee in Rupees for a given plan duration.
+ */
+export function getLicenseFee(duration?: string): number {
+  if (duration === '1 Month') return 499;
+  if (duration === 'Lifetime Commercial') return 14999;
+  return 4999; // Default 1 Year
+}
+
+/**
+ * Safely extracts a valid JavaScript Date for a ShopLicense.
+ */
+export function getLicenseDate(lic: ShopLicense): Date {
+  if (lic.createdAt) {
+    const d = new Date(lic.createdAt);
+    if (!isNaN(d.getTime())) return d;
+  }
+  if (lic.boundAt) {
+    const d = new Date(lic.boundAt);
+    if (!isNaN(d.getTime())) return d;
+  }
+  if (lic.lastActive && lic.lastActive.includes(',')) {
+    const d = new Date(lic.lastActive);
+    if (!isNaN(d.getTime())) return d;
+  }
   return new Date();
 }
 
@@ -176,6 +208,26 @@ export function filterJobsByRange(
 }
 
 /**
+ * Filter licenses to those issued/renewed inside the selected date range.
+ */
+export function filterLicensesByRange(
+  licenses: ShopLicense[],
+  rangeType: DateRangeType,
+  customStart?: string,
+  customEnd?: string
+): ShopLicense[] {
+  const { start, end } = getDateRangeBounds(rangeType, customStart, customEnd);
+  const startMs = start.getTime();
+  const endMs = end.getTime();
+
+  return licenses.filter((lic) => {
+    const licDate = getLicenseDate(lic);
+    const licMs = licDate.getTime();
+    return licMs >= startMs && licMs <= endMs;
+  });
+}
+
+/**
  * Generates continuous data points for rendering smooth interactive line graphs.
  */
 export function generateChartPoints(
@@ -272,6 +324,138 @@ export function generateChartPoints(
       label,
       fullLabel,
       revenue: Math.round(revenue * 100) / 100,
+      orders,
+      pages,
+      bwPages,
+      colorPages,
+    });
+  }
+
+  return points;
+}
+
+/**
+ * Generates continuous data points specifically for Super Admin Platform Revenue Trajectory.
+ * Plots SaaS license fees collected (from new licenses created/renewed) alongside network volume.
+ */
+export function generateAdminChartPoints(
+  licenses: ShopLicense[],
+  jobs: PrintJob[],
+  rangeType: DateRangeType,
+  customStart?: string,
+  customEnd?: string
+): ChartPoint[] {
+  const bounds = getDateRangeBounds(rangeType, customStart, customEnd);
+  const filteredJobs = filterJobsByRange(jobs, rangeType, customStart, customEnd);
+  const filteredLicenses = filterLicensesByRange(licenses, rangeType, customStart, customEnd);
+
+  // Hourly buckets for "today" or "yesterday"
+  if (rangeType === 'today' || rangeType === 'yesterday') {
+    const points: ChartPoint[] = [];
+    const baseDate = bounds.start;
+    const hours = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22];
+
+    for (const h of hours) {
+      const hStart = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), h, 0, 0).getTime();
+      const hEnd = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), h + 2, 0, 0).getTime();
+
+      const bucketJobs = filteredJobs.filter((j) => {
+        const ms = getJobDate(j).getTime();
+        return ms >= hStart && ms < hEnd;
+      });
+
+      const bucketLicenses = filteredLicenses.filter((lic) => {
+        const ms = getLicenseDate(lic).getTime();
+        return ms >= hStart && ms < hEnd;
+      });
+
+      const adminRevenue = bucketLicenses.reduce((acc, lic) => acc + getLicenseFee(lic.duration), 0);
+      const shopRevenue = bucketJobs.reduce((acc, j) => acc + (j.calculated_price_rupees || 0), 0);
+      const totalRevenue = adminRevenue + shopRevenue;
+      const orders = bucketJobs.length;
+      let pages = 0;
+      let bwPages = 0;
+      let colorPages = 0;
+
+      bucketJobs.forEach((j) => {
+        const pg = (j.page_count || 1) * (j.options.copies || 1);
+        pages += pg;
+        if (j.options.color_mode === 'color') colorPages += pg;
+        else bwPages += pg;
+      });
+
+      const displayHour = h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`;
+
+      points.push({
+        key: `${h}:00`,
+        label: displayHour,
+        fullLabel: `${baseDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} ${displayHour}`,
+        revenue: Math.round(adminRevenue * 100) / 100, // Primary metric: Admin SaaS revenue
+        adminRevenue: Math.round(adminRevenue * 100) / 100,
+        shopRevenue: Math.round(shopRevenue * 100) / 100,
+        totalRevenue: Math.round(totalRevenue * 100) / 100,
+        licensesCount: bucketLicenses.length,
+        orders,
+        pages,
+        bwPages,
+        colorPages,
+      });
+    }
+
+    return points;
+  }
+
+  // Daily buckets for rolling days (7d, 30d, month, custom, all)
+  const diffDays = Math.max(1, Math.round((bounds.end.getTime() - bounds.start.getTime()) / (1000 * 60 * 60 * 24)));
+  const daysToGenerate = Math.min(diffDays, 31);
+
+  const points: ChartPoint[] = [];
+  const startDay = new Date(bounds.end);
+  startDay.setDate(startDay.getDate() - (daysToGenerate - 1));
+
+  for (let i = 0; i < daysToGenerate; i++) {
+    const cur = new Date(startDay.getFullYear(), startDay.getMonth(), startDay.getDate() + i);
+    const dayStart = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate(), 0, 0, 0).getTime();
+    const dayEnd = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate(), 23, 59, 59, 999).getTime();
+
+    const bucketJobs = filteredJobs.filter((j) => {
+      const ms = getJobDate(j).getTime();
+      return ms >= dayStart && ms <= dayEnd;
+    });
+
+    const bucketLicenses = filteredLicenses.filter((lic) => {
+      const ms = getLicenseDate(lic).getTime();
+      return ms >= dayStart && ms <= dayEnd;
+    });
+
+    const adminRevenue = bucketLicenses.reduce((acc, lic) => acc + getLicenseFee(lic.duration), 0);
+    const shopRevenue = bucketJobs.reduce((acc, j) => acc + (j.calculated_price_rupees || 0), 0);
+    const totalRevenue = adminRevenue + shopRevenue;
+    const orders = bucketJobs.length;
+    let pages = 0;
+    let bwPages = 0;
+    let colorPages = 0;
+
+    bucketJobs.forEach((j) => {
+      const pg = (j.page_count || 1) * (j.options.copies || 1);
+      pages += pg;
+      if (j.options.color_mode === 'color') colorPages += pg;
+      else bwPages += pg;
+    });
+
+    const key = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
+    const label = cur.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    const fullLabel = cur.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
+    points.push({
+      key,
+      label,
+      fullLabel,
+      revenue: Math.round(adminRevenue * 100) / 100, // Primary metric: Admin SaaS revenue
+      adminRevenue: Math.round(adminRevenue * 100) / 100,
+      shopRevenue: Math.round(shopRevenue * 100) / 100,
+      totalRevenue: Math.round(totalRevenue * 100) / 100,
+      licensesCount: bucketLicenses.length,
       orders,
       pages,
       bwPages,
