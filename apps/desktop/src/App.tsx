@@ -59,8 +59,12 @@ import { PrintersView, type PrinterRoutingConfig } from './components/PrintersVi
 import { ServicesView } from './components/ServicesView';
 import { WebsiteView } from './components/WebsiteView';
 import { SettingsView } from './components/SettingsView';
+import { ShopAnalyticsView } from './components/ShopAnalyticsView';
 import { JobRejectModal, ServiceEditModal } from './components/Modals';
 import { AdminPortal } from './components/AdminPortal';
+import { getLicenseExpiryStatus, calculateExtendedExpiry, type LicenseExpiryInfo } from './utils/licenseExpiry';
+import { LicenseCountdownModal } from './components/LicenseCountdownModal';
+import { LicenseRenewalModal } from './components/LicenseRenewalModal';
 import { generateTestPagePngBytes } from './utils/hardwareCalibration';
 import { generateCounterStandeePngBytes } from './utils/qrStandeeGenerator';
 import { playOrderChime } from './utils/audioChime';
@@ -237,8 +241,12 @@ export interface AdminAuditEntry {
     | 'KEY_EXTENDED'
     | 'KEY_DELETED'
     | 'DEVICE_RESET'
+    | 'DEVICE_UNBOUND'
     | 'BROADCAST_PUBLISHED'
+    | 'SETTINGS_UPDATED'
+    | 'PASSWORD_CHANGED'
     | 'PASSWORD_UPDATED'
+    | 'ADMIN_LOGIN'
     | 'SHOP_SETUP_SAVED'
     | 'JOB_APPROVED'
     | 'LOGIN_LOCKOUT';
@@ -254,6 +262,7 @@ export interface GlobalBroadcast {
 }
 
 export interface PrintJobItem {
+  id?: string;
   name: string;
   page_count?: number;
   copies: number;
@@ -290,6 +299,7 @@ export interface PrintJob {
   order_mode?: 'MANUAL_APPROVAL' | 'FULL_AUTOMATIC';
   rejection_reason?: string;
   created_at: string;
+  timestamp?: string;
   pickup_pin?: string;
   file_data?: string;
   payment_method?: string;
@@ -450,6 +460,43 @@ function ProductionApp() {
   // Current Shop Data
   const currentShop: ShopLicense | undefined =
     activeSession?.role === 'SHOP_OWNER' ? licenses[activeSession.username] : undefined;
+
+  // --- License Expiry, Warning (72h) & Real-Time Live Countdown (24h) State ---
+  const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNowTimestamp(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const expiryInfo: LicenseExpiryInfo = useMemo(() => {
+    return getLicenseExpiryStatus(currentShop?.expiresAt, nowTimestamp);
+  }, [currentShop?.expiresAt, nowTimestamp]);
+
+  const [showCountdownModal, setShowCountdownModal] = useState(false);
+  const [showRenewalModal, setShowRenewalModal] = useState(false);
+  const [isVerifyingLicense, setIsVerifyingLicense] = useState(false);
+  const hasAutoShownCountdown = useRef(false);
+  const hasAutoShownExpired = useRef(false);
+
+  // Automatically trigger countdown modal when entering the final 24-hour window
+  useEffect(() => {
+    if (screen !== 'WORKSTATION') return;
+    if (expiryInfo.is24hCountdown && !hasAutoShownCountdown.current) {
+      setShowCountdownModal(true);
+      hasAutoShownCountdown.current = true;
+    } else if (!expiryInfo.is24hCountdown) {
+      hasAutoShownCountdown.current = false;
+    }
+
+    if (expiryInfo.isExpired && !hasAutoShownExpired.current) {
+      setShowCountdownModal(true);
+      hasAutoShownExpired.current = true;
+    } else if (!expiryInfo.isExpired) {
+      hasAutoShownExpired.current = false;
+    }
+  }, [screen, expiryInfo.is24hCountdown, expiryInfo.isExpired]);
 
   // --- Admin Security & MFA State ---
   const [isMfaRequired, setIsMfaRequired] = useState(false);
@@ -1745,29 +1792,153 @@ function ProductionApp() {
     setAdminNotice(`License key for "${shopName}" was successfully deleted.`);
   };
 
-  const handleExtendLicense = (username: string, durationToAdd: '1 Month' | '1 Year') => {
+  const handleExtendLicense = async (username: string, durationToAdd: '1 Month' | '1 Year') => {
     const lic = licenses[username];
     if (!lic) return;
-    const currentExpiry = new Date(lic.expiresAt);
-    const baseDate = currentExpiry > new Date() ? currentExpiry : new Date();
+    const newExpiryStr = calculateExtendedExpiry(lic.expiresAt, durationToAdd);
 
-    if (durationToAdd === '1 Month') {
-      baseDate.setDate(baseDate.getDate() + 30);
-    } else {
-      baseDate.setFullYear(baseDate.getFullYear() + 1);
-    }
-    const newExpiryStr = baseDate.toISOString().split('T')[0];
-
-    setLicenses((prev) => ({
-      ...prev,
-      [username]: {
-        ...prev[username],
+    // 1. Update local state while retaining the EXACT SAME license key
+    setLicenses((prev) => {
+      const existing = prev[username] || lic;
+      const updated: ShopLicense = {
+        ...existing,
         expiresAt: newExpiryStr,
         status: 'ACTIVE',
-      },
-    }));
-    logAdminAction('KEY_EXTENDED', `Extended license for ${lic.shopName} by ${durationToAdd} (New Expiry: ${newExpiryStr})`);
+        duration: durationToAdd,
+      };
+      return {
+        ...prev,
+        [username]: updated,
+        ...(existing.username ? { [existing.username.toLowerCase()]: updated } : {}),
+      };
+    });
+
+    // 2. Persist extended expiry directly to Supabase cloud database
+    try {
+      const { data: appRow } = await supabase
+        .from('pilot_applications')
+        .select('id, notes')
+        .or(`generated_username.ilike.${username},id.eq.${lic.appId || ''}`)
+        .maybeSingle();
+
+      let parsedNotes: any = {};
+      if (appRow?.notes) {
+        try {
+          parsedNotes = typeof appRow.notes === 'string' ? JSON.parse(appRow.notes) : appRow.notes;
+        } catch {}
+      }
+
+      const mergedNotes = {
+        ...parsedNotes,
+        expiresAt: newExpiryStr,
+        plan: durationToAdd,
+        renewedAt: new Date().toISOString(),
+      };
+
+      if (appRow?.id) {
+        await supabase
+          .from('pilot_applications')
+          .update({
+            status: 'APPROVED',
+            plan: durationToAdd,
+            notes: JSON.stringify(mergedNotes),
+          })
+          .eq('id', appRow.id);
+      } else {
+        await supabase
+          .from('pilot_applications')
+          .update({
+            status: 'APPROVED',
+            plan: durationToAdd,
+            notes: JSON.stringify(mergedNotes),
+          })
+          .ilike('generated_username', username);
+      }
+
+      // Also update public.shop_licenses if existing
+      await supabase
+        .from('shop_licenses')
+        .update({
+          expires_at: newExpiryStr,
+          is_revoked: false,
+          plan: durationToAdd,
+        })
+        .eq('license_key', lic.licenseKey);
+    } catch (sbErr) {
+      console.warn('Failed to sync license extension to Supabase:', sbErr);
+    }
+
+    logAdminAction('KEY_EXTENDED', `Extended existing license key (${lic.licenseKey}) for ${lic.shopName} by ${durationToAdd} (New Expiry: ${newExpiryStr})`);
     setAdminNotice(`Extended license for ${lic.shopName} until ${newExpiryStr}!`);
+    setNotice(`License successfully renewed! Expiry extended to ${newExpiryStr}. Warning and countdown reset.`);
+    setShowCountdownModal(false);
+  };
+
+  const handleVerifyLicense = async () => {
+    const u = (currentShop?.username || activeSession?.username || '').trim().toLowerCase();
+    if (!u) return;
+    setIsVerifyingLicense(true);
+    try {
+      const devIdentity = await getWorkstationDeviceIdentity();
+
+      // 1. Fetch latest shop record from Supabase pilot_applications
+      const { data: appRow, error: sbErr } = await supabase
+        .from('pilot_applications')
+        .select('*')
+        .or(`generated_username.ilike.${u},id.eq.${currentShop?.appId || ''}`)
+        .maybeSingle();
+
+      let cloudExpiry: string | null = null;
+      let cloudStatus: 'ACTIVE' | 'REVOKED' = 'ACTIVE';
+
+      if (!sbErr && appRow) {
+        cloudStatus = appRow.status === 'APPROVED' ? 'ACTIVE' : 'REVOKED';
+        if (appRow.notes) {
+          try {
+            const p = typeof appRow.notes === 'string' ? JSON.parse(appRow.notes) : appRow.notes;
+            if (p.expiresAt) cloudExpiry = p.expiresAt;
+          } catch {}
+        }
+      }
+
+      // 2. Fallback check via RPC
+      if (!cloudExpiry && currentShop?.licenseKey) {
+        try {
+          const { data: authRes } = await supabase.rpc('validate_shop_license', {
+            p_username: u,
+            p_license_key: currentShop.licenseKey.trim().toUpperCase(),
+            p_device_id: devIdentity.device_id,
+            p_hardware_hash: devIdentity.hardware_hash,
+            p_device_name: devIdentity.device_name,
+          });
+          if (authRes?.expires_at) {
+            cloudExpiry = authRes.expires_at.split('T')[0];
+          }
+        } catch {}
+      }
+
+      if (cloudExpiry && currentShop && cloudExpiry !== currentShop.expiresAt) {
+        const updatedShop: ShopLicense = {
+          ...currentShop,
+          expiresAt: cloudExpiry,
+          status: cloudStatus,
+        };
+        setLicenses((prev) => ({
+          ...prev,
+          [currentShop.username]: updatedShop,
+          [u]: updatedShop,
+        }));
+        setNotice(`License successfully verified! Expiry extended to ${cloudExpiry}. Warning and countdown reset.`);
+        setShowCountdownModal(false);
+      } else {
+        setNotice(`License verified: Status is ${currentShop?.status || 'ACTIVE'}, valid through ${currentShop?.expiresAt || 'N/A'}.`);
+      }
+    } catch (err) {
+      console.warn('License verification error:', err);
+      setNotice('Could not verify license with central cloud. Please verify your internet connection.');
+    } finally {
+      setIsVerifyingLicense(false);
+    }
   };
 
   const handleResetDevice = async (username: string): Promise<void> => {
@@ -1976,6 +2147,11 @@ function ProductionApp() {
 
   const handleTestPrint = async (printerName: string) => {
     if (!printerName) return;
+    if (expiryInfo.isExpired) {
+      alert('Print Bot License Expired: Diagnostic test printing is disabled. License renewal is required to continue using printbot.');
+      setShowCountdownModal(true);
+      return;
+    }
     setTestingPrinterName(printerName);
     try {
       const pngBytes = await generateTestPagePngBytes({
@@ -2009,6 +2185,11 @@ function ProductionApp() {
   };
 
   const handlePrintStandee = async () => {
+    if (expiryInfo.isExpired) {
+      alert('Print Bot License Expired: Standee printing is disabled. License renewal is required to continue using printbot.');
+      setShowCountdownModal(true);
+      return;
+    }
     setIsPrintingStandee(true);
     try {
       const shopSlug = currentShop?.username || activeSession?.username || 'dummy';
@@ -2061,10 +2242,10 @@ function ProductionApp() {
     const shopLocation = currentShop?.location;
     const opened = openWhatsAppForOrder({
       orderId: job.id,
-      customerName: job.customer_name || job.customer_email,
-      customerPhone: job.customer_phone || (job as any).phone,
+      customerName: (job as any).customer_name || job.customer_email,
+      customerPhone: (job as any).customer_phone || (job as any).phone || job.customer_email,
       pickupPin: job.pickup_pin || '0000',
-      totalRupees: job.amount_rupees || 0,
+      totalRupees: job.calculated_price_rupees || 0,
       totalSheets: job.physical_sheets || 1,
       colorMode: job.options.color_mode === 'color' ? 'Color' : 'Black & White',
       shopName,
@@ -2109,6 +2290,8 @@ function ProductionApp() {
     const shopId = (currentShop?.username || activeSession?.username || '').toLowerCase();
     if (!shopId) return;
 
+    let isFullAuto = (currentShop?.orderMode || setupOrderMode) === 'FULL_AUTOMATIC';
+
     try {
       // 1. Fetch live customer orders from Supabase cloud database
       const { data: cloudOrders, error: sbError } = await supabase
@@ -2129,9 +2312,24 @@ function ProductionApp() {
             if (parsedShopNotes?.orderMode === 'FULL_AUTOMATIC' || parsedShopNotes?.orderMode === 'MANUAL_APPROVAL') {
               liveOrderMode = parsedShopNotes.orderMode;
             }
+            // Auto-retrieve updated expiry date on cloud license renewal and reset warning/countdown
+            if (parsedShopNotes?.expiresAt && currentShop && parsedShopNotes.expiresAt !== currentShop.expiresAt) {
+              const updatedShop: ShopLicense = {
+                ...currentShop,
+                expiresAt: parsedShopNotes.expiresAt,
+                status: (shopRow.status === 'APPROVED' ? 'ACTIVE' : currentShop.status) as any,
+              };
+              setLicenses((prev) => ({
+                ...prev,
+                [currentShop.username]: updatedShop,
+                [shopId]: updatedShop,
+              }));
+              setNotice(`License successfully renewed! Expiry extended to ${parsedShopNotes.expiresAt}.`);
+              setShowCountdownModal(false);
+            }
           } catch {}
         }
-        const isFullAuto = liveOrderMode === 'FULL_AUTOMATIC';
+        isFullAuto = liveOrderMode === 'FULL_AUTOMATIC';
 
         const isAdmin = activeSession?.role === 'ADMIN' || shopId === 'admin';
         const matchingRows = cloudOrders.filter((row: any) => {
@@ -2210,6 +2408,7 @@ function ProductionApp() {
                 calculated_price_rupees: rupees,
                 status: mappedStatus,
                 created_at: meta.placedAt || (row.applied_at ? new Date(row.applied_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'),
+                timestamp: row.applied_at || meta.placedAt || new Date().toISOString(),
                 rejection_reason: meta.rejectionReason || undefined,
                 pickup_pin: row.generated_key || meta.pickupPin || undefined,
                 file_data: meta.fileData || undefined,
@@ -2362,9 +2561,9 @@ function ProductionApp() {
     }
   };
 
-  // Poll cloud queue for active counter workstation
+  // Poll cloud queue for active counter workstation or super admin portal
   useEffect(() => {
-    if (screen !== 'WORKSTATION' || (!currentShop?.username && !activeSession?.username)) return;
+    if ((screen !== 'WORKSTATION' && screen !== 'ADMIN_PORTAL') || (!currentShop?.username && !activeSession?.username)) return;
     fetchServerQueue();
     const interval = setInterval(fetchServerQueue, 3000);
     return () => clearInterval(interval);
@@ -2597,6 +2796,11 @@ function ProductionApp() {
   };
 
   const handleApproveJob = async (jobId: string) => {
+    if (expiryInfo.isExpired) {
+      setNotice('Print Bot License Expired: Order approval is disabled. Renewal is required to continue using printbot.');
+      setShowCountdownModal(true);
+      return;
+    }
     const targetJob = jobs.find((j) => j.id === jobId);
     if (!targetJob) {
       setNotice(`Job #${jobId} was not found in the queue.`);
@@ -2631,6 +2835,16 @@ function ProductionApp() {
     itemIndexOrAuto: number | boolean = false,
     printerOverride?: string
   ) => {
+    if (expiryInfo.isExpired) {
+      const msg = 'Print Bot License Expired: Hardware printing is disabled. License renewal is required to continue using printbot.';
+      if (typeof itemIndexOrAuto === 'boolean' && itemIndexOrAuto) {
+        setNotice(msg);
+      } else {
+        alert(msg);
+      }
+      setShowCountdownModal(true);
+      return;
+    }
     const targetJob = jobs.find((j) => j.id === jobId);
     if (!targetJob) return;
     const targetPrinter =
@@ -2845,7 +3059,7 @@ function ProductionApp() {
 
   useEffect(() => {
     const isFullAuto = (currentShop?.orderMode || setupOrderMode) === 'FULL_AUTOMATIC';
-    if (screen !== 'WORKSTATION' || !isFullAuto) return;
+    if (screen !== 'WORKSTATION' || !isFullAuto || expiryInfo.isExpired) return;
 
     const onlinePrinters = nativePrinters?.filter((printer) => printer.is_online) || [];
     const targetPrinter =
@@ -2940,6 +3154,7 @@ function ProductionApp() {
       calculated_price_rupees: 20.0,
       status: currentShop?.orderMode === 'FULL_AUTOMATIC' ? 'QUEUED' : 'PENDING_APPROVAL',
       created_at: 'Just now',
+      timestamp: new Date().toISOString(),
     };
     setJobs((prev) => [newJob, ...prev]);
     setNotice(`New incoming QR customer order ${randomId} received!`);
@@ -2980,8 +3195,8 @@ function ProductionApp() {
         setSetupLocation={setSetupLocation}
         setupPhone={setupPhone}
         setSetupPhone={setSetupPhone}
-        setupBwRate={setupBwRate}
-        setupColorRate={setupColorRate}
+        setupBwRate={currentShop?.rates?.bwPerSideRupees || 2}
+        setupColorRate={currentShop?.rates?.colorPerSideRupees || 10}
         setupOrderMode={setupOrderMode}
         onSaveSetup={handleSaveSetup}
         onLogout={handleLogout}
@@ -3243,9 +3458,14 @@ function ProductionApp() {
       onLogout={handleLogout}
       cloudSyncStatus="CONNECTED"
       notice={notice}
-      onDismissNotice={() => setNotice(null)}
+      onDismissNotice={() => setNotice('')}
       globalBroadcast={globalBroadcast}
       hardwareWarning={hardwareWarning}
+      expiryInfo={expiryInfo}
+      onOpenRenewalModal={() => setShowRenewalModal(true)}
+      onOpenCountdownModal={() => setShowCountdownModal(true)}
+      onVerifyLicense={handleVerifyLicense}
+      isVerifyingLicense={isVerifyingLicense}
     >
       {activeTab === 'queue' && (
         <QueueView
@@ -3260,6 +3480,11 @@ function ProductionApp() {
           statusFilter={statusFilter}
           setStatusFilter={setStatusFilter}
           onApproveAll={async () => {
+            if (expiryInfo.isExpired) {
+              setNotice('Print Bot License Expired: Order approval is disabled. Renewal is required to continue using printbot.');
+              setShowCountdownModal(true);
+              return;
+            }
             const pendingIds = jobs.filter((j) => j.status === 'PENDING_APPROVAL').map((j) => j.id);
             setJobs((prev) =>
               prev.map((j) => (j.status === 'PENDING_APPROVAL' ? { ...j, status: 'QUEUED' } : j))
@@ -3287,6 +3512,8 @@ function ProductionApp() {
             setNotice('Checking for incoming cloud orders...');
             fetchServerQueue();
           }}
+          isLicenseExpired={expiryInfo.isExpired}
+          onOpenRenewalModal={() => setShowRenewalModal(true)}
         />
       )}
 
@@ -3300,6 +3527,8 @@ function ProductionApp() {
           testingPrinterName={testingPrinterName}
           onPrintStandee={handlePrintStandee}
           isPrintingStandee={isPrintingStandee}
+          isLicenseExpired={expiryInfo.isExpired}
+          onOpenRenewalModal={() => setShowRenewalModal(true)}
           onRefreshPrinters={async () => {
             setIsRefreshingPrinters(true);
             try {
@@ -3356,6 +3585,18 @@ function ProductionApp() {
           }}
           onPublishServices={handlePublishServices}
           onLoadDefaultServices={() => handlePublishServices(DEFAULT_SHOP_SERVICES)}
+        />
+      )}
+
+      {activeTab === 'analytics' && (
+        <ShopAnalyticsView
+          currentShop={currentShop}
+          jobs={jobs}
+          onRefreshJobs={() => {
+            setNotice('Checking for incoming cloud orders...');
+            fetchServerQueue();
+          }}
+          onWhatsAppCustomer={handleWhatsAppCustomer}
         />
       )}
 
@@ -3418,6 +3659,39 @@ function ProductionApp() {
           setServiceFormDiscountNote={setServiceFormDiscountNote}
           onSaveService={handleSaveServiceSubmit}
           onClose={() => setIsServiceModalOpen(false)}
+        />
+      )}
+
+      {/* 24-Hour Live Countdown / Expired Modal */}
+      <LicenseCountdownModal
+        isOpen={showCountdownModal}
+        onClose={() => setShowCountdownModal(false)}
+        expiryInfo={expiryInfo}
+        shopName={currentShop?.shopName || activeSession?.username || 'Print Bot Workstation'}
+        licenseKey={currentShop?.licenseKey || 'N/A'}
+        onOpenRenewalModal={() => {
+          setShowCountdownModal(false);
+          setShowRenewalModal(true);
+        }}
+        onVerifyLicense={handleVerifyLicense}
+        isVerifying={isVerifyingLicense}
+      />
+
+      {/* License Renewal Modal */}
+      {currentShop && (
+        <LicenseRenewalModal
+          isOpen={showRenewalModal}
+          onClose={() => setShowRenewalModal(false)}
+          shopName={currentShop.shopName || currentShop.username}
+          username={currentShop.username}
+          licenseKey={currentShop.licenseKey}
+          currentExpiresAt={currentShop.expiresAt}
+          expiryInfo={expiryInfo}
+          onExtendLicense={async (u, dur) => {
+            await handleExtendLicense(u, dur);
+          }}
+          onVerifyLicense={handleVerifyLicense}
+          isVerifying={isVerifyingLicense}
         />
       )}
     </DesktopShell>

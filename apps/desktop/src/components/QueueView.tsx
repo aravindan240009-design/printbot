@@ -41,6 +41,8 @@ interface QueueViewProps {
   onDirectPrint?: (jobId: string, specificItemIndex?: number) => void;
   printerRouting?: { bwPrinter: string; colorPrinter: string; duplexPrinter: string };
   onWhatsAppCustomer?: (job: PrintJob) => void;
+  isLicenseExpired?: boolean;
+  onOpenRenewalModal?: () => void;
 }
 
 export const QueueView: React.FC<QueueViewProps> = ({
@@ -67,6 +69,8 @@ export const QueueView: React.FC<QueueViewProps> = ({
   onDirectPrint,
   printerRouting,
   onWhatsAppCustomer,
+  isLicenseExpired = false,
+  onOpenRenewalModal,
 }) => {
   const [isClearDialogOpen, setIsClearDialogOpen] = React.useState(false);
   const [clearError, setClearError] = React.useState<string | null>(null);
@@ -132,6 +136,48 @@ export const QueueView: React.FC<QueueViewProps> = ({
 
   return (
     <div className="pb-view">
+      {/* License Expired Callout */}
+      {isLicenseExpired && (
+        <div
+          style={{
+            padding: '14px 18px',
+            background: '#fef2f2',
+            border: '2px solid #ef4444',
+            borderRadius: '10px',
+            marginBottom: '18px',
+            color: '#991b1b',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '14px',
+            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.1)',
+          }}
+          role="alert"
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <AlertTriangle size={22} color="#dc2626" style={{ flexShrink: 0 }} />
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '13.5px' }}>
+                Order Processing &amp; Printing Disabled
+              </div>
+              <div style={{ fontSize: '12px', color: '#b91c1c', marginTop: '2px' }}>
+                Your Print Bot license has expired. Renewal is required to approve, dispatch, or print counter orders.
+              </div>
+            </div>
+          </div>
+          {onOpenRenewalModal && (
+            <button
+              type="button"
+              onClick={onOpenRenewalModal}
+              className="pb-btn pb-btn-primary pb-btn-sm"
+              style={{ background: '#dc2626', color: '#ffffff', fontWeight: 800, height: '32px', whiteSpace: 'nowrap' }}
+            >
+              Renew License Now →
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Page Title & Top Actions */}
       <div className="pb-page-header">
         <div>
@@ -169,8 +215,10 @@ export const QueueView: React.FC<QueueViewProps> = ({
           <button
             type="button"
             className="pb-btn pb-btn-primary"
-            disabled={pendingCount === 0}
-            onClick={onApproveAll}
+            disabled={pendingCount === 0 || isLicenseExpired}
+            onClick={isLicenseExpired ? onOpenRenewalModal : onApproveAll}
+            title={isLicenseExpired ? 'License Expired - Renewal required' : 'Approve all pending jobs'}
+            style={isLicenseExpired ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
           >
             <CheckCircle2 size={14} />
             <span>Approve All Pending ({pendingCount})</span>

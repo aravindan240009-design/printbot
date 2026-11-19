@@ -10,6 +10,7 @@ import {
   Tag,
   Clock,
   Layers,
+  Mail,
 } from 'lucide-react';
 import { type ShopServiceItem, type PrintJob } from '../App';
 

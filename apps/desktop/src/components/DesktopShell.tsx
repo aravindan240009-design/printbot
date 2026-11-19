@@ -17,10 +17,14 @@ import {
   AlertTriangle,
   RotateCcw,
   Megaphone,
+  Clock,
+  TrendingUp,
 } from 'lucide-react';
 import { type ShopLicense } from '../App';
+import type { LicenseExpiryInfo } from '../utils/licenseExpiry';
+import { LicenseExpiryBanner } from './LicenseExpiryBanner';
 
-export type Tab = 'queue' | 'printers' | 'services' | 'website' | 'settings';
+export type Tab = 'queue' | 'printers' | 'services' | 'analytics' | 'website' | 'settings';
 
 interface DesktopShellProps {
   currentShop?: ShopLicense;
@@ -41,6 +45,11 @@ interface DesktopShellProps {
   onDismissNotice: () => void;
   globalBroadcast?: { active: boolean; message: string; type: 'info' | 'warning' | 'urgent' };
   hardwareWarning?: { title: string; message: string; printerName?: string } | null;
+  expiryInfo?: LicenseExpiryInfo;
+  onOpenRenewalModal?: () => void;
+  onOpenCountdownModal?: () => void;
+  onVerifyLicense?: () => void;
+  isVerifyingLicense?: boolean;
   children: React.ReactNode;
 }
 
@@ -63,6 +72,11 @@ export const DesktopShell: React.FC<DesktopShellProps> = ({
   onDismissNotice,
   globalBroadcast,
   hardwareWarning,
+  expiryInfo,
+  onOpenRenewalModal,
+  onOpenCountdownModal,
+  onVerifyLicense,
+  isVerifyingLicense,
   children,
 }) => {
   return (
@@ -89,6 +103,41 @@ export const DesktopShell: React.FC<DesktopShellProps> = ({
             <span style={{ color: 'var(--pb-desk-text-dim)' }}>•</span>
             <span style={{ color: 'var(--pb-desk-text)' }}>{username}</span>
           </div>
+
+          {/* Real-Time License Expiry Warning / Countdown Status Chip */}
+          {expiryInfo && expiryInfo.status !== 'ACTIVE' && expiryInfo.status !== 'LIFETIME' && (
+            <div
+              className="pb-titlebar-status-chip"
+              onClick={expiryInfo.is24hCountdown ? onOpenCountdownModal : onOpenRenewalModal}
+              style={{
+                cursor: 'pointer',
+                background: expiryInfo.isExpired ? '#991b1b' : expiryInfo.is24hCountdown ? '#450a0a' : '#fef3c7',
+                color: expiryInfo.isExpired ? '#ffffff' : expiryInfo.is24hCountdown ? '#fecaca' : '#92400e',
+                border: expiryInfo.isExpired ? '1px solid #ef4444' : expiryInfo.is24hCountdown ? '1px solid #ef4444' : '1px solid #fde68a',
+                fontWeight: 750,
+                fontSize: '11px',
+                gap: '6px',
+              }}
+              title={expiryInfo.is24hCountdown ? 'Click to view countdown popup' : 'Click to renew license'}
+            >
+              {expiryInfo.isExpired ? (
+                <>
+                  <Lock size={12} color="#ffffff" />
+                  <span>License Expired</span>
+                </>
+              ) : expiryInfo.is24hCountdown ? (
+                <>
+                  <Clock size={12} className="animate-pulse" color="#f87171" />
+                  <span>Countdown: <strong style={{ fontFamily: 'monospace' }}>{expiryInfo.formattedCountdown}</strong></span>
+                </>
+              ) : (
+                <>
+                  <AlertTriangle size={12} color="#d97706" />
+                  <span>Expires in: <strong>{expiryInfo.daysRemaining === 1 ? '1 day' : `${expiryInfo.daysRemaining} days`}</strong></span>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="pb-titlebar-right">
@@ -167,6 +216,16 @@ export const DesktopShell: React.FC<DesktopShellProps> = ({
                 <span>Services &amp; Rates</span>
                 <span className="pb-sidebar-badge">{servicesCount}</span>
               </button>
+
+              <button
+                type="button"
+                className={`pb-sidebar-nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
+                aria-current={activeTab === 'analytics' ? 'page' : undefined}
+                onClick={() => setActiveTab('analytics')}
+              >
+                <TrendingUp size={16} />
+                <span>Revenue &amp; Analytics</span>
+              </button>
             </nav>
           </div>
 
@@ -222,6 +281,16 @@ export const DesktopShell: React.FC<DesktopShellProps> = ({
 
         {/* Main Content Area */}
         <main className="pb-desktop-main">
+          {/* License Expiry Banner (Warning 72h, Countdown 24h, or Expired) */}
+          {expiryInfo && (
+            <LicenseExpiryBanner
+              expiryInfo={expiryInfo}
+              onOpenRenewalModal={onOpenRenewalModal || (() => {})}
+              onVerifyLicense={onVerifyLicense || (() => {})}
+              isVerifying={isVerifyingLicense}
+              onOpenCountdownModal={onOpenCountdownModal}
+            />
+          )}
           {/* Network Broadcast Announcement */}
           {globalBroadcast?.active && globalBroadcast?.message && (
             <div

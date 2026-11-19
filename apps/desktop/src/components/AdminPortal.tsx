@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ShieldCheck,
   UserCheck,
@@ -36,8 +36,23 @@ import {
   Layers,
   AlertTriangle,
   FileText,
+  Trophy,
+  Flame,
+  ArrowUpDown,
+  DollarSign,
+  ArrowLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { type PrintJob } from '../App';
+import { DateRangePicker } from './DateRangePicker';
+import { InteractiveLineGraph } from './InteractiveLineGraph';
+import {
+  type DateRangeType,
+  getDateRangeBounds,
+  filterJobsByRange,
+  generateChartPoints,
+  computeShopAnalytics,
+} from '../utils/analyticsUtils';
 
 export interface PilotApplication {
   id: string;
@@ -97,6 +112,8 @@ export interface AdminAuditEntry {
     | 'PASSWORD_CHANGED'
     | 'PASSWORD_UPDATED'
     | 'ADMIN_LOGIN'
+    | 'SHOP_SETUP_SAVED'
+    | 'JOB_APPROVED'
     | 'LOGIN_LOCKOUT';
   details: string;
   actor: string;
@@ -237,10 +254,57 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [licenseSearchQuery, setLicenseSearchQuery] = useState('');
   const [licenseStatusFilter, setLicenseStatusFilter] = useState<'ALL' | 'ACTIVE' | 'REVOKED'>('ALL');
 
+  // Shop Directory & Devices Drill-Down View State
+  const [selectedShopUsername, setSelectedShopUsername] = useState<string | null>(null);
+  const [shopDirectorySearchQuery, setShopDirectorySearchQuery] = useState('');
+  const [shopDirectoryFilter, setShopDirectoryFilter] = useState<'ALL' | 'LOCKED' | 'UNBOUND'>('ALL');
+
+  // Revenue & Analytics Interactive State
+  const [revenueDateRange, setRevenueDateRange] = useState<DateRangeType>('all');
+  const [revenueCustomStart, setRevenueCustomStart] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().split('T')[0];
+  });
+  const [revenueCustomEnd, setRevenueCustomEnd] = useState<string>(() => {
+    return new Date().toISOString().split('T')[0];
+  });
+  const [revenueSearchQuery, setRevenueSearchQuery] = useState('');
+  const [revenueSortKey, setRevenueSortKey] = useState<'REVENUE' | 'ORDERS' | 'PAGES'>('REVENUE');
+
   // Filter out the platform admin account from shop lists
   const shopList = Object.values(licenses).filter((l) => l.username.toLowerCase() !== 'admin');
   const activeCount = shopList.filter((l) => l.status === 'ACTIVE').length;
   const revokedCount = shopList.filter((l) => l.status === 'REVOKED').length;
+
+  // Filtered Shop Directory for Simple List View
+  const filteredShopDirectory = useMemo(() => {
+    return shopList.filter((s) => {
+      if (shopDirectoryFilter === 'LOCKED' && !s.deviceId) return false;
+      if (shopDirectoryFilter === 'UNBOUND' && !!s.deviceId) return false;
+      if (!shopDirectorySearchQuery.trim()) return true;
+      const q = shopDirectorySearchQuery.toLowerCase();
+      return (
+        s.shopName.toLowerCase().includes(q) ||
+        s.username.toLowerCase().includes(q) ||
+        (s.ownerName && s.ownerName.toLowerCase().includes(q)) ||
+        (s.location && s.location.toLowerCase().includes(q)) ||
+        (s.phone && s.phone.includes(q)) ||
+        (s.deviceName && s.deviceName.toLowerCase().includes(q)) ||
+        (s.deviceId && s.deviceId.toLowerCase().includes(q))
+      );
+    });
+  }, [shopList, shopDirectoryFilter, shopDirectorySearchQuery]);
+
+  // Selected shop for Full Details Page
+  const selectedShop = useMemo(() => {
+    if (!selectedShopUsername) return null;
+    return (
+      licenses[selectedShopUsername] ||
+      shopList.find((s) => s.username.toLowerCase() === selectedShopUsername.toLowerCase()) ||
+      null
+    );
+  }, [selectedShopUsername, licenses, shopList]);
 
   // Real Revenue Calculations
   const totalSubscriptionRevenue = shopList.reduce((acc, l) => {
@@ -253,6 +317,64 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const totalNetworkOrders = completedJobs.length;
   const totalNetworkPages = completedJobs.reduce((acc, j) => acc + (j.page_count * (j.options.copies || 1)), 0);
   const totalPrintRevenueRupees = completedJobs.reduce((acc, j) => acc + (j.calculated_price_rupees || 0), 0);
+
+  // Date range bounds for Revenue tab
+  const revenueBounds = useMemo(() => {
+    return getDateRangeBounds(revenueDateRange, revenueCustomStart, revenueCustomEnd);
+  }, [revenueDateRange, revenueCustomStart, revenueCustomEnd]);
+
+  // Jobs filtered by selected date range
+  const rangeCompletedJobs = useMemo(() => {
+    return filterJobsByRange(jobs, revenueDateRange, revenueCustomStart, revenueCustomEnd);
+  }, [jobs, revenueDateRange, revenueCustomStart, revenueCustomEnd]);
+
+  // Chart data points across the selected range
+  const networkChartPoints = useMemo(() => {
+    return generateChartPoints(jobs, revenueDateRange, revenueCustomStart, revenueCustomEnd);
+  }, [jobs, revenueDateRange, revenueCustomStart, revenueCustomEnd]);
+
+  // Computed & Ranked Shop Analytics (HIGHEST REVENUE ON TOP by default)
+  const {
+    items: rankedShops,
+    totalNetworkTurnover,
+    totalNetworkOrders: rangeNetworkOrders,
+    totalNetworkPages: rangeNetworkPages,
+  } = useMemo(() => {
+    return computeShopAnalytics(shopList, rangeCompletedJobs, totalSubscriptionRevenue);
+  }, [shopList, rangeCompletedJobs, totalSubscriptionRevenue]);
+
+  // Sort and filter rankedShops for display
+  const sortedAndFilteredShops = useMemo(() => {
+    let list = [...rankedShops];
+
+    // Filter by search query if any
+    if (revenueSearchQuery.trim()) {
+      const q = revenueSearchQuery.toLowerCase();
+      list = list.filter(
+        (s) =>
+          s.shopName.toLowerCase().includes(q) ||
+          s.username.toLowerCase().includes(q) ||
+          s.location.toLowerCase().includes(q) ||
+          s.licenseKey.toLowerCase().includes(q)
+      );
+    }
+
+    // Sort by chosen metric (defaults to REVENUE, so highest revenue is on top)
+    if (revenueSortKey === 'REVENUE') {
+      list.sort((a, b) => b.printTurnover - a.printTurnover || b.ordersCount - a.ordersCount);
+    } else if (revenueSortKey === 'ORDERS') {
+      list.sort((a, b) => b.ordersCount - a.ordersCount || b.printTurnover - a.printTurnover);
+    } else if (revenueSortKey === 'PAGES') {
+      list.sort((a, b) => b.pagesCount - a.pagesCount || b.printTurnover - a.printTurnover);
+    }
+
+    return list;
+  }, [rankedShops, revenueSearchQuery, revenueSortKey]);
+
+  // Top 3 Podium shops
+  const topShops = useMemo(() => {
+    return rankedShops.slice(0, 3);
+  }, [rankedShops]);
 
   const pendingAppCount = applications.filter((a) => a.status === 'PENDING').length;
 
@@ -340,7 +462,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setAdminActiveTab(item.id as AdminTab)}
+                  onClick={() => {
+                    setAdminActiveTab(item.id as AdminTab);
+                    setSelectedShopUsername(null);
+                  }}
                   className={`pb-admin-nav-item ${isActive ? 'active' : ''}`}
                 >
                   <Icon size={16} />
@@ -1085,10 +1210,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                               <div style={{ display: 'inline-flex', gap: '6px' }}>
                                 <button
                                   type="button"
+                                  onClick={() => handleExtendLicense(lic.username, '1 Month')}
+                                  className="pb-btn pb-btn-secondary pb-btn-sm"
+                                  style={{ fontSize: '11px', height: '28px', padding: '0 8px' }}
+                                  title="Extend existing license by 1 month (+30 days)"
+                                >
+                                  +1 Month
+                                </button>
+                                <button
+                                  type="button"
                                   onClick={() => handleExtendLicense(lic.username, '1 Year')}
                                   className="pb-btn pb-btn-secondary pb-btn-sm"
                                   style={{ fontSize: '11px', height: '28px', padding: '0 8px' }}
-                                  title="Extend license by 1 year"
+                                  title="Extend existing license by 1 year (+365 days)"
                                 >
                                   +1 Year
                                 </button>
@@ -1126,190 +1260,776 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           {/* ========================================================= */}
           {adminActiveTab === 'SHOPS_DEVICES' && (
             <div>
-              {/* Policy Banner */}
-              <div
-                className="pb-admin-card"
-                style={{
-                  background: '#eff6ff',
-                  border: '1px solid #bfdbfe',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '12px',
-                  padding: '16px 20px',
-                  marginBottom: '20px',
-                }}
-              >
-                <Laptop size={22} color="#2563eb" style={{ flexShrink: 0, marginTop: '2px' }} />
+              {/* IF A SPECIFIC SHOP IS SELECTED: SHOW FULL SHOP DETAILS PAGE */}
+              {selectedShop ? (
                 <div>
-                  <h3 style={{ fontSize: '13.5px', fontWeight: 800, margin: '0 0 3px', color: '#1e3a8a' }}>
-                    Hardware Node Device Binding Policy
-                  </h3>
-                  <p style={{ margin: 0, fontSize: '11.5px', color: '#1e40af', lineHeight: 1.45 }}>
-                    Each subscribed Xerox shop connects unlimited physical printers through their authenticated Windows counter PC.
-                    Device pairing is cryptographically locked to the workstation's hardware/TPM identity to prevent unauthorized cloning.
-                    If a shop upgrades or replaces their counter computer, click <strong>Reset Hardware Pairing</strong>.
-                  </p>
-                </div>
-              </div>
-
-              {/* Shop & Devices Grid */}
-              {shopList.length === 0 ? (
-                <div className="pb-admin-card" style={{ textAlign: 'center', padding: '48px 24px', color: '#94a3b8' }}>
-                  <Building2 size={40} style={{ margin: '0 auto 10px', opacity: 0.5 }} />
-                  <h3 style={{ fontSize: '16px', fontWeight: 800, margin: '0 0 6px', color: '#0f172a' }}>
-                    No Registered Shops
-                  </h3>
-                  <p style={{ fontSize: '12.5px', margin: 0 }}>
-                    No shop licenses have been created yet. Issue a license key to register a shop.
-                  </p>
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '16px' }}>
-                  {shopList.map((lic) => (
-                    <div
-                      key={lic.username}
-                      className="pb-admin-card"
-                      style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '20px' }}
+                  {/* Top Navigation & Back Bar */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '12px',
+                      marginBottom: '18px',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setSelectedShopUsername(null)}
+                      className="pb-btn pb-btn-secondary"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}
                     >
+                      <ArrowLeft size={14} /> Back to Shop Directory
+                    </button>
+
+                    <div style={{ fontSize: '11.5px', color: '#64748b' }}>
+                      Platform Operations / Shop Directory &amp; Devices /{' '}
+                      <strong style={{ color: '#0f172a' }}>{selectedShop.shopName}</strong>
+                    </div>
+                  </div>
+
+                  {/* Main Shop Header Card */}
+                  {(() => {
+                    // Calculate live stats for this selected shop from jobs
+                    const shopJobs = jobs.filter((j) => {
+                      const u = (selectedShop.username || '').toLowerCase();
+                      const n = (selectedShop.shopName || '').toLowerCase();
+                      const jShop = ((j as any).shop_id || '').toLowerCase();
+                      const jEmail = (j.customer_email || '').toLowerCase();
+                      if (shopList.length === 1) return true;
+                      if (jShop && (jShop === u || jShop === n || jShop.includes(u) || u.includes(jShop))) return true;
+                      if (jEmail && jEmail.includes(u)) return true;
+                      return false;
+                    });
+                    const shopCompleted = shopJobs.filter((j) => j.status === 'COMPLETED');
+                    const shopOrderCount = shopCompleted.length;
+                    const shopPageCount = shopCompleted.reduce((acc, j) => acc + (j.page_count * (j.options.copies || 1)), 0);
+                    const shopTurnover = shopCompleted.reduce((acc, j) => acc + (j.calculated_price_rupees || 0), 0);
+
+                    return (
                       <div>
-                        {/* Header */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
-                          <div>
-                            <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0, color: '#0f172a' }}>
-                              {lic.shopName}
-                            </h3>
-                            <div style={{ color: '#64748b', fontSize: '11px', marginTop: '2px' }}>
-                              User: <code>{lic.username}</code> · Plan: {lic.duration || '1 Year'}
-                            </div>
-                          </div>
-                          <span
-                            style={{
-                              padding: '2px 8px',
-                              borderRadius: '12px',
-                              fontSize: '10.5px',
-                              fontWeight: 750,
-                              background: lic.status === 'ACTIVE' ? '#ecfdf5' : '#fef2f2',
-                              color: lic.status === 'ACTIVE' ? '#047857' : '#b91c1c',
-                            }}
-                          >
-                            {lic.status}
-                          </span>
-                        </div>
-
-                        {/* Shop Details */}
-                        <div style={{ display: 'grid', gap: '8px', fontSize: '12px', color: '#334155', marginBottom: '14px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <User size={13} color="#64748b" />
-                            <span><strong style={{ color: '#64748b' }}>Owner:</strong> {lic.ownerName || lic.shopName}</span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <MapPin size={13} color="#64748b" />
-                            <span><strong style={{ color: '#64748b' }}>Location:</strong> {lic.location || 'Main Counter'}</span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <Phone size={13} color="#64748b" />
-                            <span><strong style={{ color: '#64748b' }}>Phone:</strong> {lic.phone || 'Contact on file'}</span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <Radio size={13} color="#64748b" />
-                            <span>
-                              <strong style={{ color: '#64748b' }}>Dispatch Mode:</strong>{' '}
-                              <span style={{ fontWeight: 700, color: lic.orderMode === 'FULL_AUTOMATIC' ? '#059669' : '#d97706' }}>
-                                {lic.orderMode === 'FULL_AUTOMATIC' ? '⚡ Full Automatic' : '✋ Manual Approval'}
-                              </span>
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Device Pairing info card */}
+                        {/* Header Box */}
                         <div
+                          className="pb-admin-card"
                           style={{
-                            padding: '12px 14px',
-                            borderRadius: '8px',
-                            background: '#f8fafc',
-                            border: '1px solid #e2e8f0',
+                            padding: '24px',
+                            marginBottom: '20px',
+                            borderLeft: '4px solid #2563eb',
                           }}
                         >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                            <span style={{ fontSize: '10.5px', color: '#64748b', textTransform: 'uppercase', fontWeight: 800 }}>
-                              Authorized PC Identity
-                            </span>
-                            <span
-                              style={{
-                                fontSize: '10px',
-                                fontWeight: 750,
-                                color: lic.deviceId ? '#059669' : '#ea580c',
-                                background: lic.deviceId ? '#ecfdf5' : '#fff7ed',
-                                padding: '1px 6px',
-                                borderRadius: '4px',
-                              }}
-                            >
-                              {lic.deviceId ? '● Node Locked' : '○ Pending First Login'}
-                            </span>
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              justifyContent: 'space-between',
+                              flexWrap: 'wrap',
+                              gap: '16px',
+                            }}
+                          >
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                <h1 style={{ fontSize: '22px', fontWeight: 850, margin: 0, color: '#0f172a' }}>
+                                  {selectedShop.shopName}
+                                </h1>
+                                <span
+                                  style={{
+                                    padding: '3px 10px',
+                                    borderRadius: '12px',
+                                    fontSize: '11px',
+                                    fontWeight: 750,
+                                    background: selectedShop.status === 'ACTIVE' ? '#ecfdf5' : '#fef2f2',
+                                    color: selectedShop.status === 'ACTIVE' ? '#047857' : '#b91c1c',
+                                  }}
+                                >
+                                  {selectedShop.status}
+                                </span>
+                                <span
+                                  style={{
+                                    padding: '3px 10px',
+                                    borderRadius: '12px',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    background: '#eff6ff',
+                                    color: '#2563eb',
+                                  }}
+                                >
+                                  {selectedShop.duration || '1 Year Subscription'}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '13px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                <span>Username: <code style={{ color: '#2563eb' }}>{selectedShop.username}</code></span>
+                                <span>•</span>
+                                <span>Branch: <strong>{selectedShop.location || 'Main Counter'}</strong></span>
+                                <span>•</span>
+                                <span>
+                                  Hardware Node:{' '}
+                                  <strong style={{ color: selectedShop.deviceId ? '#059669' : '#ea580c' }}>
+                                    {selectedShop.deviceId ? `● Locked to ${selectedShop.deviceName || 'Counter PC'}` : '○ Awaiting Pairing'}
+                                  </strong>
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Top Actions */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleResetDevice(selectedShop.username)}
+                                className="pb-btn pb-btn-secondary"
+                                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}
+                              >
+                                <Laptop size={14} /> Reset Hardware Pairing
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRevokeKey(selectedShop.username)}
+                                className="pb-btn pb-btn-secondary"
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  fontSize: '12px',
+                                  color: selectedShop.status === 'ACTIVE' ? '#b91c1c' : '#047857',
+                                }}
+                              >
+                                {selectedShop.status === 'ACTIVE' ? 'Revoke License' : 'Reactivate License'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (confirm(`Delete shop "${selectedShop.shopName}"?`)) {
+                                    handleDeleteKey(selectedShop.username);
+                                    setSelectedShopUsername(null);
+                                  }
+                                }}
+                                className="pb-btn pb-btn-danger"
+                                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}
+                              >
+                                <Trash2 size={14} /> Delete Shop
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Detailed Sections Grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '18px' }}>
+                          {/* Card 1: Shop Profile & Contact Details */}
+                          <div className="pb-admin-card" style={{ padding: '20px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
+                              <Building size={18} color="#2563eb" />
+                              <h3 style={{ fontSize: '14px', fontWeight: 800, margin: 0, color: '#0f172a' }}>
+                                Shop Profile &amp; Contact Details
+                              </h3>
+                            </div>
+
+                            <div style={{ display: 'grid', gap: '10px', fontSize: '12.5px', color: '#334155' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: '#64748b' }}>Shop Commercial Name:</span>
+                                <strong>{selectedShop.shopName}</strong>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: '#64748b' }}>Registered Owner:</span>
+                                <strong>{selectedShop.ownerName || selectedShop.shopName}</strong>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: '#64748b' }}>Primary Contact Phone:</span>
+                                <strong>{selectedShop.phone || 'Contact on file'}</strong>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: '#64748b' }}>Official Email Address:</span>
+                                <span>{selectedShop.email || 'Not specified'}</span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: '#64748b' }}>Branch / Location Address:</span>
+                                <strong>{selectedShop.location || 'Main Counter'}</strong>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: '#64748b' }}>Counter UPI Payment ID:</span>
+                                <code style={{ color: '#059669', fontSize: '11.5px' }}>
+                                  {selectedShop.upiId || 'Not configured'}
+                                </code>
+                              </div>
+                            </div>
                           </div>
 
-                          <div style={{ display: 'grid', gap: '4px', fontSize: '11.5px' }}>
-                            <div>
-                              <strong style={{ color: '#64748b' }}>Machine Name:</strong>{' '}
-                              <span style={{ fontWeight: 700, color: lic.deviceName ? '#0f172a' : '#94a3b8' }}>
-                                {lic.deviceName || 'Awaiting Station Login'}
+                          {/* Card 2: Authorized PC Identity & Hardware Lock */}
+                          <div className="pb-admin-card" style={{ padding: '20px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Laptop size={18} color="#059669" />
+                                <h3 style={{ fontSize: '14px', fontWeight: 800, margin: 0, color: '#0f172a' }}>
+                                  Hardware Node &amp; Device Identity
+                                </h3>
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: '10.5px',
+                                  fontWeight: 750,
+                                  color: selectedShop.deviceId ? '#059669' : '#ea580c',
+                                  background: selectedShop.deviceId ? '#ecfdf5' : '#fff7ed',
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                }}
+                              >
+                                {selectedShop.deviceId ? '● Node Locked' : '○ Pending First Login'}
                               </span>
                             </div>
-                            <div>
-                              <strong style={{ color: '#64748b' }}>Hardware Key:</strong>{' '}
-                              {lic.deviceId ? (
-                                <code style={{ fontSize: '11px', color: '#2563eb' }}>{lic.deviceId}</code>
-                              ) : (
-                                <span style={{ color: '#94a3b8' }}>Unbound</span>
-                              )}
+
+                            <div style={{ display: 'grid', gap: '10px', fontSize: '12.5px', color: '#334155' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: '#64748b' }}>Machine Hostname:</span>
+                                <strong style={{ color: selectedShop.deviceName ? '#0f172a' : '#94a3b8' }}>
+                                  {selectedShop.deviceName || 'Awaiting Station Login'}
+                                </strong>
+                              </div>
+                              <div>
+                                <div style={{ color: '#64748b', marginBottom: '3px' }}>Hardware Cryptographic Key:</div>
+                                {selectedShop.deviceId ? (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <code style={{ fontSize: '11px', color: '#2563eb', background: '#f8fafc', padding: '4px 8px', borderRadius: '4px', border: '1px solid #e2e8f0', flex: 1, wordBreak: 'break-all' }}>
+                                      {selectedShop.deviceId}
+                                    </code>
+                                    <button
+                                      type="button"
+                                      onClick={() => copyToClipboard(selectedShop.deviceId || '', 'Hardware Key')}
+                                      style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px', color: '#64748b' }}
+                                      title="Copy key"
+                                    >
+                                      <Copy size={13} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Unbound (Awaiting First Workstation Login)</span>
+                                )}
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: '#64748b' }}>Hardware Pairing Timestamp:</span>
+                                <span>
+                                  {selectedShop.boundAt
+                                    ? new Date(selectedShop.boundAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+                                    : 'Not Bound Yet'}
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: '#64748b' }}>Spooler Engine &amp; Architecture:</span>
+                                <span style={{ fontSize: '11px', color: '#334155', fontWeight: 600 }}>
+                                  Tauri 2.0 Native x86_64 Win32 Spooler
+                                </span>
+                              </div>
                             </div>
-                            <div>
-                              <strong style={{ color: '#64748b' }}>Binding Timestamp:</strong>{' '}
-                              <span style={{ color: lic.boundAt ? '#334155' : '#94a3b8' }}>
-                                {lic.boundAt
-                                  ? new Date(lic.boundAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
-                                  : 'Not Bound Yet'}
-                              </span>
+
+                            <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleResetDevice(selectedShop.username)}
+                                className="pb-btn pb-btn-secondary pb-btn-sm"
+                                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                              >
+                                <Laptop size={13} /> Reset Hardware Pairing for this Shop
+                              </button>
+                              <div style={{ fontSize: '10.5px', color: '#94a3b8', marginTop: '4px', textAlign: 'center' }}>
+                                Allows the shop to bind a new counter PC if computer is replaced or upgraded.
+                              </div>
                             </div>
-                            <div>
-                              <strong style={{ color: '#64748b' }}>Architecture:</strong>{' '}
-                              <span style={{ color: '#334155' }}>Tauri 2.0 Native x86_64 Win32 Spooler</span>
+                          </div>
+
+                          {/* Card 3: License & Subscription Contract */}
+                          <div className="pb-admin-card" style={{ padding: '20px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
+                              <KeyRound size={18} color="#d97706" />
+                              <h3 style={{ fontSize: '14px', fontWeight: 800, margin: 0, color: '#0f172a' }}>
+                                License &amp; Subscription Contract
+                              </h3>
+                            </div>
+
+                            <div style={{ display: 'grid', gap: '10px', fontSize: '12.5px', color: '#334155' }}>
+                              <div>
+                                <div style={{ color: '#64748b', marginBottom: '3px' }}>Issued License Key:</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <code style={{ fontSize: '12px', fontWeight: 750, color: '#2563eb', background: '#eff6ff', padding: '4px 8px', borderRadius: '4px', border: '1px solid #bfdbfe', flex: 1 }}>
+                                    {selectedShop.licenseKey}
+                                  </code>
+                                  <button
+                                    type="button"
+                                    onClick={() => copyToClipboard(selectedShop.licenseKey, 'License Key')}
+                                    style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px', color: '#64748b' }}
+                                    title="Copy license key"
+                                  >
+                                    <Copy size={14} />
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: '#64748b' }}>Subscription Tier:</span>
+                                <strong>{selectedShop.duration || '1 Year Commercial'}</strong>
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: '#64748b' }}>Expires At:</span>
+                                <strong style={{ color: '#0f172a' }}>
+                                  {selectedShop.expiresAt
+                                    ? new Date(selectedShop.expiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+                                    : 'Never'}
+                                </strong>
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: '#64748b' }}>Contract Status:</span>
+                                <span
+                                  style={{
+                                    padding: '2px 8px',
+                                    borderRadius: '10px',
+                                    fontSize: '11px',
+                                    fontWeight: 750,
+                                    background: selectedShop.status === 'ACTIVE' ? '#ecfdf5' : '#fef2f2',
+                                    color: selectedShop.status === 'ACTIVE' ? '#047857' : '#b91c1c',
+                                  }}
+                                >
+                                  {selectedShop.status}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid #f1f5f9', display: 'flex', gap: '8px' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleExtendLicense(selectedShop.username, '1 Month')}
+                                className="pb-btn pb-btn-secondary pb-btn-sm"
+                                style={{ flex: 1, fontSize: '11.5px' }}
+                              >
+                                + Extend 1 Month
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleExtendLicense(selectedShop.username, '1 Year')}
+                                className="pb-btn pb-btn-secondary pb-btn-sm"
+                                style={{ flex: 1, fontSize: '11.5px' }}
+                              >
+                                + Extend 1 Year
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Card 4: Operations & Live Spooler Performance */}
+                          <div className="pb-admin-card" style={{ padding: '20px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
+                              <TrendingUp size={18} color="#7c3aed" />
+                              <h3 style={{ fontSize: '14px', fontWeight: 800, margin: 0, color: '#0f172a' }}>
+                                Operations &amp; Live Performance
+                              </h3>
+                            </div>
+
+                            <div style={{ display: 'grid', gap: '10px', fontSize: '12.5px', color: '#334155' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ color: '#64748b' }}>Dispatch Automation:</span>
+                                <span
+                                  style={{
+                                    fontWeight: 750,
+                                    color: selectedShop.orderMode === 'FULL_AUTOMATIC' ? '#059669' : '#d97706',
+                                    background: selectedShop.orderMode === 'FULL_AUTOMATIC' ? '#ecfdf5' : '#fffbeb',
+                                    padding: '2px 8px',
+                                    borderRadius: '6px',
+                                    fontSize: '11.5px',
+                                  }}
+                                >
+                                  {selectedShop.orderMode === 'FULL_AUTOMATIC' ? '⚡ Full Automatic Dispatch' : '✋ Manual Operator Approval'}
+                                </span>
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: '#64748b' }}>Completed Orders:</span>
+                                <strong style={{ fontSize: '13px', color: '#0f172a' }}>{shopOrderCount} orders</strong>
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: '#64748b' }}>Spooled Print Volume:</span>
+                                <strong style={{ fontSize: '13px', color: '#0f172a' }}>{shopPageCount} pages</strong>
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: '#64748b' }}>Total Print Turnover:</span>
+                                <strong style={{ fontSize: '14px', color: '#059669', fontWeight: 850 }}>
+                                  ₹{shopTurnover.toFixed(2)}
+                                </strong>
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: '#64748b' }}>Last Counter Activity:</span>
+                                <span style={{ fontSize: '11.5px', color: '#64748b' }}>
+                                  {selectedShop.lastActive
+                                    ? new Date(selectedShop.lastActive).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+                                    : 'Recently Active'}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
+                    );
+                  })()}
+                </div>
+              ) : (
+                /* OTHERWISE: SHOW SIMPLE SHOP DIRECTORY LIST (OUTSIDE VIEW) */
+                <div>
+                  {/* Header Title & Sync */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '12px',
+                      marginBottom: '18px',
+                    }}
+                  >
+                    <div>
+                      <h2 style={{ fontSize: '18px', fontWeight: 850, color: '#0f172a', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Building size={22} color="#2563eb" />
+                        Shop Directory &amp; Counter Workstations
+                      </h2>
+                      <p style={{ fontSize: '12.5px', color: '#64748b', margin: 0 }}>
+                        Click any shop to view its complete profile, hardware node identity, and license details.
+                      </p>
+                    </div>
 
-                      {/* Actions */}
-                      <div
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 14px',
+                        background: '#ecfdf5',
+                        border: '1px solid #a7f3d0',
+                        borderRadius: '20px',
+                        fontSize: '11.5px',
+                        fontWeight: 750,
+                        color: '#065f46',
+                      }}
+                    >
+                      <span
                         style={{
-                          marginTop: '16px',
-                          paddingTop: '12px',
-                          borderTop: '1px solid #f1f5f9',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: '#10b981',
+                          boxShadow: '0 0 0 3px rgba(16, 185, 129, 0.25)',
+                        }}
+                      />
+                      <span>Cloud Connected</span>
+                    </div>
+                  </div>
+
+                  {/* Top KPI Metrics Strip */}
+                  <div className="pb-admin-stats-grid">
+                    <div className="pb-admin-stat-card">
+                      <div className="pb-admin-stat-label">Total Subscribed Shops</div>
+                      <div className="pb-admin-stat-val" style={{ color: '#0f172a' }}>{shopList.length}</div>
+                      <div className="pb-admin-stat-hint">Active multi-tenant Xerox stations</div>
+                    </div>
+
+                    <div className="pb-admin-stat-card">
+                      <div className="pb-admin-stat-label">Hardware Nodes Locked</div>
+                      <div className="pb-admin-stat-val" style={{ color: '#059669' }}>
+                        {shopList.filter((l) => l.deviceId).length}
+                      </div>
+                      <div className="pb-admin-stat-hint">Cryptographically bound PCs</div>
+                    </div>
+
+                    <div className="pb-admin-stat-card">
+                      <div className="pb-admin-stat-label">Awaiting First Pairing</div>
+                      <div className="pb-admin-stat-val" style={{ color: '#ea580c' }}>
+                        {shopList.filter((l) => !l.deviceId).length}
+                      </div>
+                      <div className="pb-admin-stat-hint">Pending counter workstation login</div>
+                    </div>
+
+                    <div className="pb-admin-stat-card">
+                      <div className="pb-admin-stat-label">Active Licenses</div>
+                      <div className="pb-admin-stat-val" style={{ color: '#2563eb' }}>{activeCount}</div>
+                      <div className="pb-admin-stat-hint">{revokedCount} revoked</div>
+                    </div>
+                  </div>
+
+                  {/* Clean Search & Filter Toolbar */}
+                  <div
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '10px',
+                      padding: '12px 16px',
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                      marginBottom: '16px',
+                    }}
+                  >
+                    {/* Status Filter Pills */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '11.5px', color: '#64748b', fontWeight: 650, marginRight: '4px' }}>
+                        Filter:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShopDirectoryFilter('ALL')}
+                        style={{
+                          border: 'none',
+                          background: shopDirectoryFilter === 'ALL' ? '#2563eb' : '#f1f5f9',
+                          color: shopDirectoryFilter === 'ALL' ? '#ffffff' : '#475569',
+                          padding: '5px 12px',
+                          borderRadius: '6px',
+                          fontSize: '11.5px',
+                          fontWeight: shopDirectoryFilter === 'ALL' ? 750 : 600,
+                          cursor: 'pointer',
                         }}
                       >
-                        <button
-                          type="button"
-                          onClick={() => handleResetDevice(lic.username)}
-                          className="pb-btn pb-btn-secondary pb-btn-sm"
-                          style={{ height: '32px', fontSize: '11.5px', gap: '6px' }}
-                        >
-                          <Laptop size={13} /> Reset Hardware Pairing
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteKey(lic.username)}
-                          className="pb-btn pb-btn-danger pb-btn-sm"
-                          style={{ height: '32px', fontSize: '11.5px', padding: '0 10px' }}
-                          title="Delete shop license"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
+                        All Shops ({shopList.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShopDirectoryFilter('LOCKED')}
+                        style={{
+                          border: 'none',
+                          background: shopDirectoryFilter === 'LOCKED' ? '#059669' : '#f1f5f9',
+                          color: shopDirectoryFilter === 'LOCKED' ? '#ffffff' : '#475569',
+                          padding: '5px 12px',
+                          borderRadius: '6px',
+                          fontSize: '11.5px',
+                          fontWeight: shopDirectoryFilter === 'LOCKED' ? 750 : 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Node Locked ({shopList.filter((l) => l.deviceId).length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShopDirectoryFilter('UNBOUND')}
+                        style={{
+                          border: 'none',
+                          background: shopDirectoryFilter === 'UNBOUND' ? '#ea580c' : '#f1f5f9',
+                          color: shopDirectoryFilter === 'UNBOUND' ? '#ffffff' : '#475569',
+                          padding: '5px 12px',
+                          borderRadius: '6px',
+                          fontSize: '11.5px',
+                          fontWeight: shopDirectoryFilter === 'UNBOUND' ? 750 : 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Awaiting Pairing ({shopList.filter((l) => !l.deviceId).length})
+                      </button>
                     </div>
-                  ))}
+
+                    {/* Search box */}
+                    <div style={{ position: 'relative', width: '260px' }}>
+                      <Search
+                        size={14}
+                        color="#94a3b8"
+                        style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Search shop, owner, city, PC..."
+                        value={shopDirectorySearchQuery}
+                        onChange={(e) => setShopDirectorySearchQuery(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '6px 10px 6px 30px',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          background: '#f8fafc',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Simple Clean Shop Directory Table */}
+                  <div className="pb-admin-table-card">
+                    <div style={{ overflowX: 'auto' }}>
+                      <table className="pb-admin-table">
+                        <thead>
+                          <tr>
+                            <th>Shop Name &amp; Counter</th>
+                            <th>Owner &amp; Contact</th>
+                            <th>Subscription Plan</th>
+                            <th>Hardware Pairing Node</th>
+                            <th>Dispatch Mode</th>
+                            <th>Status</th>
+                            <th style={{ textAlign: 'right' }}>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredShopDirectory.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: '36px' }}>
+                                No Xerox shops found matching your search.
+                              </td>
+                            </tr>
+                          ) : (
+                            filteredShopDirectory.map((lic) => {
+                              const isBound = !!lic.deviceId;
+
+                              return (
+                                <tr
+                                  key={lic.username}
+                                  onClick={() => setSelectedShopUsername(lic.username)}
+                                  style={{
+                                    cursor: 'pointer',
+                                    transition: 'background 0.15s ease',
+                                  }}
+                                  title="Click to view full shop details"
+                                >
+                                  {/* Shop Name & Location */}
+                                  <td>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <div
+                                        style={{
+                                          width: '32px',
+                                          height: '32px',
+                                          borderRadius: '8px',
+                                          background: '#eff6ff',
+                                          color: '#2563eb',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          fontWeight: 800,
+                                          fontSize: '12px',
+                                          flexShrink: 0,
+                                        }}
+                                      >
+                                        <Building size={16} />
+                                      </div>
+                                      <div>
+                                        <strong style={{ color: '#0f172a', fontSize: '13.5px' }}>{lic.shopName}</strong>
+                                        <div style={{ fontSize: '11px', color: '#64748b' }}>
+                                          {lic.location || 'Main Counter'} • <code style={{ color: '#2563eb' }}>{lic.username}</code>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  {/* Owner & Contact */}
+                                  <td>
+                                    <div style={{ fontWeight: 650, color: '#334155' }}>
+                                      {lic.ownerName || lic.shopName}
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: '#64748b' }}>
+                                      {lic.phone || 'Contact on file'}
+                                    </div>
+                                  </td>
+
+                                  {/* Plan */}
+                                  <td>
+                                    <div style={{ fontWeight: 650, color: '#0f172a' }}>{lic.duration || '1 Year'}</div>
+                                    <code style={{ fontSize: '10.5px', color: '#2563eb' }}>{lic.licenseKey}</code>
+                                  </td>
+
+                                  {/* Hardware Node */}
+                                  <td>
+                                    {isBound ? (
+                                      <div>
+                                        <span
+                                          style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            fontSize: '11px',
+                                            fontWeight: 750,
+                                            color: '#047857',
+                                            background: '#ecfdf5',
+                                            padding: '2px 8px',
+                                            borderRadius: '6px',
+                                          }}
+                                        >
+                                          <span>●</span>
+                                          <span>{lic.deviceName || 'Counter PC'}</span>
+                                        </span>
+                                        <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px', fontFamily: 'monospace' }}>
+                                          {lic.deviceId ? `${lic.deviceId.slice(0, 16)}...` : ''}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <span
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          fontSize: '11px',
+                                          fontWeight: 700,
+                                          color: '#c2410c',
+                                          background: '#fff7ed',
+                                          padding: '2px 8px',
+                                          borderRadius: '6px',
+                                        }}
+                                      >
+                                        <span>○</span>
+                                        <span>Pending First Login</span>
+                                      </span>
+                                    )}
+                                  </td>
+
+                                  {/* Dispatch Mode */}
+                                  <td>
+                                    <span
+                                      style={{
+                                        fontSize: '11px',
+                                        fontWeight: 700,
+                                        color: lic.orderMode === 'FULL_AUTOMATIC' ? '#059669' : '#d97706',
+                                      }}
+                                    >
+                                      {lic.orderMode === 'FULL_AUTOMATIC' ? '⚡ Auto Spool' : '✋ Manual'}
+                                    </span>
+                                  </td>
+
+                                  {/* Status */}
+                                  <td>
+                                    <span
+                                      style={{
+                                        padding: '2px 8px',
+                                        borderRadius: '12px',
+                                        fontSize: '10.5px',
+                                        fontWeight: 750,
+                                        background: lic.status === 'ACTIVE' ? '#ecfdf5' : '#fef2f2',
+                                        color: lic.status === 'ACTIVE' ? '#047857' : '#b91c1c',
+                                      }}
+                                    >
+                                      {lic.status}
+                                    </span>
+                                  </td>
+
+                                  {/* Action */}
+                                  <td style={{ textAlign: 'right' }}>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedShopUsername(lic.username);
+                                      }}
+                                      className="pb-btn pb-btn-secondary pb-btn-sm"
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        fontSize: '11.5px',
+                                        padding: '4px 10px',
+                                      }}
+                                    >
+                                      <span>View Full Details</span>
+                                      <ChevronRight size={13} />
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -1320,8 +2040,77 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           {/* ========================================================= */}
           {adminActiveTab === 'REVENUE' && (
             <div>
-              {/* Stats Grid */}
+              {/* Header with Live Sync Status */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '12px',
+                  marginBottom: '18px',
+                }}
+              >
+                <div>
+                  <h2 style={{ fontSize: '18px', fontWeight: 850, color: '#0f172a', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <TrendingUp size={22} color="#059669" />
+                    Platform Revenue &amp; Network Analytics
+                  </h2>
+                  <p style={{ fontSize: '12.5px', color: '#64748b', margin: 0 }}>
+                    Real-time aggregated print turnover, daily spooling trajectory, and dynamic revenue-ranked shop performance
+                  </p>
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 14px',
+                    background: '#ecfdf5',
+                    border: '1px solid #a7f3d0',
+                    borderRadius: '20px',
+                    fontSize: '11.5px',
+                    fontWeight: 750,
+                    color: '#065f46',
+                  }}
+                >
+                  <span
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: '#10b981',
+                      boxShadow: '0 0 0 3px rgba(16, 185, 129, 0.25)',
+                    }}
+                  />
+                  <span>Live Real-Time Sync (Auto 3s)</span>
+                </div>
+              </div>
+
+              {/* Date Range Picker Filter Bar */}
+              <div style={{ marginBottom: '20px' }}>
+                <DateRangePicker
+                  rangeType={revenueDateRange}
+                  onChangeRange={setRevenueDateRange}
+                  customStart={revenueCustomStart}
+                  customEnd={revenueCustomEnd}
+                  onChangeCustomStart={setRevenueCustomStart}
+                  onChangeCustomEnd={setRevenueCustomEnd}
+                  activeLabel={revenueBounds.label}
+                />
+              </div>
+
+              {/* Primary High-Impact Stats Grid */}
               <div className="pb-admin-stats-grid">
+                <div className="pb-admin-stat-card">
+                  <div className="pb-admin-stat-label">Period Print Turnover</div>
+                  <div className="pb-admin-stat-val" style={{ color: '#059669' }}>
+                    ₹{totalNetworkTurnover.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div className="pb-admin-stat-hint">Customer print payments in {revenueBounds.label}</div>
+                </div>
+
                 <div className="pb-admin-stat-card">
                   <div className="pb-admin-stat-label">Total Subscription Revenue</div>
                   <div className="pb-admin-stat-val" style={{ color: '#2563eb' }}>
@@ -1332,24 +2121,123 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
                 <div className="pb-admin-stat-card">
                   <div className="pb-admin-stat-label">Projected Annual ARR</div>
-                  <div className="pb-admin-stat-val" style={{ color: '#059669' }}>
+                  <div className="pb-admin-stat-val" style={{ color: '#0f172a' }}>
                     ₹{(activeCount * 4999).toLocaleString('en-IN')}
                   </div>
-                  <div className="pb-admin-stat-hint">Software subscription run-rate</div>
+                  <div className="pb-admin-stat-hint">Active SaaS subscription run-rate</div>
                 </div>
 
                 <div className="pb-admin-stat-card">
                   <div className="pb-admin-stat-label">Network Orders Handled</div>
-                  <div className="pb-admin-stat-val">{totalNetworkOrders}</div>
-                  <div className="pb-admin-stat-hint">Direct customer QR uploads</div>
+                  <div className="pb-admin-stat-val">{rangeNetworkOrders}</div>
+                  <div className="pb-admin-stat-hint">Direct customer QR uploads completed</div>
                 </div>
 
                 <div className="pb-admin-stat-card">
                   <div className="pb-admin-stat-label">Total Pages Spooled</div>
-                  <div className="pb-admin-stat-val">{totalNetworkPages}</div>
-                  <div className="pb-admin-stat-hint">Aggregated print volume</div>
+                  <div className="pb-admin-stat-val">{rangeNetworkPages}</div>
+                  <div className="pb-admin-stat-hint">Aggregated print volume in period</div>
                 </div>
               </div>
+
+              {/* Interactive Line Graph */}
+              <div style={{ marginBottom: '24px' }}>
+                <InteractiveLineGraph
+                  data={networkChartPoints}
+                  title={`Network Revenue Trajectory • ${revenueBounds.label}`}
+                  subtitle="Consolidated daily revenue and print volume across all connected Xerox shops"
+                  accentColor="#2563eb"
+                  defaultMetric="revenue"
+                  height={260}
+                />
+              </div>
+
+              {/* Top Performing Shops Podium / Leaderboard */}
+              {topShops.length > 0 && (
+                <div style={{ marginBottom: '24px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                    <Trophy size={18} color="#d97706" />
+                    <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                      Top Performing Xerox Shops • {revenueBounds.label}
+                    </h3>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
+                    {topShops.map((shop, idx) => {
+                      const isGold = idx === 0;
+                      const isSilver = idx === 1;
+                      const isBronze = idx === 2;
+
+                      const medalEmoji = isGold ? '🥇' : isSilver ? '🥈' : '🥉';
+                      const badgeBg = isGold ? '#fef3c7' : isSilver ? '#f1f5f9' : '#fff7ed';
+                      const badgeBorder = isGold ? '#f59e0b' : isSilver ? '#cbd5e1' : '#fdba74';
+                      const badgeColor = isGold ? '#b45309' : isSilver ? '#475569' : '#c2410c';
+                      const labelText = isGold ? 'RANK #1 TOP EARNER' : isSilver ? 'RANK #2 RUNNER UP' : 'RANK #3 THIRD PLACE';
+
+                      return (
+                        <div
+                          key={shop.username}
+                          style={{
+                            background: '#ffffff',
+                            border: `1.5px solid ${badgeBorder}`,
+                            borderRadius: '12px',
+                            padding: '16px 18px',
+                            boxShadow: isGold ? '0 4px 12px rgba(245, 158, 11, 0.12)' : '0 1px 3px rgba(15, 23, 42, 0.04)',
+                            position: 'relative',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                background: badgeBg,
+                                color: badgeColor,
+                                border: `1px solid ${badgeBorder}`,
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                fontSize: '10.5px',
+                                fontWeight: 800,
+                                letterSpacing: '0.04em',
+                              }}
+                            >
+                              <span>{medalEmoji}</span>
+                              <span>{labelText}</span>
+                            </span>
+                            <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 650 }}>
+                              {shop.marketSharePercent}% Volume
+                            </span>
+                          </div>
+
+                          <div style={{ fontWeight: 850, fontSize: '16px', color: '#0f172a', marginBottom: '2px' }}>
+                            {shop.shopName}
+                          </div>
+                          <div style={{ fontSize: '11.5px', color: '#64748b', marginBottom: '12px' }}>
+                            {shop.location} • <code style={{ fontSize: '10.5px', color: '#2563eb' }}>{shop.username}</code>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
+                            <div>
+                              <div style={{ fontSize: '10.5px', color: '#64748b', fontWeight: 600 }}>PRINT REVENUE</div>
+                              <div style={{ fontSize: '18px', fontWeight: 850, color: '#059669' }}>
+                                ₹{shop.printTurnover.toFixed(2)}
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: '10.5px', color: '#64748b', fontWeight: 600 }}>VOLUME</div>
+                              <div style={{ fontSize: '12.5px', fontWeight: 750, color: '#0f172a' }}>
+                                {shop.ordersCount} orders • {shop.pagesCount} pgs
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Zero-Knowledge Privacy Card */}
               <div
@@ -1360,13 +2248,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   display: 'flex',
                   alignItems: 'flex-start',
                   gap: '14px',
-                  padding: '18px 20px',
+                  padding: '16px 18px',
                   marginBottom: '20px',
                 }}
               >
-                <ShieldCheck size={26} color="#2563eb" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <ShieldCheck size={24} color="#2563eb" style={{ flexShrink: 0, marginTop: '2px' }} />
                 <div>
-                  <h3 style={{ fontSize: '14px', fontWeight: 800, margin: '0 0 4px', color: '#0f172a' }}>
+                  <h3 style={{ fontSize: '13.5px', fontWeight: 800, margin: '0 0 4px', color: '#0f172a' }}>
                     Strict Zero-Knowledge Multi-Tenant Privacy Guarantee
                   </h3>
                   <p style={{ fontSize: '12px', color: '#64748b', margin: 0, lineHeight: 1.5 }}>
@@ -1377,64 +2265,232 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 </div>
               </div>
 
-              {/* Shop Volume Breakdown Table */}
+              {/* Shop Volume Breakdown Table (Highest Revenue Automatically Ranked First) */}
               <div className="pb-admin-table-card">
-                <h3 style={{ fontSize: '15px', fontWeight: 800, margin: '0 0 14px', color: '#0f172a' }}>
-                  Anonymous Shop Volume &amp; Revenue Breakdown
-                </h3>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    marginBottom: '16px',
+                  }}
+                >
+                  <div>
+                    <h3 style={{ fontSize: '15px', fontWeight: 800, margin: '0 0 2px', color: '#0f172a' }}>
+                      Shop Volume &amp; Revenue Breakdown ({sortedAndFilteredShops.length} Active Shops)
+                    </h3>
+                    <div style={{ fontSize: '12px', color: '#64748b' }}>
+                      Real-time revenue ranking — the shop with highest revenue is placed automatically at the top
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    {/* Sort selector */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f1f5f9', padding: '3px', borderRadius: '8px' }}>
+                      <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 650, padding: '0 4px' }}>
+                        Sort by:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setRevenueSortKey('REVENUE')}
+                        style={{
+                          border: 'none',
+                          background: revenueSortKey === 'REVENUE' ? '#ffffff' : 'transparent',
+                          color: revenueSortKey === 'REVENUE' ? '#059669' : '#64748b',
+                          fontWeight: revenueSortKey === 'REVENUE' ? 750 : 600,
+                          fontSize: '11px',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          boxShadow: revenueSortKey === 'REVENUE' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                        }}
+                      >
+                        Revenue (Top)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRevenueSortKey('ORDERS')}
+                        style={{
+                          border: 'none',
+                          background: revenueSortKey === 'ORDERS' ? '#ffffff' : 'transparent',
+                          color: revenueSortKey === 'ORDERS' ? '#2563eb' : '#64748b',
+                          fontWeight: revenueSortKey === 'ORDERS' ? 750 : 600,
+                          fontSize: '11px',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          boxShadow: revenueSortKey === 'ORDERS' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                        }}
+                      >
+                        Orders
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRevenueSortKey('PAGES')}
+                        style={{
+                          border: 'none',
+                          background: revenueSortKey === 'PAGES' ? '#ffffff' : 'transparent',
+                          color: revenueSortKey === 'PAGES' ? '#7c3aed' : '#64748b',
+                          fontWeight: revenueSortKey === 'PAGES' ? 750 : 600,
+                          fontSize: '11px',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          boxShadow: revenueSortKey === 'PAGES' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                        }}
+                      >
+                        Pages
+                      </button>
+                    </div>
+
+                    {/* Search box */}
+                    <div style={{ position: 'relative', width: '220px' }}>
+                      <Search
+                        size={13}
+                        color="#94a3b8"
+                        style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Search shop, city, key..."
+                        value={revenueSearchQuery}
+                        onChange={(e) => setRevenueSearchQuery(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '5px 8px 5px 28px',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          fontSize: '11.5px',
+                          background: '#f8fafc',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <div style={{ overflowX: 'auto' }}>
                   <table className="pb-admin-table">
                     <thead>
                       <tr>
-                        <th>Shop Name</th>
+                        <th style={{ width: '60px', textAlign: 'center' }}>Rank</th>
+                        <th>Shop Name &amp; Counter</th>
                         <th>Plan &amp; License</th>
                         <th>Completed Orders</th>
                         <th>Printed Pages</th>
                         <th>Print Turnover (₹)</th>
+                        <th>Avg Order Value</th>
+                        <th style={{ width: '120px' }}>Network Share</th>
                         <th>Status</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {shopList.length === 0 ? (
+                      {sortedAndFilteredShops.length === 0 ? (
                         <tr>
-                          <td colSpan={6} style={{ textAlign: 'center', color: '#94a3b8', padding: '24px' }}>
-                            No active shops in directory.
+                          <td colSpan={9} style={{ textAlign: 'center', color: '#94a3b8', padding: '28px' }}>
+                            No active shops matching criteria.
                           </td>
                         </tr>
                       ) : (
-                        shopList.map((lic) => {
-                          const shopJobs = completedJobs.filter(
-                            (j) =>
-                              ((j as any).shop_id && (j as any).shop_id === lic.username.toLowerCase()) ||
-                              j.customer_email.toLowerCase().includes(lic.username.toLowerCase()) ||
-                              shopList.length === 1
-                          );
-                          const shopOrderCount = shopJobs.length;
-                          const shopPageCount = shopJobs.reduce((acc, j) => acc + (j.page_count * (j.options.copies || 1)), 0);
-                          const shopGmv = shopJobs.reduce((acc, j) => acc + (j.calculated_price_rupees || 0), 0);
+                        sortedAndFilteredShops.map((shop) => {
+                          const isTop1 = shop.rank === 1;
+                          const isTop2 = shop.rank === 2;
+                          const isTop3 = shop.rank === 3;
+                          const medal = isTop1 ? '🥇' : isTop2 ? '🥈' : isTop3 ? '🥉' : null;
 
                           return (
-                            <tr key={lic.username}>
+                            <tr
+                              key={shop.username}
+                              style={{
+                                background: isTop1 ? '#fafdf9' : undefined,
+                                transition: 'background 0.15s ease',
+                              }}
+                            >
+                              <td style={{ textAlign: 'center' }}>
+                                <span
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '50%',
+                                    background: isTop1 ? '#fef3c7' : isTop2 ? '#f1f5f9' : isTop3 ? '#fff7ed' : '#f8fafc',
+                                    border: `1px solid ${isTop1 ? '#f59e0b' : isTop2 ? '#cbd5e1' : isTop3 ? '#fdba74' : '#e2e8f0'}`,
+                                    fontSize: '12px',
+                                    fontWeight: 800,
+                                    color: isTop1 ? '#b45309' : isTop2 ? '#475569' : isTop3 ? '#c2410c' : '#64748b',
+                                  }}
+                                  title={`Rank #${shop.rank}`}
+                                >
+                                  {medal || `#${shop.rank}`}
+                                </span>
+                              </td>
                               <td>
-                                <strong style={{ color: '#0f172a' }}>{lic.shopName}</strong>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <strong style={{ color: '#0f172a', fontSize: '13px' }}>{shop.shopName}</strong>
+                                  {isTop1 && (
+                                    <span
+                                      style={{
+                                        fontSize: '9.5px',
+                                        fontWeight: 800,
+                                        background: '#ecfdf5',
+                                        color: '#047857',
+                                        border: '1px solid #a7f3d0',
+                                        padding: '1px 5px',
+                                        borderRadius: '4px',
+                                      }}
+                                    >
+                                      Top Earner
+                                    </span>
+                                  )}
+                                </div>
                                 <div style={{ fontSize: '11px', color: '#64748b' }}>
-                                  {lic.location || 'Main Counter'}
+                                  {shop.location} • <span style={{ color: '#94a3b8' }}>{shop.username}</span>
                                 </div>
                               </td>
                               <td>
-                                <div>{lic.duration || '1 Year'}</div>
-                                <code style={{ fontSize: '10.5px', color: '#2563eb' }}>{lic.licenseKey}</code>
+                                <div style={{ fontWeight: 650, color: '#334155' }}>{shop.planDuration}</div>
+                                <code style={{ fontSize: '10.5px', color: '#2563eb' }}>{shop.licenseKey}</code>
                               </td>
                               <td>
-                                <strong style={{ fontSize: '13px', color: '#0f172a' }}>{shopOrderCount}</strong>
+                                <strong style={{ fontSize: '13.5px', color: '#0f172a' }}>{shop.ordersCount}</strong>
                               </td>
                               <td>
-                                <strong style={{ fontSize: '13px', color: '#0f172a' }}>{shopPageCount}</strong>
+                                <strong style={{ fontSize: '13.5px', color: '#0f172a' }}>{shop.pagesCount}</strong>
+                                <div style={{ fontSize: '10.5px', color: '#64748b' }}>
+                                  {shop.bwPages} B&amp;W • {shop.colorPages} Color
+                                </div>
                               </td>
                               <td>
-                                <strong style={{ fontSize: '13px', color: '#059669' }}>
-                                  ₹{shopGmv > 0 ? shopGmv.toFixed(2) : (lic.duration === '1 Month' ? '499.00' : '4,999.00')}
+                                <strong style={{ fontSize: '14px', color: '#059669', fontWeight: 850 }}>
+                                  ₹{shop.printTurnover.toFixed(2)}
                                 </strong>
+                              </td>
+                              <td>
+                                <span style={{ fontSize: '12px', fontWeight: 700, color: '#334155' }}>
+                                  ₹{shop.avgOrderValue.toFixed(2)}
+                                </span>
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <div style={{ flex: 1, height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+                                    <div
+                                      style={{
+                                        width: `${Math.min(100, Math.max(shop.marketSharePercent, 4))}%`,
+                                        height: '100%',
+                                        background: isTop1 ? '#059669' : '#2563eb',
+                                        borderRadius: '3px',
+                                        transition: 'width 0.4s ease',
+                                      }}
+                                    />
+                                  </div>
+                                  <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748b', minWidth: '34px' }}>
+                                    {shop.marketSharePercent}%
+                                  </span>
+                                </div>
                               </td>
                               <td>
                                 <span
@@ -1443,11 +2499,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                                     borderRadius: '12px',
                                     fontSize: '10.5px',
                                     fontWeight: 750,
-                                    background: lic.status === 'ACTIVE' ? '#ecfdf5' : '#fef2f2',
-                                    color: lic.status === 'ACTIVE' ? '#047857' : '#b91c1c',
+                                    background: shop.status === 'ACTIVE' ? '#ecfdf5' : '#fef2f2',
+                                    color: shop.status === 'ACTIVE' ? '#047857' : '#b91c1c',
                                   }}
                                 >
-                                  {lic.status}
+                                  {shop.status}
                                 </span>
                               </td>
                             </tr>

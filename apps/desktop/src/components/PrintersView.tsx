@@ -30,6 +30,8 @@ interface PrintersViewProps {
   testingPrinterName?: string | null;
   onPrintStandee?: () => Promise<void>;
   isPrintingStandee?: boolean;
+  isLicenseExpired?: boolean;
+  onOpenRenewalModal?: () => void;
 }
 
 export const PrintersView: React.FC<PrintersViewProps> = ({
@@ -43,6 +45,8 @@ export const PrintersView: React.FC<PrintersViewProps> = ({
   testingPrinterName = null,
   onPrintStandee,
   isPrintingStandee = false,
+  isLicenseExpired = false,
+  onOpenRenewalModal,
 }) => {
   const displayPrinters =
     nativePrinters && nativePrinters.length > 0
@@ -88,6 +92,48 @@ export const PrintersView: React.FC<PrintersViewProps> = ({
 
   return (
     <div className="pb-view">
+      {/* License Expired Callout */}
+      {isLicenseExpired && (
+        <div
+          style={{
+            padding: '14px 18px',
+            background: '#fef2f2',
+            border: '2px solid #ef4444',
+            borderRadius: '10px',
+            marginBottom: '18px',
+            color: '#991b1b',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '14px',
+            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.1)',
+          }}
+          role="alert"
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <AlertTriangle size={22} color="#dc2626" style={{ flexShrink: 0 }} />
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '13.5px' }}>
+                Hardware Printing Disabled — License Expired
+              </div>
+              <div style={{ fontSize: '12px', color: '#b91c1c', marginTop: '2px' }}>
+                Hardware test prints, standee prints, and customer job spooling are disabled until your license is renewed.
+              </div>
+            </div>
+          </div>
+          {onOpenRenewalModal && (
+            <button
+              type="button"
+              onClick={onOpenRenewalModal}
+              className="pb-btn pb-btn-primary pb-btn-sm"
+              style={{ background: '#dc2626', color: '#ffffff', fontWeight: 800, height: '32px', whiteSpace: 'nowrap' }}
+            >
+              Renew License Now →
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Page Header */}
       <div className="pb-page-header">
         <div>

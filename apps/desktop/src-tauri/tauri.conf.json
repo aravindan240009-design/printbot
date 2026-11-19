@@ -28,15 +28,20 @@
   "bundle": {
     "active": true,
     "targets": ["nsis", "msi"],
+    "publisher": "Print Bot Platform",
+    "copyright": "Copyright © 2026 Print Bot Platform. All rights reserved.",
+    "category": "Business",
+    "shortDescription": "Print Bot Workstation Kiosk & Counter Spooler",
+    "longDescription": "Print Bot Counter Workstation native Windows Win32 print spooler and kiosk dispatch engine.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/icon.ico"
     ],
     "windows": {
-      "certificateThumbprint": null,
+      "certificateThumbprint": "B6BEF7C738FA63F35DD647C5CD105432DE148481",
       "digestAlgorithm": "sha256",
-      "timestampUrl": ""
+      "timestampUrl": "http://timestamp.digicert.com"
     }
   }
 }
