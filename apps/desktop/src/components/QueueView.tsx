@@ -360,6 +360,13 @@ export const QueueView: React.FC<QueueViewProps> = ({
                         Binding: {job.options.binding}
                       </span>
                     )}
+                    {Boolean((job.options as any).photo_preset || (job.options as any).photoPreset) &&
+                      (job.options as any).photo_preset !== 'standard' &&
+                      (job.options as any).photoPreset !== 'standard' && (
+                        <span className="pb-chip" style={{ borderColor: 'rgba(245, 158, 11, 0.4)', color: '#d97706', fontWeight: 700 }}>
+                          📸 {((job.options as any).photo_preset || (job.options as any).photoPreset) === 'passport_8up' ? 'Passport 8-Up Sheet' : ((job.options as any).photo_preset || (job.options as any).photoPreset) === 'photo_4x6' ? '4×6 Studio Photo' : 'ID Card 2-Up Sheet'}
+                        </span>
+                    )}
                   </div>
 
                   {job.items && job.items.length > 1 && (

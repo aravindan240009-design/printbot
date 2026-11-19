@@ -62,6 +62,7 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
           nup: 1,
           finishing: 'none',
           photoPreset: 'standard',
+          photoCrop: { zoom: 1, panX: 0, panY: 0, rotation: 0, aspectRatio: '3.5:4.5' },
           orientation: 'portrait',
         },
         source: file,

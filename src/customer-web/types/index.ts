@@ -8,6 +8,14 @@ export type FinishingOption = 'none' | 'staple' | 'spiral' | 'hard_bind';
 export type PhotoPreset = 'standard' | 'passport_8up' | 'id_card' | 'photo_4x6';
 export type OrientationOption = 'portrait' | 'landscape' | 'auto';
 
+export interface PhotoCropOptions {
+  zoom: number;
+  panX: number;
+  panY: number;
+  rotation: number;
+  aspectRatio: '3.5:4.5' | '4:6' | '1:1' | 'free';
+}
+
 export interface PrintOptions {
   copies: number;
   colorMode: ColorMode;
@@ -18,6 +26,7 @@ export interface PrintOptions {
   nup: number;
   finishing: FinishingOption;
   photoPreset: PhotoPreset;
+  photoCrop?: PhotoCropOptions;
   orientation: OrientationOption;
 }
 

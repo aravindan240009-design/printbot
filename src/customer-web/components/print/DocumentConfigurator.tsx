@@ -1,4 +1,5 @@
 import React from 'react';
+import { Camera, Crop, RotateCcw, RotateCw } from 'lucide-react';
 import {
   DocumentItem,
   PrintOptions,
@@ -165,6 +166,209 @@ export const DocumentConfigurator: React.FC<DocumentConfiguratorProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Photo & Media Capabilities (Phase 2) */}
+      <div className="pb-form-group">
+        <label className="pb-form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Camera size={14} color="var(--pb-brand)" />
+          Photo &amp; Passport Sheet Layout
+        </label>
+        <div className="pb-pill-grid pb-photo-preset-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+          <button
+            type="button"
+            className={`pb-pill-choice ${options.photoPreset === 'standard' ? 'active' : ''}`}
+            onClick={() => onUpdateOptions({ photoPreset: 'standard' })}
+          >
+            <span>📄 Full Page</span>
+            <span className="pb-pill-subtext">Fit to standard page</span>
+          </button>
+          <button
+            type="button"
+            className={`pb-pill-choice ${options.photoPreset === 'passport_8up' ? 'active' : ''}`}
+            onClick={() => onUpdateOptions({
+              photoPreset: 'passport_8up',
+              photoCrop: options.photoCrop || { zoom: 1, panX: 0, panY: 0, rotation: 0, aspectRatio: '3.5:4.5' },
+            })}
+          >
+            <span style={{ fontWeight: 750, color: options.photoPreset === 'passport_8up' ? 'var(--pb-brand)' : undefined }}>
+              🛂 Passport Sheet (8 Photos)
+            </span>
+            <span className="pb-pill-subtext">35×45mm with cutting guides</span>
+          </button>
+          <button
+            type="button"
+            className={`pb-pill-choice ${options.photoPreset === 'photo_4x6' ? 'active' : ''}`}
+            onClick={() => onUpdateOptions({
+              photoPreset: 'photo_4x6',
+              photoCrop: options.photoCrop || { zoom: 1, panX: 0, panY: 0, rotation: 0, aspectRatio: '4:6' },
+            })}
+          >
+            <span>🖼️ 4×6 Photo Print</span>
+            <span className="pb-pill-subtext">Standard studio size</span>
+          </button>
+          <button
+            type="button"
+            className={`pb-pill-choice ${options.photoPreset === 'id_card' ? 'active' : ''}`}
+            onClick={() => onUpdateOptions({
+              photoPreset: 'id_card',
+              photoCrop: options.photoCrop || { zoom: 1, panX: 0, panY: 0, rotation: 0, aspectRatio: 'free' },
+            })}
+          >
+            <span>🪪 ID Card (2-Up)</span>
+            <span className="pb-pill-subtext">Front &amp; back on 1 page</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Interactive Aspect Ratio Cropping & Alignment (Phase 2) */}
+      {options.photoPreset !== 'standard' && (
+        <div
+          className="pb-photo-crop-panel"
+          style={{
+            background: 'var(--pb-surface-alt, #f8fafc)',
+            border: '1px solid var(--pb-border, #e2e8f0)',
+            borderRadius: 'var(--pb-radius-md, 12px)',
+            padding: '12px 14px',
+            marginBottom: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 750, color: 'var(--pb-text, #1e293b)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Crop size={14} color="var(--pb-brand)" />
+              Photo Crop &amp; Alignment
+            </span>
+            <button
+              type="button"
+              onClick={() => onUpdateOptions({
+                photoCrop: {
+                  zoom: 1,
+                  panX: 0,
+                  panY: 0,
+                  rotation: 0,
+                  aspectRatio: options.photoPreset === 'passport_8up' ? '3.5:4.5' : options.photoPreset === 'photo_4x6' ? '4:6' : 'free',
+                },
+              })}
+              style={{
+                fontSize: '0.72rem',
+                color: 'var(--pb-brand, #2563eb)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: 650,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
+              }}
+            >
+              <RotateCcw size={11} /> Reset
+            </button>
+          </div>
+
+          {/* Aspect Ratio Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--pb-muted, #64748b)', marginRight: '4px' }}>Crop Ratio:</span>
+            {[
+              { id: '3.5:4.5', label: 'Passport (3.5:4.5)' },
+              { id: '4:6', label: 'Photo (4:6)' },
+              { id: '1:1', label: 'Square (1:1)' },
+              { id: 'free', label: 'Free / Original' },
+            ].map((ratio) => (
+              <button
+                key={ratio.id}
+                type="button"
+                onClick={() => onUpdateOptions({
+                  photoCrop: {
+                    ...(options.photoCrop || { zoom: 1, panX: 0, panY: 0, rotation: 0 }),
+                    aspectRatio: ratio.id as any,
+                  },
+                })}
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  fontSize: '0.73rem',
+                  fontWeight: 650,
+                  cursor: 'pointer',
+                  border: (options.photoCrop?.aspectRatio || (options.photoPreset === 'passport_8up' ? '3.5:4.5' : '4:6')) === ratio.id
+                    ? '1px solid var(--pb-brand, #2563eb)'
+                    : '1px solid var(--pb-border, #cbd5e1)',
+                  background: (options.photoCrop?.aspectRatio || (options.photoPreset === 'passport_8up' ? '3.5:4.5' : '4:6')) === ratio.id
+                    ? 'var(--pb-brand-soft, #eff6ff)'
+                    : '#ffffff',
+                  color: (options.photoCrop?.aspectRatio || (options.photoPreset === 'passport_8up' ? '3.5:4.5' : '4:6')) === ratio.id
+                    ? 'var(--pb-brand, #2563eb)'
+                    : 'var(--pb-text-secondary, #475569)',
+                }}
+              >
+                {ratio.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Zoom Slider */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--pb-muted)', marginBottom: '3px' }}>
+              <span>Zoom / Head Size</span>
+              <span style={{ fontWeight: 700, color: 'var(--pb-text)' }}>{Math.round((options.photoCrop?.zoom || 1) * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="1"
+              max="2.5"
+              step="0.05"
+              value={options.photoCrop?.zoom || 1}
+              onChange={(e) => onUpdateOptions({
+                photoCrop: {
+                  ...(options.photoCrop || { panX: 0, panY: 0, rotation: 0, aspectRatio: '3.5:4.5' }),
+                  zoom: parseFloat(e.target.value),
+                },
+              })}
+              style={{ width: '100%', accentColor: 'var(--pb-brand)' }}
+            />
+          </div>
+
+          {/* Vertical Pan (Align Face / Chin) */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--pb-muted)', marginBottom: '3px' }}>
+              <span>Vertical Position (Center Face)</span>
+              <span style={{ fontWeight: 700, color: 'var(--pb-text)' }}>{options.photoCrop?.panY || 0}px</span>
+            </div>
+            <input
+              type="range"
+              min="-80"
+              max="80"
+              step="2"
+              value={options.photoCrop?.panY || 0}
+              onChange={(e) => onUpdateOptions({
+                photoCrop: {
+                  ...(options.photoCrop || { zoom: 1, panX: 0, rotation: 0, aspectRatio: '3.5:4.5' }),
+                  panY: parseInt(e.target.value, 10),
+                },
+              })}
+              style={{ width: '100%', accentColor: 'var(--pb-brand)' }}
+            />
+          </div>
+
+          {/* Rotate Button */}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              className="pb-btn pb-btn-secondary"
+              onClick={() => onUpdateOptions({
+                photoCrop: {
+                  ...(options.photoCrop || { zoom: 1, panX: 0, panY: 0, aspectRatio: '3.5:4.5' }),
+                  rotation: ((options.photoCrop?.rotation || 0) + 90) % 360,
+                },
+              })}
+              style={{ fontSize: '0.75rem', padding: '4px 10px', height: '30px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+            >
+              <RotateCw size={13} /> Rotate 90° ({options.photoCrop?.rotation || 0}°)
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Page Range Selection (Always Visible on Main Card) */}
       <div className="pb-form-group">

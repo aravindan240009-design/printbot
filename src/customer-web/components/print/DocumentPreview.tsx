@@ -26,6 +26,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   const isPdf = isPdfFile(file);
   const isImage = isImageFile(file);
   const isBw = file.options?.colorMode !== 'color';
+  const crop = file.options?.photoCrop || { zoom: 1, panX: 0, panY: 0, rotation: 0, aspectRatio: '3.5:4.5' };
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewAreaRef = useRef<HTMLDivElement>(null);
   const [objectUrl, setObjectUrl] = useState<{ source: File; url: string } | null>(null);
@@ -209,7 +210,25 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
             {pageCount} {pageCount === 1 ? 'page' : 'pages'}
           </p>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {file.options.photoPreset !== 'standard' && (
+            <span
+              style={{
+                fontSize: '0.74rem',
+                fontWeight: 750,
+                padding: '3px 9px',
+                borderRadius: '999px',
+                background: 'rgba(245, 158, 11, 0.12)',
+                color: '#d97706',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+            >
+              {file.options.photoPreset === 'passport_8up' ? '🛂 8-Up Passport' : file.options.photoPreset === 'photo_4x6' ? '🖼️ 4×6 Photo' : '🪪 ID Card 2-Up'}
+            </span>
+          )}
           <span
             style={{
               fontSize: '0.74rem',
@@ -230,7 +249,191 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
       </header>
 
       <div className="pb-preview-area" ref={previewAreaRef}>
-        {isImage && fileUrl && status !== 'error' && (
+        {/* Phase 2: Passport 8-Up Layout Sheet */}
+        {file.options.photoPreset === 'passport_8up' && fileUrl && status !== 'error' && (
+          <div
+            className="pb-passport-sheet-view"
+            style={{
+              width: '100%',
+              maxWidth: '380px',
+              margin: '0 auto',
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              borderRadius: '8px',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
+              padding: '14px 12px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px dashed #cbd5e1', paddingBottom: '6px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#1e293b', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                🛂 35×45mm Passport Photos (8-Photo Sheet)
+              </span>
+              <span style={{ fontSize: '10px', color: '#64748b' }}>
+                ✂️ Cutting Guides
+              </span>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: '8px',
+                padding: '6px',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+              }}
+            >
+              {[0, 1, 2, 3, 4, 5, 6, 7].map((idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    aspectRatio: '3.5 / 4.5',
+                    background: '#ffffff',
+                    border: '1px dashed #94a3b8',
+                    borderRadius: '2px',
+                    overflow: 'hidden',
+                    position: 'relative',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                  }}
+                >
+                  <img
+                    src={fileUrl}
+                    alt={`Passport photo ${idx + 1}`}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      transform: `scale(${crop.zoom || 1}) translate(${crop.panX || 0}px, ${crop.panY || 0}px) rotate(${crop.rotation || 0}deg)`,
+                      filter: isBw ? 'grayscale(100%) contrast(108%)' : 'none',
+                      transition: 'transform 0.15s ease, filter 0.2s ease',
+                    }}
+                    onLoad={() => setStatus('ready')}
+                    onError={handleImageError}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div style={{ fontSize: '10px', color: '#64748b', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <span>📐 Size: 3.5cm × 4.5cm</span>
+              <span>•</span>
+              <span>🖨️ Ready for Xerox &amp; Photo Studio Spooling</span>
+            </div>
+          </div>
+        )}
+
+        {/* Phase 2: 4x6 Photo Print */}
+        {file.options.photoPreset === 'photo_4x6' && fileUrl && status !== 'error' && (
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '320px',
+              margin: '0 auto',
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              borderRadius: '8px',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
+              padding: '12px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px dashed #cbd5e1', paddingBottom: '6px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#1e293b' }}>
+                🖼️ Standard 4×6 Photo Print
+              </span>
+              <span style={{ fontSize: '10px', color: '#64748b' }}>Postcard Studio Glossy</span>
+            </div>
+            <div
+              style={{
+                aspectRatio: '4 / 6',
+                background: '#ffffff',
+                border: '1px solid #94a3b8',
+                borderRadius: '4px',
+                overflow: 'hidden',
+                position: 'relative',
+              }}
+            >
+              <img
+                src={fileUrl}
+                alt="4x6 photo preview"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  transform: `scale(${crop.zoom || 1}) translate(${crop.panX || 0}px, ${crop.panY || 0}px) rotate(${crop.rotation || 0}deg)`,
+                  filter: isBw ? 'grayscale(100%) contrast(108%)' : 'none',
+                  transition: 'transform 0.15s ease, filter 0.2s ease',
+                }}
+                onLoad={() => setStatus('ready')}
+                onError={handleImageError}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Phase 2: ID Card Layout */}
+        {file.options.photoPreset === 'id_card' && fileUrl && status !== 'error' && (
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '340px',
+              margin: '0 auto',
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              borderRadius: '8px',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
+              padding: '12px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px dashed #cbd5e1', paddingBottom: '6px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#1e293b' }}>
+                🪪 ID Card Layout (2-Up Sheet)
+              </span>
+              <span style={{ fontSize: '10px', color: '#64748b' }}>85.6 × 54 mm Standard</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '6px', background: '#f8fafc', borderRadius: '6px' }}>
+              {[0, 1].map((idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    aspectRatio: '85.6 / 53.98',
+                    background: '#ffffff',
+                    border: '1px dashed #94a3b8',
+                    borderRadius: '6px',
+                    overflow: 'hidden',
+                    position: 'relative',
+                  }}
+                >
+                  <img
+                    src={fileUrl}
+                    alt={`ID Card copy ${idx + 1}`}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      transform: `scale(${crop.zoom || 1}) translate(${crop.panX || 0}px, ${crop.panY || 0}px) rotate(${crop.rotation || 0}deg)`,
+                      filter: isBw ? 'grayscale(100%) contrast(108%)' : 'none',
+                    }}
+                    onLoad={() => setStatus('ready')}
+                    onError={handleImageError}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Standard Image View */}
+        {file.options.photoPreset === 'standard' && isImage && fileUrl && status !== 'error' && (
           <img
             className="pb-preview-image"
             src={fileUrl}

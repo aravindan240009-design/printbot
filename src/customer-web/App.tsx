@@ -59,6 +59,7 @@ import {
   loadShopProfile,
   subscribeToShopRealtime,
 } from './utils/tenant';
+import { compositePhotoSheet } from './utils/photoSheet';
 
 const defaultShopSession: ShopSession = {
   session_token: 'shop-session-counter',
@@ -496,14 +497,24 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
     const itemsWithData = await Promise.all(
       files.map(async (f) => {
         let b64: string | undefined = undefined;
-        if (f.source && f.source.size <= 3.5 * 1024 * 1024) {
+        if (f.source && f.source.size <= 4.5 * 1024 * 1024) {
           try {
-            b64 = await new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result as string);
-              reader.onerror = () => resolve('');
-              reader.readAsDataURL(f.source as Blob);
-            });
+            const isImage = f.source.type.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(f.name);
+            if (isImage && f.options.photoPreset && f.options.photoPreset !== 'standard') {
+              b64 = await compositePhotoSheet(
+                f.source as Blob,
+                f.options.photoPreset,
+                f.options.photoCrop,
+                f.options.colorMode === 'bw',
+              );
+            } else {
+              b64 = await new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = () => resolve('');
+                reader.readAsDataURL(f.source as Blob);
+              });
+            }
           } catch {}
         }
         return {
