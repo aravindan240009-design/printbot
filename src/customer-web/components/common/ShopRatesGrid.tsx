@@ -93,3 +93,4 @@ export const ShopRatesGrid: React.FC<ShopRatesGridProps> = ({ rates, t, shopName
     </div>
   );
 };
+

@@ -663,6 +663,13 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
 
       <main className="pb-main-content" id="main-content">
         <div className="pb-container">
+          {/* Global Shop Rates Banner (Visible across all steps) */}
+          {session.rates && (
+            <div style={{ paddingTop: '14px' }}>
+              <ShopRatesGrid rates={session.rates} t={t} shopName={session.shop_name} />
+            </div>
+          )}
+
           {/* VIEW: HOME / LANDING */}
           {activeView === 'home' && (
             <>
@@ -726,7 +733,6 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
 
               {/* Quick Upload Dropzone directly on Home */}
               <div style={{ marginTop: '20px', marginBottom: '32px' }}>
-                <ShopRatesGrid rates={session.rates} t={t} shopName={session.shop_name} />
                 <div className="pb-section-header">
                   <h2 className="pb-section-title">{t.uploadTitle}</h2>
                   <p className="pb-section-subtitle">
@@ -792,7 +798,6 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
               {/* Step 1: Upload */}
               {printStep === 1 && (
                 <div>
-                  <ShopRatesGrid rates={session.rates} t={t} shopName={session.shop_name} />
                   <div className="pb-section-header">
                     <h2 className="pb-section-title">{t.uploadTitle}</h2>
                     <p className="pb-section-subtitle">{t.uploadFormats}</p>

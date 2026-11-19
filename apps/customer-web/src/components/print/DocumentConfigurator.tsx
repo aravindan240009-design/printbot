@@ -178,6 +178,16 @@ export const DocumentConfigurator: React.FC<DocumentConfiguratorProps> = ({
         </div>
       </div>
 
+      {/* Page Range Selection (Always Visible on Main Card) */}
+      <div className="pb-form-group">
+        <VisualPageRangePicker
+          range={options.pageRange}
+          totalPageCount={activeFile.pageCount || 1}
+          onChange={(newRange) => onUpdateOptions({ pageRange: newRange })}
+          t={t}
+        />
+      </div>
+
       {/* Duplex (Print Sides) */}
       <div className="pb-form-group">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
@@ -302,15 +312,6 @@ export const DocumentConfigurator: React.FC<DocumentConfiguratorProps> = ({
                 <span className="pb-pill-subtext">+₹150.00</span>
               </button>
             </div>
-          </div>
-
-          <div className="pb-form-group">
-            <VisualPageRangePicker
-              range={options.pageRange}
-              totalPageCount={activeFile.pageCount || 1}
-              onChange={(newRange) => onUpdateOptions({ pageRange: newRange })}
-              t={t}
-            />
           </div>
 
           <div className="pb-form-group">
