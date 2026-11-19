@@ -10,6 +10,7 @@ import {
   MapPin,
   RefreshCw,
   Lock,
+  Zap,
 } from 'lucide-react';
 import { DocumentItem, ServerQuote, ShopSession } from '../../types';
 import { TranslationKeys } from '../../locales';
@@ -317,14 +318,37 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
             type="button"
             className={`pb-pill-choice ${paymentMethod === 'upi' ? 'active' : ''}`}
             onClick={() => setPaymentMethod('upi')}
-            style={{ textAlign: 'left', alignItems: 'flex-start', padding: '18px' }}
+            style={{ textAlign: 'left', alignItems: 'flex-start', padding: '18px', position: 'relative' }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 750 }}>
-              <CreditCard size={20} color="var(--pb-brand)" />
-              <span>Razorpay Payment Gateway</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 750 }}>
+                <CreditCard size={20} color="var(--pb-brand)" />
+                <span>UPI / Online Payment</span>
+              </div>
+              <span
+                style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  padding: '2px 8px',
+                  borderRadius: '999px',
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  color: '#059669',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                }}
+              >
+                <Zap size={10} />
+                Fastest
+              </span>
             </div>
-            <span className="pb-pill-subtext" style={{ textAlign: 'left', marginTop: '4px' }}>
-              UPI (GPay, PhonePe, Paytm), Cards, NetBanking
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#2563eb', fontSize: '0.82rem', fontWeight: 700, margin: '2px 0 4px' }}>
+              <span>{t.instantAutoPrint || '⚡ Instant Auto-Print'}</span>
+            </div>
+            <span className="pb-pill-subtext" style={{ textAlign: 'left' }}>
+              {t.fastestNoWaiting || 'Direct to printer • Zero waiting in counter queue'}
             </span>
           </button>
 
@@ -336,10 +360,10 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 750 }}>
               <Printer size={20} color="var(--pb-brand)" />
-              <span>{t.payCashTitle}</span>
+              <span>{t.payCashCounter || t.payCashTitle}</span>
             </div>
-            <span className="pb-pill-subtext" style={{ textAlign: 'left', marginTop: '4px' }}>
-              {t.payCashSubtitle}
+            <span className="pb-pill-subtext" style={{ textAlign: 'left', marginTop: '6px' }}>
+              {t.payCashDesc || t.payCashSubtitle}
             </span>
           </button>
         </div>

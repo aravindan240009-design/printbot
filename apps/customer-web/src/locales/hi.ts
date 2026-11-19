@@ -184,4 +184,16 @@ export const hi: typeof en = {
   // Trust & Security
   secureShop: 'सत्यापित प्रिंट बॉट दुकान',
   autoDeleteNotice: 'छपाई के तुरंत बाद सर्वर से फ़ाइलें हटा दी जाती हैं।',
+
+  // Live Shop Rates & Checkout Enhancements
+  rateBwSingle: 'B&W सिंगल (एक तरफ)',
+  rateBwDouble: 'B&W डबल (दोनों तरफ)',
+  rateColorSingle: 'कलर सिंगल (एक तरफ)',
+  rateColorDouble: 'कलर डबल (दोनों तरफ)',
+  pageOneOnly: 'केवल पेज 1',
+  pagesFirstFive: 'पेज 1-5',
+  instantAutoPrint: '⚡ तुरंत ऑटो-प्रिंट',
+  fastestNoWaiting: 'सबसे तेज़ • काउंटर पर इंतज़ार नहीं',
+  payCashCounter: 'काउंटर पर नकद भुगतान करें',
+  payCashDesc: 'प्रिंट शुरू करने के लिए दुकानदार को नकद दें',
 };

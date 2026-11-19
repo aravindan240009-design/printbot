@@ -182,4 +182,16 @@ export const en = {
   // Trust & Security
   secureShop: 'Verified Print Shop Counter',
   autoDeleteNotice: 'Uploaded files are automatically deleted from server memory after printing.',
+
+  // Live Shop Rates & Checkout Enhancements
+  rateBwSingle: 'B&W Single',
+  rateBwDouble: 'B&W Double',
+  rateColorSingle: 'Color Single',
+  rateColorDouble: 'Color Double',
+  pageOneOnly: 'Page 1 Only',
+  pagesFirstFive: 'Pages 1-5',
+  instantAutoPrint: '⚡ Instant Auto-Print',
+  fastestNoWaiting: 'Fastest • Zero waiting at counter',
+  payCashCounter: 'Pay Cash at Counter',
+  payCashDesc: 'Pay shopkeeper to approve & release print',
 };

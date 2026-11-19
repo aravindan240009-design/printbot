@@ -31,7 +31,7 @@ export const VisualPageRangePicker: React.FC<VisualPageRangePickerProps> = ({
     }
   };
 
-  const handlePreset = (preset: 'all' | 'odd' | 'even') => {
+  const handlePreset = (preset: string) => {
     setCustomInput(preset);
     onChange(preset);
   };
@@ -99,7 +99,7 @@ export const VisualPageRangePicker: React.FC<VisualPageRangePickerProps> = ({
       )}
 
       {/* Quick Preset Buttons */}
-      <div className="pb-range-chips-row">
+      <div className="pb-range-chips-row" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
         <button
           type="button"
           className={`pb-range-chip-btn ${customInput === 'all' ? 'active' : ''}`}
@@ -107,20 +107,45 @@ export const VisualPageRangePicker: React.FC<VisualPageRangePickerProps> = ({
         >
           {t.allPages}
         </button>
-        <button
-          type="button"
-          className={`pb-range-chip-btn ${customInput === 'odd' ? 'active' : ''}`}
-          onClick={() => handlePreset('odd')}
-        >
-          {t.oddPages}
-        </button>
-        <button
-          type="button"
-          className={`pb-range-chip-btn ${customInput === 'even' ? 'active' : ''}`}
-          onClick={() => handlePreset('even')}
-        >
-          {t.evenPages}
-        </button>
+
+        {total > 1 && (
+          <button
+            type="button"
+            className={`pb-range-chip-btn ${customInput === '1' ? 'active' : ''}`}
+            onClick={() => handlePreset('1')}
+          >
+            {t.pageOneOnly || 'Page 1 Only'}
+          </button>
+        )}
+
+        {total >= 3 && (
+          <button
+            type="button"
+            className={`pb-range-chip-btn ${customInput === `1-${Math.min(5, total)}` ? 'active' : ''}`}
+            onClick={() => handlePreset(`1-${Math.min(5, total)}`)}
+          >
+            {t.pagesFirstFive || `1 - ${Math.min(5, total)}`}
+          </button>
+        )}
+
+        {total > 2 && (
+          <>
+            <button
+              type="button"
+              className={`pb-range-chip-btn ${customInput === 'odd' ? 'active' : ''}`}
+              onClick={() => handlePreset('odd')}
+            >
+              {t.oddPages}
+            </button>
+            <button
+              type="button"
+              className={`pb-range-chip-btn ${customInput === 'even' ? 'active' : ''}`}
+              onClick={() => handlePreset('even')}
+            >
+              {t.evenPages}
+            </button>
+          </>
+        )}
       </div>
 
       {/* Interactive Page Chips (if total pages <= 60 for clean UI) */}

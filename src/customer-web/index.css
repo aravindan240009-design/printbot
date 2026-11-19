@@ -1934,3 +1934,147 @@ button:disabled {
     scroll-behavior: auto !important;
   }
 }
+
+/* ==============================================================================
+   SHOP RATES 2X2 GRID (Mobile-Optimized ApnaPrinter-style Rates Banner)
+   ============================================================================== */
+.pb-shop-rates-wrapper {
+  margin-bottom: 20px;
+  background: var(--pb-surface, #ffffff);
+  border: 1px solid var(--pb-border, #e2e8f0);
+  border-radius: var(--pb-radius-xl, 16px);
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.pb-rates-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--pb-border, #f1f5f9);
+}
+
+.pb-rates-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pb-rates-tag {
+  font-size: 0.8rem;
+  font-weight: 750;
+  color: var(--pb-text, #1e293b);
+  display: inline-flex;
+  align-items: center;
+}
+
+.pb-rates-shop-sub {
+  font-size: 0.75rem;
+  color: var(--pb-muted, #64748b);
+  background: var(--pb-surface-alt, #f8fafc);
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--pb-border, #e2e8f0);
+}
+
+.pb-rates-discount-badge {
+  font-size: 0.72rem;
+  font-weight: 750;
+  color: #059669;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.pb-rates-grid-2x2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .pb-rates-grid-2x2 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.pb-rate-cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: var(--pb-radius-md, 12px);
+  border: 1px solid var(--pb-border, #e2e8f0);
+  background: var(--pb-surface-alt, #f8fafc);
+  transition: all 0.2s ease;
+}
+
+.pb-rate-cell:hover {
+  border-color: var(--pb-brand, #2563eb);
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.08);
+}
+
+.pb-rate-cell.pb-rate-duplex {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.pb-rate-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.pb-rate-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pb-dot-bw {
+  background: #334155;
+}
+
+.pb-dot-color {
+  background: linear-gradient(135deg, #ef4444, #3b82f6);
+}
+
+.pb-dot-duplex {
+  width: auto;
+  height: auto;
+  font-size: 11px;
+  color: #059669;
+  font-weight: 800;
+}
+
+.pb-rate-label {
+  font-size: 0.74rem;
+  font-weight: 650;
+  color: var(--pb-text-secondary, #475569);
+  white-space: nowrap;
+}
+
+.pb-rate-price {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--pb-text, #0f172a);
+  font-family: Outfit, Inter, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.pb-rate-price.highlight-duplex {
+  color: #059669;
+}
+
+.pb-rate-unit {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--pb-muted, #94a3b8);
+  margin-left: 2px;
+}

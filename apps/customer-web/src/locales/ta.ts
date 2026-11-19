@@ -184,4 +184,16 @@ export const ta: typeof en = {
   // Trust & Security
   secureShop: 'அங்கீகரிக்கப்பட்ட பிரிண்ட் பாட் கடை',
   autoDeleteNotice: 'அச்சிடப்பட்டதும் கோப்புகள் உடனடியாக சேவையகத்திலிருந்து நீக்கப்படும்.',
+
+  // Live Shop Rates & Checkout Enhancements
+  rateBwSingle: 'B&W ஒற்றைப் பக்கம்',
+  rateBwDouble: 'B&W இரு பக்கம்',
+  rateColorSingle: 'வண்ணம் ஒற்றைப் பக்கம்',
+  rateColorDouble: 'வண்ணம் இரு பக்கம்',
+  pageOneOnly: 'பக்கம் 1 மட்டும்',
+  pagesFirstFive: 'பக்கங்கள் 1-5',
+  instantAutoPrint: '⚡ உடனடி தானியங்கி அச்சு',
+  fastestNoWaiting: 'மிக விரைவானது • கவுண்டரில் காத்திருக்க வேண்டாம்',
+  payCashCounter: 'கவுண்டரில் பணம் செலுத்தவும்',
+  payCashDesc: 'அச்சிட கடைக்காரரிடம் பணம் செலுத்தவும்',
 };
