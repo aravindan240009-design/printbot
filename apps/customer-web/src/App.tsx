@@ -301,27 +301,17 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
     if (!files.length) {
       throw new Error('Add a document before starting payment.');
     }
-    if (files.length !== 1) {
-      throw new Error('Secure online checkout currently supports one document per order. Please checkout each document separately.');
-    }
-
     const firstFile = files[0];
-    const extension = firstFile.name.split('.').pop()?.toLowerCase();
-    const fileSize = firstFile.source?.size || firstFile.sizeBytes || 0;
-    if (!['pdf', 'jpg', 'jpeg', 'png'].includes(extension || '')) {
-      throw new Error('Automatic printing currently supports PDF, JPG, and PNG files only.');
-    }
-    if (!fileSize || fileSize > 2.5 * 1024 * 1024) {
-      throw new Error('Automatic printing currently supports files up to 2.5 MB. No payment was started.');
-    }
     const cleanPhone = customerDetails.customerPhone.replace(/[^0-9]/g, '');
     const customerEmail = cleanPhone ? `${cleanPhone}@walkin.customer.in` : 'customer@walkin.in';
+    const combinedFileName = files.length === 1 ? files[0].name : `${files[0].name} + ${files.length - 1} more (${files.length} documents)`;
+    const totalSizeBytes = files.reduce((acc, f) => acc + (f.sizeBytes || f.source?.size || 1024), 0);
     const createPayload: CreateOrderPayload = {
       customer_email: customerEmail,
       customer_phone: customerDetails.customerPhone || undefined,
-      file_name: firstFile.name,
-      file_size_bytes: firstFile.sizeBytes || firstFile.source?.size || 1024,
-      page_count: firstFile.pageCount || 1,
+      file_name: combinedFileName,
+      file_size_bytes: totalSizeBytes,
+      page_count: quote.total_logical_pages || 1,
       options: {
         copies: firstFile.options.copies || 1,
         color_mode: firstFile.options.colorMode === 'color' ? 'color' : firstFile.options.colorMode === 'grayscale' ? 'grayscale' : 'bw',
@@ -385,18 +375,48 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
     const customerEmail = cleanPhone ? `${cleanPhone}@walkin.customer.in` : 'customer@walkin.in';
     const targetShopId = (session.shop_slug || session.shop_id || 'ashwin').toLowerCase();
 
-    // Safely convert file to base64 if <= 2.5MB so desktop operator can view & print
-    let fileBase64: string | undefined = undefined;
-    if (firstFile.source && firstFile.source.size <= 2.5 * 1024 * 1024) {
-      try {
-        fileBase64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = () => resolve('');
-          reader.readAsDataURL(firstFile.source);
-        });
-      } catch {}
-    }
+    // Safely convert all uploaded files to base64 so desktop workstation can view & print each file
+    const itemsWithData = await Promise.all(
+      files.map(async (f) => {
+        let b64: string | undefined = undefined;
+        if (f.source && f.source.size <= 3.5 * 1024 * 1024) {
+          try {
+            b64 = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = () => resolve('');
+              reader.readAsDataURL(f.source as Blob);
+            });
+          } catch {}
+        }
+        return {
+          name: f.name,
+          fileSize: f.sizeBytes || f.source?.size || 1024,
+          page_count: f.pageCount || 1,
+          pageCount: f.pageCount || 1,
+          copies: f.options.copies || 1,
+          color_mode: f.options.colorMode === 'color' ? 'color' : 'bw',
+          colorMode: f.options.colorMode === 'color' ? 'Color' : f.options.colorMode === 'grayscale' ? 'Grayscale' : 'B&W',
+          sheets: Math.ceil((f.pageCount || 1) / (f.options.duplex === 'simplex' ? 1 : 2)) * (f.options.copies || 1),
+          paper_size: f.options.paperSize || 'A4',
+          paperSize: f.options.paperSize || 'A4',
+          duplex_mode: f.options.duplex || 'simplex',
+          duplexMode: f.options.duplex || 'simplex',
+          finishing: f.options.finishing || 'none',
+          paper_gsm: parseInt(f.options.paperGsm || '75', 10) || 75,
+          paperGsm: parseInt(f.options.paperGsm || '75', 10) || 75,
+          page_range: f.options.pageRange || 'all',
+          pageRange: f.options.pageRange || 'all',
+          file_data: b64,
+          fileData: b64,
+        };
+      })
+    );
+
+    const combinedFileName = files.length === 1
+      ? firstFile.name
+      : `${firstFile.name} + ${files.length - 1} more (${files.length} documents)`;
+    const totalSizeBytes = files.reduce((acc, f) => acc + (f.sizeBytes || f.source?.size || 1024), 0);
 
     const orderMeta = {
       orderId: assignedOrderId,
@@ -408,10 +428,10 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
       customerName: details.customerName || 'Walk-in Customer',
       customerPhone: details.customerPhone || '',
       customerEmail: customerEmail,
-      fileName: firstFile.name,
-      fileSize: firstFile.sizeBytes || firstFile.source?.size || 1024,
-      fileData: fileBase64,
-      pageCount: firstFile.pageCount || 1,
+      fileName: combinedFileName,
+      fileSize: totalSizeBytes,
+      fileData: itemsWithData[0]?.fileData,
+      pageCount: quote.total_logical_pages,
       copies: firstFile.options.copies || 1,
       colorMode: firstFile.options.colorMode === 'color' ? 'Color' : firstFile.options.colorMode === 'grayscale' ? 'Grayscale' : 'B&W',
       paperSize: firstFile.options.paperSize || 'A4',
@@ -427,23 +447,16 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
       notes: details.notes || '',
       status: 'PENDING_APPROVAL',
       placedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      items: files.map((f) => ({
-        name: f.name,
-        copies: f.options.copies,
-        colorMode: f.options.colorMode === 'color' ? 'Color' : f.options.colorMode === 'grayscale' ? 'Grayscale' : 'B&W',
-        sheets: Math.ceil((f.pageCount || 1) / (f.options.duplex === 'simplex' ? 1 : 2)) * f.options.copies,
-        paperSize: f.options.paperSize,
-        finishing: f.options.finishing,
-      })),
+      items: itemsWithData,
     };
 
     // Create the API job before writing the shared order row so both systems use the same ID.
     const createPayload: CreateOrderPayload = {
       customer_email: customerEmail,
       customer_phone: details.customerPhone || undefined,
-      file_name: firstFile.name,
-      file_size_bytes: firstFile.sizeBytes || firstFile.source?.size || 1024,
-      page_count: firstFile.pageCount || 1,
+      file_name: combinedFileName,
+      file_size_bytes: totalSizeBytes,
+      page_count: quote.total_logical_pages,
       options: {
         copies: firstFile.options.copies || 1,
         color_mode: firstFile.options.colorMode === 'color' ? 'color' : firstFile.options.colorMode === 'grayscale' ? 'grayscale' : 'bw',
@@ -473,7 +486,7 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
       const orderRecord = {
         id: assignedOrderId,
         shop_name: targetShopId,
-        city: firstFile.name,
+        city: combinedFileName,
         contact_number: details.customerPhone || '',
         plan: 'ORDER',
         status: 'ORDER_PENDING',
@@ -506,14 +519,7 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
       paymentId: details.paymentId,
       status: details.paymentMethod === 'upi' && !details.paymentId ? 'PENDING_PAYMENT' : 'ORDER_RECEIVED',
       placedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      items: files.map((f) => ({
-        name: f.name,
-        copies: f.options.copies,
-        colorMode: f.options.colorMode === 'color' ? 'Color' : f.options.colorMode === 'grayscale' ? 'Grayscale' : 'B&W',
-        sheets: Math.ceil((f.pageCount || 1) / (f.options.duplex === 'simplex' ? 1 : 2)) * f.options.copies,
-        paperSize: f.options.paperSize,
-        finishing: f.options.finishing,
-      })),
+      items: itemsWithData,
       qrToken: 'printbot_token_' + assignedOrderId,
     };
 

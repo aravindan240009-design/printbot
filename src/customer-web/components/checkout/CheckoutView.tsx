@@ -176,8 +176,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   };
 
   const handleSubmit = () => {
-    if (files.length !== 1 || quoteStatus !== 'ready' || !quote) {
-      alert('Wait for a server price and checkout one document at a time.');
+    if (files.length === 0 || quoteStatus !== 'ready' || !quote) {
+      alert('Wait for a server price before completing checkout.');
       return;
     }
     if (paymentMethod === 'upi') {
@@ -214,10 +214,48 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           TEST MODE — Razorpay test payments only. Orders are visible only in the isolated test workstation; printing is disabled.
         </p>
       )}
-      {files.length !== 1 && (
-        <p role="alert" style={{ color: 'var(--pb-danger)' }}>
-          Checkout currently accepts one document per order. Remove the other documents and checkout them separately.
-        </p>
+      {files.length > 1 && (
+        <div
+          style={{
+            padding: '14px 18px',
+            borderRadius: 'var(--pb-radius-lg)',
+            background: 'var(--pb-surface-alt)',
+            border: '1px solid var(--pb-border)',
+            marginBottom: '20px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.88rem', fontWeight: 750, color: 'var(--pb-text)' }}>
+              📁 {files.length} Documents in this Order
+            </span>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#059669', background: 'rgba(16, 185, 129, 0.12)', padding: '2px 8px', borderRadius: '999px' }}>
+              Combined Checkout
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {files.map((f, i) => (
+              <div
+                key={f.id || i}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  fontSize: '0.8rem',
+                  color: 'var(--pb-text-secondary)',
+                  padding: '3px 0',
+                  borderBottom: i < files.length - 1 ? '1px dashed var(--pb-border)' : undefined,
+                }}
+              >
+                <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }}>
+                  {i + 1}. {f.name}
+                </span>
+                <span>
+                  {f.pageCount || 1} pg • {f.options.copies || 1} {f.options.copies === 1 ? 'copy' : 'copies'} • {f.options.colorMode === 'color' ? 'Color' : 'B&W'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Destination & Order Summary Ribbon */}
@@ -474,7 +512,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               <button
                 type="button"
                 onClick={handleRazorpayCheckout}
-                disabled={isProcessingPayment || quoteStatus !== 'ready' || !quote || files.length !== 1}
+                disabled={isProcessingPayment || quoteStatus !== 'ready' || !quote || files.length === 0}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -553,7 +591,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           className="pb-btn-primary"
           style={{ flex: 1, minHeight: '52px', minWidth: '240px', fontSize: '1rem' }}
           onClick={handleSubmit}
-          disabled={isProcessingPayment || quoteStatus !== 'ready' || !quote || files.length !== 1}
+          disabled={isProcessingPayment || quoteStatus !== 'ready' || !quote || files.length === 0}
         >
           {isProcessingPayment ? (
             <>

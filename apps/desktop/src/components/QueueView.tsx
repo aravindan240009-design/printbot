@@ -38,7 +38,7 @@ interface QueueViewProps {
   selectedPrinterName?: string;
   setSelectedPrinterName?: (val: string) => void;
   nativePrinters?: Array<{ name: string; is_default?: boolean; is_online?: boolean }>;
-  onDirectPrint?: (jobId: string) => void;
+  onDirectPrint?: (jobId: string, specificItemIndex?: number) => void;
 }
 
 export const QueueView: React.FC<QueueViewProps> = ({
@@ -292,7 +292,9 @@ export const QueueView: React.FC<QueueViewProps> = ({
               return (
               <div key={job.id} className="pb-job-card">
                 <div className="pb-job-file-avatar">
-                  <span className="pb-file-ext-tag">{getFileExtension(job.file_name)}</span>
+                  <span className="pb-file-ext-tag">
+                    {job.items && job.items.length > 1 ? `${job.items.length}x` : getFileExtension(job.file_name)}
+                  </span>
                   <FileText size={20} />
                 </div>
 
@@ -301,6 +303,19 @@ export const QueueView: React.FC<QueueViewProps> = ({
                     <span className="pb-job-filename" title={job.file_name}>
                       {job.file_name}
                     </span>
+                    {job.items && job.items.length > 1 && (
+                      <span
+                        className="pb-chip"
+                        style={{
+                          background: 'rgba(37, 99, 235, 0.1)',
+                          color: '#2563eb',
+                          fontWeight: 700,
+                          fontSize: '11px',
+                        }}
+                      >
+                        📁 {job.items.length} Documents Batch
+                      </span>
+                    )}
                     {getStatusBadge(job.status)}
                   </div>
 
@@ -347,6 +362,127 @@ export const QueueView: React.FC<QueueViewProps> = ({
                     )}
                   </div>
 
+                  {job.items && job.items.length > 1 && (
+                    <div
+                      className="pb-job-multi-docs"
+                      style={{
+                        marginTop: '10px',
+                        marginBottom: '8px',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        padding: '10px 12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Layers size={13} color="#2563eb" />
+                          Order Documents ({job.items.length})
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#64748b' }}>
+                          Individual Controls
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {job.items.map((item, idx) => {
+                          const itemExt = getFileExtension(item.name);
+                          const itemData = item.file_data || (idx === 0 ? job.file_data : undefined);
+                          return (
+                            <div
+                              key={item.id || `${item.name}-${idx}`}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                background: '#ffffff',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '6px',
+                                padding: '6px 10px',
+                                fontSize: '12px',
+                                gap: '8px',
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                                <span
+                                  style={{
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    background: '#eff6ff',
+                                    color: '#2563eb',
+                                    padding: '2px 5px',
+                                    borderRadius: '4px',
+                                    textTransform: 'uppercase',
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {itemExt}
+                                </span>
+                                <span
+                                  style={{
+                                    fontWeight: 600,
+                                    color: '#1e293b',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                  }}
+                                  title={item.name}
+                                >
+                                  {idx + 1}. {item.name}
+                                </span>
+                                <span style={{ color: '#64748b', fontSize: '11px', flexShrink: 0 }}>
+                                  • {item.page_count || 1} pgs • {item.copies || 1} {item.copies === 1 ? 'copy' : 'copies'} • {(item.color_mode || 'bw').toUpperCase()} • {item.duplex_mode === 'simplex' ? 'Single Sided' : 'Double Sided'}
+                                </span>
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                {itemData && (
+                                  <a
+                                    href={getFileViewUrl(itemData, item.name)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="pb-btn pb-btn-secondary pb-btn-sm"
+                                    style={{
+                                      textDecoration: 'none',
+                                      padding: '2px 8px',
+                                      fontSize: '11px',
+                                      height: '24px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                    }}
+                                    title={`Preview ${item.name}`}
+                                  >
+                                    <FileText size={11} /> View Doc
+                                  </a>
+                                )}
+                                <button
+                                  type="button"
+                                  className="pb-btn pb-btn-primary pb-btn-sm"
+                                  style={{
+                                    padding: '2px 8px',
+                                    fontSize: '11px',
+                                    height: '24px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                  }}
+                                  onClick={() => onDirectPrint && onDirectPrint(job.id, idx)}
+                                  title={`Print ${item.name} individually to ${selectedPrinterName || 'printer'}`}
+                                >
+                                  <Printer size={11} /> Print Doc
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   {job.status === 'PENDING_APPROVAL' && paymentVerificationPending && (
                     <p className="pb-form-hint" role="status">
                       Waiting for the payment provider to verify this UPI payment. Printing is locked until verification completes.
@@ -361,7 +497,7 @@ export const QueueView: React.FC<QueueViewProps> = ({
                         onClick={() => onApproveJob(job.id)}
                         title={`Approve and send print stream directly to ${selectedPrinterName || 'connected printer'}`}
                       >
-                        <Printer size={13} /> Approve &amp; Print
+                        <Printer size={13} /> {job.items && job.items.length > 1 ? `Approve & Print All (${job.items.length} Docs)` : 'Approve & Print'}
                       </button>
                       <button
                         type="button"
@@ -378,7 +514,7 @@ export const QueueView: React.FC<QueueViewProps> = ({
                           className="pb-btn pb-btn-secondary pb-btn-sm"
                           style={{ textDecoration: 'none' }}
                         >
-                          <FileText size={13} /> View File
+                          <FileText size={13} /> {job.items && job.items.length > 1 ? 'View Primary Doc' : 'View File'}
                         </a>
                       )}
                     </div>
@@ -401,7 +537,7 @@ export const QueueView: React.FC<QueueViewProps> = ({
                           className="pb-btn pb-btn-secondary pb-btn-sm"
                           style={{ textDecoration: 'none' }}
                         >
-                          <FileText size={13} /> View File
+                          <FileText size={13} /> {job.items && job.items.length > 1 ? 'View Primary Doc' : 'View File'}
                         </a>
                       )}
                     </div>
@@ -415,7 +551,7 @@ export const QueueView: React.FC<QueueViewProps> = ({
                         onClick={() => onDirectPrint && onDirectPrint(job.id)}
                         title={`Send print job to ${selectedPrinterName || 'hardware printer'}`}
                       >
-                        <Printer size={13} /> Print to Device
+                        <Printer size={13} /> {job.items && job.items.length > 1 ? `Print All (${job.items.length} Docs)` : 'Print to Device'}
                       </button>
                       <button
                         type="button"
@@ -432,7 +568,7 @@ export const QueueView: React.FC<QueueViewProps> = ({
                           className="pb-btn pb-btn-secondary pb-btn-sm"
                           style={{ textDecoration: 'none' }}
                         >
-                          <FileText size={13} /> View File
+                          <FileText size={13} /> {job.items && job.items.length > 1 ? 'View Primary Doc' : 'View File'}
                         </a>
                       )}
                     </div>
@@ -446,7 +582,7 @@ export const QueueView: React.FC<QueueViewProps> = ({
                         onClick={() => onDirectPrint && onDirectPrint(job.id)}
                         title={`Print an extra copy to ${selectedPrinterName || 'hardware printer'}`}
                       >
-                        <Printer size={13} /> Print Again
+                        <Printer size={13} /> {job.items && job.items.length > 1 ? `Print All Again (${job.items.length} Docs)` : 'Print Again'}
                       </button>
                       {job.file_data && (
                         <a
@@ -456,7 +592,7 @@ export const QueueView: React.FC<QueueViewProps> = ({
                           className="pb-btn pb-btn-secondary pb-btn-sm"
                           style={{ textDecoration: 'none' }}
                         >
-                          <FileText size={13} /> View File
+                          <FileText size={13} /> {job.items && job.items.length > 1 ? 'View Primary Doc' : 'View File'}
                         </a>
                       )}
                     </div>

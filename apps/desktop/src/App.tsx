@@ -249,6 +249,18 @@ export interface GlobalBroadcast {
   updatedAt: string;
 }
 
+export interface PrintJobItem {
+  name: string;
+  page_count?: number;
+  copies: number;
+  color_mode: 'color' | 'bw' | 'grayscale';
+  paper_size?: string;
+  duplex_mode?: 'simplex' | 'duplex_long' | 'duplex_short';
+  paper_gsm?: number;
+  binding?: string;
+  file_data?: string;
+}
+
 export interface PrintJob {
   id: string;
   shop_id?: string;
@@ -278,6 +290,7 @@ export interface PrintJob {
   file_data?: string;
   payment_method?: string;
   payment_status?: string;
+  items?: PrintJobItem[];
 }
 
 export interface ConnectedPrinter {
@@ -2027,6 +2040,18 @@ function ProductionApp() {
                 payment_method: meta.paymentMethod || 'cash',
                 payment_status: paymentStatus,
                 order_mode: isFullAuto ? 'FULL_AUTOMATIC' : 'MANUAL_APPROVAL',
+                items: Array.isArray(meta.items)
+                  ? meta.items.map((it: any) => ({
+                      name: it.name || 'Document.pdf',
+                      page_count: it.pageCount || it.page_count || 1,
+                      copies: it.copies || 1,
+                      color_mode: (it.colorMode === 'Color' || it.color_mode === 'color' ? 'color' : 'bw') as any,
+                      paper_size: it.paperSize || it.paper_size || 'A4',
+                      duplex_mode: it.duplexMode || it.duplex_mode || 'simplex',
+                      finishing: it.finishing || 'none',
+                      file_data: it.fileData || it.file_data || undefined,
+                    }))
+                  : undefined,
               } as PrintJob;
             } catch (err) {
               console.warn('Error parsing cloud order row:', err);
@@ -2406,98 +2431,14 @@ function ProductionApp() {
     );
 
     const shopId = currentShop?.username || activeSession?.username || 'shop';
-    const targetPrinter =
-      selectedPrinterName ||
-      nativePrinters?.find((p) => p.is_online)?.name ||
-      nativePrinters?.find((p) => p.is_default)?.name ||
-      nativePrinters?.[0]?.name ||
-      '';
-
-    let printableBytes: number[] | null = null;
-    try {
-      printableBytes = await resolvePrintableFileBytes(targetJob);
-    } catch (err) {
-      console.warn('Failed to resolve printable bytes:', err);
-    }
-
-    if (!printableBytes || printableBytes.length === 0) {
-      setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, status: 'PENDING_APPROVAL' } : j)));
-      setNotice(`Job #${jobId} cannot print because no supported file is attached or available on disk.`);
-      return;
-    }
-
-    let renderedPages: number[][];
-    try {
-      renderedPages = await renderDocumentPagesForPrinter(
-        printableBytes,
-        targetJob.options.color_mode !== 'color',
-      );
-    } catch (renderErr: any) {
-      setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, status: 'PENDING_APPROVAL' } : j)));
-      setNotice(`Job #${jobId} could not be rendered: ${renderErr?.message || renderErr}`);
-      return;
-    }
-
-    try {
-      await ensureCurrentWorkstationBinding();
-    } catch (bindingError) {
-      setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, status: 'PENDING_APPROVAL' } : j)));
-      setNotice(`Job #${jobId} could not be sent to the printer: ${bindingError instanceof Error ? bindingError.message : bindingError}`);
-      return;
-    }
-
     try {
       await syncOrderStatusToCloud(jobId, 'ORDER_QUEUED');
     } catch (syncError) {
-      setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, status: 'PENDING_APPROVAL' } : j)));
-      setNotice(`Job #${jobId} was not sent to the printer because its queue status could not be synchronized: ${syncError instanceof Error ? syncError.message : syncError}`);
-      return;
+      console.warn('Could not sync QUEUED status:', syncError);
     }
 
-    try {
-      const result = await printToHardware({
-        job_id: jobId,
-        attempt_id: createPrintAttemptId(jobId),
-        printer_name: targetPrinter,
-        file_name: targetJob.file_name,
-        file_bytes: printableBytes,
-        rendered_pages: renderedPages,
-        copies: targetJob.options.copies || 1,
-        duplex_mode: targetJob.options.duplex_mode,
-      });
-      setJobs((prev) =>
-        prev.map((j) => (j.id === jobId ? { ...j, status: 'PRINTING' } : j))
-      );
-      try {
-        await syncOrderStatusToCloud(jobId, 'ORDER_PRINTING');
-        setNotice(`Job #${jobId} submitted to ${targetPrinter} (Windows spooler job #${result.spooler_job_id}).`);
-      } catch (syncError) {
-        setNotice(`Job #${jobId} was submitted to ${targetPrinter}, but live status sync failed: ${syncError instanceof Error ? syncError.message : syncError}`);
-      }
-
-      // Automatically transition to COMPLETED once spool submission completes
-      setTimeout(async () => {
-        setJobs((prev) =>
-          prev.map((j) => (j.id === jobId ? { ...j, status: 'COMPLETED' } : j))
-        );
-        try {
-          await syncOrderStatusToCloud(jobId, 'ORDER_COMPLETED');
-          setNotice(`Job #${jobId} print completed & ready for counter pickup.`);
-        } catch (syncErr) {
-          console.warn('Sync completed status failed:', syncErr);
-        }
-      }, 1500);
-    } catch (printErr: any) {
-      console.warn('Hardware printing dispatch:', printErr);
-      setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, status: 'PENDING_APPROVAL' } : j)));
-      try {
-        await syncOrderStatusToCloud(jobId, 'ORDER_PENDING');
-        setNotice(`Job #${jobId} could not be printed: ${printErr?.message || printErr}`);
-      } catch (syncError) {
-        setNotice(`Job #${jobId} could not be printed, and its cloud status could not be reset: ${syncError instanceof Error ? syncError.message : syncError}`);
-      }
-      return;
-    }
+    // Direct print all documents in this job (or single document)
+    await handleDirectPrint(jobId, false);
 
     try {
       const headers: Record<string, string> = { 'X-Tenant-ID': shopId };
@@ -2509,7 +2450,11 @@ function ProductionApp() {
     } catch {}
   };
 
-  const handleDirectPrint = async (jobId: string, automatic = false, printerOverride?: string) => {
+  const handleDirectPrint = async (
+    jobId: string,
+    itemIndexOrAuto: number | boolean = false,
+    printerOverride?: string
+  ) => {
     const targetJob = jobs.find((j) => j.id === jobId);
     if (!targetJob) return;
     const targetPrinter =
@@ -2520,6 +2465,116 @@ function ProductionApp() {
       nativePrinters?.[0]?.name ||
       '';
 
+    const isSpecificItem = typeof itemIndexOrAuto === 'number';
+    const automatic = typeof itemIndexOrAuto === 'boolean' ? itemIndexOrAuto : false;
+
+    // Single item print from a multi-document order
+    if (isSpecificItem) {
+      const itemIndex = itemIndexOrAuto;
+      const targetItem = targetJob.items?.[itemIndex];
+      if (!targetItem) {
+        alert(`Document #${itemIndex + 1} not found in job #${jobId}`);
+        return;
+      }
+
+      let fileBytes: number[] | null = null;
+      if (targetItem.file_data) {
+        fileBytes = decodePrintableFileData(targetItem.file_data);
+      } else {
+        fileBytes = await resolvePrintableFileBytes(targetJob);
+      }
+
+      if (!fileBytes || fileBytes.length === 0) {
+        alert(`No printable file data found for "${targetItem.name}".`);
+        return;
+      }
+
+      try {
+        const isBw = (targetItem.color_mode || targetJob.options.color_mode) !== 'color';
+        const renderedPages = await renderDocumentPagesForPrinter(fileBytes, isBw);
+        await ensureCurrentWorkstationBinding();
+        const result = await printToHardware({
+          job_id: jobId,
+          attempt_id: `${createPrintAttemptId(jobId)}-item-${itemIndex}`,
+          printer_name: targetPrinter,
+          file_name: targetItem.name,
+          file_bytes: fileBytes,
+          rendered_pages: renderedPages,
+          copies: targetItem.copies || 1,
+          duplex_mode: targetItem.duplex_mode || targetJob.options.duplex_mode,
+        });
+        setNotice(`Document "${targetItem.name}" submitted to ${targetPrinter} (Windows spooler job #${result.spooler_job_id}).`);
+      } catch (err: any) {
+        alert(`Hardware print error for "${targetItem.name}": ${err?.message || err}`);
+      }
+      return;
+    }
+
+    // Multi-document order: iterate through and spool each document
+    if (targetJob.items && targetJob.items.length > 1) {
+      let spooledCount = 0;
+      for (let i = 0; i < targetJob.items.length; i++) {
+        const item = targetJob.items[i];
+        let fileBytes: number[] | null = null;
+        if (item.file_data) {
+          fileBytes = decodePrintableFileData(item.file_data);
+        } else if (i === 0) {
+          fileBytes = await resolvePrintableFileBytes(targetJob);
+        }
+
+        if (!fileBytes || fileBytes.length === 0) {
+          console.warn(`Skipping item ${item.name}: no printable data`);
+          continue;
+        }
+
+        try {
+          const isBw = (item.color_mode || targetJob.options.color_mode) !== 'color';
+          const renderedPages = await renderDocumentPagesForPrinter(fileBytes, isBw);
+          await ensureCurrentWorkstationBinding();
+          await printToHardware({
+            job_id: jobId,
+            attempt_id: automatic
+              ? `auto-${currentShop?.username || activeSession?.username || 'shop'}-${jobId}-doc-${i}`
+              : `${createPrintAttemptId(jobId)}-doc-${i}`,
+            printer_name: targetPrinter,
+            file_name: item.name,
+            file_bytes: fileBytes,
+            rendered_pages: renderedPages,
+            copies: item.copies || 1,
+            duplex_mode: item.duplex_mode || targetJob.options.duplex_mode,
+          });
+          spooledCount++;
+          setNotice(`Spooled ${spooledCount}/${targetJob.items.length}: "${item.name}" to ${targetPrinter}...`);
+        } catch (err: any) {
+          console.error(`Error spooling item ${item.name}:`, err);
+        }
+      }
+
+      setJobs((prev) =>
+        prev.map((j) => (j.id === jobId ? { ...j, status: 'PRINTING' } : j))
+      );
+      try {
+        await syncOrderStatusToCloud(jobId, 'ORDER_PRINTING');
+        setNotice(`All ${spooledCount} documents from Job #${jobId} submitted to ${targetPrinter}.`);
+      } catch (syncError) {
+        setNotice(`Job #${jobId} submitted to ${targetPrinter}, but live status sync failed.`);
+      }
+
+      setTimeout(async () => {
+        setJobs((prev) =>
+          prev.map((j) => (j.id === jobId ? { ...j, status: 'COMPLETED' } : j))
+        );
+        try {
+          await syncOrderStatusToCloud(jobId, 'ORDER_COMPLETED');
+          setNotice(`Job #${jobId} (${spooledCount} documents) completed & ready for counter pickup.`);
+        } catch (syncErr) {
+          console.warn('Sync completed status failed:', syncErr);
+        }
+      }, 1500);
+      return;
+    }
+
+    // Single document fallback
     let result: Awaited<ReturnType<typeof printToHardware>>;
     try {
       const fileBytes = await resolvePrintableFileBytes(targetJob);
