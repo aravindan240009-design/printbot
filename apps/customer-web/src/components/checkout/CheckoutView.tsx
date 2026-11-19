@@ -74,8 +74,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   const amount = quote ? quote.total_rupees.toFixed(2) : '--';
 
   const handleRazorpayCheckout = async () => {
-    if (files.length !== 1 || quoteStatus !== 'ready' || !quote) {
-      alert('Wait for a server price and checkout one document at a time.');
+    if (files.length === 0 || quoteStatus !== 'ready' || !quote) {
+      alert('Wait for a server price before completing checkout.');
       return;
     }
     setIsProcessingPayment(true);

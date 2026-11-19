@@ -437,8 +437,8 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
     paymentId?: string;
     orderId?: string;
   }) => {
-    if (!quote || quoteStatus !== 'ready' || files.length !== 1) {
-      alert('Wait for a server price and checkout one document at a time.');
+    if (!quote || quoteStatus !== 'ready' || files.length === 0) {
+      alert('Wait for a server price before completing checkout.');
       return;
     }
 
