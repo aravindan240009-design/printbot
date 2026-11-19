@@ -55,12 +55,16 @@ import { DesktopShell, type Tab } from './components/DesktopShell';
 import { LockScreen } from './components/LockScreen';
 import { SetupWizard } from './components/SetupWizard';
 import { QueueView } from './components/QueueView';
-import { PrintersView } from './components/PrintersView';
+import { PrintersView, type PrinterRoutingConfig } from './components/PrintersView';
 import { ServicesView } from './components/ServicesView';
 import { WebsiteView } from './components/WebsiteView';
 import { SettingsView } from './components/SettingsView';
 import { JobRejectModal, ServiceEditModal } from './components/Modals';
 import { AdminPortal } from './components/AdminPortal';
+import { generateTestPagePngBytes } from './utils/hardwareCalibration';
+import { generateCounterStandeePngBytes } from './utils/qrStandeeGenerator';
+import { playOrderChime } from './utils/audioChime';
+import { openWhatsAppForOrder } from './utils/whatsappNotification';
 
 const API_BASE = ((import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '');
 
@@ -1902,6 +1906,178 @@ function ProductionApp() {
   const [selectedPrinterName, setSelectedPrinterName] = useState<string>('');
   const autoPrintAttemptedJobIds = useRef<Set<string>>(new Set());
 
+  // Smart Multi-Printer Auto-Routing preferences
+  const [printerRouting, setPrinterRouting] = useState<PrinterRoutingConfig>(() => {
+    try {
+      const saved = localStorage.getItem('printbot_printer_routing');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return { bwPrinter: '', colorPrinter: '', duplexPrinter: '' };
+  });
+
+  const handleUpdatePrinterRouting = (newRouting: PrinterRoutingConfig) => {
+    setPrinterRouting(newRouting);
+    try {
+      localStorage.setItem('printbot_printer_routing', JSON.stringify(newRouting));
+    } catch {}
+    setNotice('Updated smart dedicated printer auto-routing preferences.');
+  };
+
+  // Hardware health check and offline alert banner calculation
+  const hardwareWarning = useMemo(() => {
+    if (!nativePrinters || nativePrinters.length === 0) {
+      return {
+        title: 'No Printers Found',
+        message: 'No active Windows print spooler queues detected. Connect USB or network printer to enable counter printing.',
+      };
+    }
+
+    const assignedPrinters = [
+      { role: 'Black & White', name: printerRouting.bwPrinter },
+      { role: 'Color', name: printerRouting.colorPrinter },
+      { role: 'Duplex', name: printerRouting.duplexPrinter },
+      { role: 'Default', name: selectedPrinterName },
+    ].filter((p) => p.name && p.name.trim() !== '');
+
+    for (const prn of assignedPrinters) {
+      const match = nativePrinters.find((p) => p.name.toLowerCase() === prn.name.toLowerCase());
+      if (!match) {
+        return {
+          title: 'Configured Printer Missing',
+          message: `Configured ${prn.role} printer ("${prn.name}") is disconnected or uninstalled!`,
+          printerName: prn.name,
+        };
+      }
+      if (!match.is_online) {
+        return {
+          title: 'Printer Offline',
+          message: `One of the configured printers ("${prn.name}") is offline or unavailable!`,
+          printerName: prn.name,
+        };
+      }
+    }
+    return null;
+  }, [nativePrinters, printerRouting, selectedPrinterName]);
+
+  // Phase 2: Audio chime alert on new order arrival
+  const prevJobCountRef = useRef<number>(0);
+  useEffect(() => {
+    if (jobs.length > prevJobCountRef.current && prevJobCountRef.current > 0) {
+      if (isAudioEnabled) {
+        playOrderChime();
+      }
+    }
+    prevJobCountRef.current = jobs.length;
+  }, [jobs.length, isAudioEnabled]);
+
+  // Phase 1: Test Print & Phase 2: Counter Standee states
+  const [testingPrinterName, setTestingPrinterName] = useState<string | null>(null);
+  const [isPrintingStandee, setIsPrintingStandee] = useState<boolean>(false);
+
+  const handleTestPrint = async (printerName: string) => {
+    if (!printerName) return;
+    setTestingPrinterName(printerName);
+    try {
+      const pngBytes = await generateTestPagePngBytes({
+        shopName: currentShop?.shopName || 'Print Bot Workstation',
+        stationName: currentShop?.deviceName || 'Counter PC',
+        deviceId: currentShop?.deviceId || 'STATION-01',
+        printerName,
+        driverName: nativePrinters?.find((p) => p.name === printerName)?.driver_name,
+        portName: nativePrinters?.find((p) => p.name === printerName)?.port_name,
+      });
+
+      const renderedPages = await renderDocumentPagesForPrinter(pngBytes, false);
+      await ensureCurrentWorkstationBinding();
+      const result = await printToHardware({
+        job_id: `test-${Date.now()}`,
+        attempt_id: `test-print-${Date.now()}`,
+        printer_name: printerName,
+        file_name: 'Calibration_Test_Page.png',
+        file_bytes: pngBytes,
+        rendered_pages: renderedPages,
+        copies: 1,
+        duplex_mode: 'simplex',
+      });
+
+      setNotice(`Diagnostic test page sent to ${printerName} (Spooler job #${result.spooler_job_id}).`);
+    } catch (err: any) {
+      alert(`Failed to send test page to ${printerName}: ${err?.message || err}`);
+    } finally {
+      setTestingPrinterName(null);
+    }
+  };
+
+  const handlePrintStandee = async () => {
+    setIsPrintingStandee(true);
+    try {
+      const shopSlug = currentShop?.username || activeSession?.username || 'dummy';
+      const qrUrl = `https://printbotak.callofduty12mobile18.workers.dev/${shopSlug}`;
+      const pngBytes = await generateCounterStandeePngBytes({
+        shopName: currentShop?.shopName || 'Print Bot Counter',
+        shopLocation: currentShop?.location || 'Main Counter Stand',
+        qrUrl,
+        phone: currentShop?.phone,
+      });
+
+      const targetPrinter =
+        printerRouting.colorPrinter ||
+        selectedPrinterName ||
+        nativePrinters?.find((p) => p.is_online)?.name ||
+        '';
+
+      if (!targetPrinter) {
+        const blob = new Blob([new Uint8Array(pngBytes)], { type: 'image/png' });
+        const url = URL.createObjectURL(blob);
+        const w = window.open(url, '_blank');
+        w?.print();
+        setNotice('Generated Counter QR Standee! Printable preview opened in new window.');
+        return;
+      }
+
+      const renderedPages = await renderDocumentPagesForPrinter(pngBytes, false);
+      await ensureCurrentWorkstationBinding();
+      const result = await printToHardware({
+        job_id: `standee-${Date.now()}`,
+        attempt_id: `standee-print-${Date.now()}`,
+        printer_name: targetPrinter,
+        file_name: 'Counter_QR_Standee_A4.png',
+        file_bytes: pngBytes,
+        rendered_pages: renderedPages,
+        copies: 1,
+        duplex_mode: 'simplex',
+      });
+
+      setNotice(`Counter QR Standee sent to ${targetPrinter} (Spooler job #${result.spooler_job_id})!`);
+    } catch (err: any) {
+      alert(`Failed to print standee: ${err?.message || err}`);
+    } finally {
+      setIsPrintingStandee(false);
+    }
+  };
+
+  const handleWhatsAppCustomer = (job: PrintJob) => {
+    const shopName = currentShop?.shopName || 'Print Bot Counter';
+    const shopLocation = currentShop?.location;
+    const opened = openWhatsAppForOrder({
+      orderId: job.id,
+      customerName: job.customer_name || job.customer_email,
+      customerPhone: job.customer_phone || (job as any).phone,
+      pickupPin: job.pickup_pin || '0000',
+      totalRupees: job.amount_rupees || 0,
+      totalSheets: job.physical_sheets || 1,
+      colorMode: job.options.color_mode === 'color' ? 'Color' : 'Black & White',
+      shopName,
+      shopLocation,
+    });
+
+    if (opened) {
+      setNotice(`Opened WhatsApp message for order #${job.id}.`);
+    } else {
+      alert('Customer did not provide a valid mobile number for this order.');
+    }
+  };
+
   // Fetch native Windows spooler printers if available
   useEffect(() => {
     const bindAndDiscover = async () => {
@@ -2465,6 +2641,25 @@ function ProductionApp() {
       nativePrinters?.[0]?.name ||
       '';
 
+    const resolveEffectivePrinter = (colorMode?: string, duplexMode?: string): string => {
+      if (printerOverride) return printerOverride;
+      const isDuplex = duplexMode === 'duplex_long' || duplexMode === 'duplex_short';
+      const isColor = colorMode === 'color';
+      if (isDuplex && printerRouting.duplexPrinter) {
+        const prn = nativePrinters?.find((p) => p.name.toLowerCase() === printerRouting.duplexPrinter.toLowerCase() && p.is_online);
+        if (prn) return prn.name;
+      }
+      if (isColor && printerRouting.colorPrinter) {
+        const prn = nativePrinters?.find((p) => p.name.toLowerCase() === printerRouting.colorPrinter.toLowerCase() && p.is_online);
+        if (prn) return prn.name;
+      }
+      if (!isColor && printerRouting.bwPrinter) {
+        const prn = nativePrinters?.find((p) => p.name.toLowerCase() === printerRouting.bwPrinter.toLowerCase() && p.is_online);
+        if (prn) return prn.name;
+      }
+      return targetPrinter;
+    };
+
     const isSpecificItem = typeof itemIndexOrAuto === 'number';
     const automatic = typeof itemIndexOrAuto === 'boolean' ? itemIndexOrAuto : false;
 
@@ -2489,6 +2684,11 @@ function ProductionApp() {
         return;
       }
 
+      const itemPrinter = resolveEffectivePrinter(
+        targetItem.color_mode || targetJob.options.color_mode,
+        targetItem.duplex_mode || targetJob.options.duplex_mode
+      );
+
       try {
         const isBw = (targetItem.color_mode || targetJob.options.color_mode) !== 'color';
         const renderedPages = await renderDocumentPagesForPrinter(fileBytes, isBw);
@@ -2496,16 +2696,16 @@ function ProductionApp() {
         const result = await printToHardware({
           job_id: jobId,
           attempt_id: `${createPrintAttemptId(jobId)}-item-${itemIndex}`,
-          printer_name: targetPrinter,
+          printer_name: itemPrinter,
           file_name: targetItem.name,
           file_bytes: fileBytes,
           rendered_pages: renderedPages,
           copies: targetItem.copies || 1,
           duplex_mode: targetItem.duplex_mode || targetJob.options.duplex_mode,
         });
-        setNotice(`Document "${targetItem.name}" submitted to ${targetPrinter} (Windows spooler job #${result.spooler_job_id}).`);
+        setNotice(`Document "${targetItem.name}" submitted to ${itemPrinter} (Windows spooler job #${result.spooler_job_id}).`);
       } catch (err: any) {
-        alert(`Hardware print error for "${targetItem.name}": ${err?.message || err}`);
+        alert(`Hardware print error for "${targetItem.name}" on ${itemPrinter}: ${err?.message || err}`);
       }
       return;
     }
@@ -2527,6 +2727,11 @@ function ProductionApp() {
           continue;
         }
 
+        const itemPrinter = resolveEffectivePrinter(
+          item.color_mode || targetJob.options.color_mode,
+          item.duplex_mode || targetJob.options.duplex_mode
+        );
+
         try {
           const isBw = (item.color_mode || targetJob.options.color_mode) !== 'color';
           const renderedPages = await renderDocumentPagesForPrinter(fileBytes, isBw);
@@ -2536,7 +2741,7 @@ function ProductionApp() {
             attempt_id: automatic
               ? `auto-${currentShop?.username || activeSession?.username || 'shop'}-${jobId}-doc-${i}`
               : `${createPrintAttemptId(jobId)}-doc-${i}`,
-            printer_name: targetPrinter,
+            printer_name: itemPrinter,
             file_name: item.name,
             file_bytes: fileBytes,
             rendered_pages: renderedPages,
@@ -2544,9 +2749,9 @@ function ProductionApp() {
             duplex_mode: item.duplex_mode || targetJob.options.duplex_mode,
           });
           spooledCount++;
-          setNotice(`Spooled ${spooledCount}/${targetJob.items.length}: "${item.name}" to ${targetPrinter}...`);
+          setNotice(`Spooled ${spooledCount}/${targetJob.items.length}: "${item.name}" to ${itemPrinter}...`);
         } catch (err: any) {
-          console.error(`Error spooling item ${item.name}:`, err);
+          console.error(`Error spooling item ${item.name} to ${itemPrinter}:`, err);
         }
       }
 
@@ -2555,9 +2760,9 @@ function ProductionApp() {
       );
       try {
         await syncOrderStatusToCloud(jobId, 'ORDER_PRINTING');
-        setNotice(`All ${spooledCount} documents from Job #${jobId} submitted to ${targetPrinter}.`);
+        setNotice(`All ${spooledCount} documents from Job #${jobId} submitted.`);
       } catch (syncError) {
-        setNotice(`Job #${jobId} submitted to ${targetPrinter}, but live status sync failed.`);
+        setNotice(`Job #${jobId} submitted to spooler, but live status sync failed.`);
       }
 
       setTimeout(async () => {
@@ -2575,6 +2780,11 @@ function ProductionApp() {
     }
 
     // Single document fallback
+    const singleEffectivePrinter = resolveEffectivePrinter(
+      targetJob.options.color_mode,
+      targetJob.options.duplex_mode
+    );
+
     let result: Awaited<ReturnType<typeof printToHardware>>;
     try {
       const fileBytes = await resolvePrintableFileBytes(targetJob);
@@ -2595,7 +2805,7 @@ function ProductionApp() {
         attempt_id: automatic
           ? `auto-${currentShop?.username || activeSession?.username || 'shop'}-${jobId}`
           : createPrintAttemptId(jobId),
-        printer_name: targetPrinter,
+        printer_name: singleEffectivePrinter,
         file_name: targetJob.file_name,
         file_bytes: fileBytes,
         rendered_pages: renderedPages,
@@ -2603,7 +2813,7 @@ function ProductionApp() {
         duplex_mode: targetJob.options.duplex_mode,
       });
     } catch (err: any) {
-      const message = `Hardware print error for ${targetPrinter}: ${err?.message || err}`;
+      const message = `Hardware print error for ${singleEffectivePrinter}: ${err?.message || err}`;
       if (automatic) setNotice(`Automatic printing stopped for job #${jobId}. Check the printer before retrying. ${message}`);
       else alert(message);
       return;
@@ -3035,6 +3245,7 @@ function ProductionApp() {
       notice={notice}
       onDismissNotice={() => setNotice(null)}
       globalBroadcast={globalBroadcast}
+      hardwareWarning={hardwareWarning}
     >
       {activeTab === 'queue' && (
         <QueueView
@@ -3070,6 +3281,8 @@ function ProductionApp() {
           selectedPrinterName={selectedPrinterName}
           setSelectedPrinterName={setSelectedPrinterName}
           nativePrinters={nativePrinters || []}
+          printerRouting={printerRouting}
+          onWhatsAppCustomer={handleWhatsAppCustomer}
           onRefreshJobs={() => {
             setNotice('Checking for incoming cloud orders...');
             fetchServerQueue();
@@ -3081,6 +3294,12 @@ function ProductionApp() {
         <PrintersView
           nativePrinters={nativePrinters || []}
           fallbackPrinters={printers}
+          printerRouting={printerRouting}
+          onUpdatePrinterRouting={handleUpdatePrinterRouting}
+          onTestPrint={handleTestPrint}
+          testingPrinterName={testingPrinterName}
+          onPrintStandee={handlePrintStandee}
+          isPrintingStandee={isPrintingStandee}
           onRefreshPrinters={async () => {
             setIsRefreshingPrinters(true);
             try {

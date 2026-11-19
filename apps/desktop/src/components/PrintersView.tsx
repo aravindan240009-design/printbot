@@ -2,20 +2,34 @@ import React from 'react';
 import {
   Printer,
   RefreshCw,
-  CheckCircle2,
-  Cpu,
-  Layers,
-  Settings,
   ShieldCheck,
   Check,
+  Sliders,
+  FileCheck,
+  QrCode,
+  Zap,
+  AlertTriangle,
+  Play,
 } from 'lucide-react';
 import { type NativePrinterInfo } from '../native';
+
+export interface PrinterRoutingConfig {
+  bwPrinter: string;
+  colorPrinter: string;
+  duplexPrinter: string;
+}
 
 interface PrintersViewProps {
   nativePrinters: NativePrinterInfo[];
   fallbackPrinters?: Array<{ id: string; name: string; driver_name?: string }>;
   onRefreshPrinters: () => void;
   isRefreshing?: boolean;
+  printerRouting: PrinterRoutingConfig;
+  onUpdatePrinterRouting: (routing: PrinterRoutingConfig) => void;
+  onTestPrint: (printerName: string) => Promise<void>;
+  testingPrinterName?: string | null;
+  onPrintStandee?: () => Promise<void>;
+  isPrintingStandee?: boolean;
 }
 
 export const PrintersView: React.FC<PrintersViewProps> = ({
@@ -23,6 +37,12 @@ export const PrintersView: React.FC<PrintersViewProps> = ({
   fallbackPrinters = [],
   onRefreshPrinters,
   isRefreshing = false,
+  printerRouting,
+  onUpdatePrinterRouting,
+  onTestPrint,
+  testingPrinterName = null,
+  onPrintStandee,
+  isPrintingStandee = false,
 }) => {
   const displayPrinters =
     nativePrinters && nativePrinters.length > 0
@@ -64,19 +84,34 @@ export const PrintersView: React.FC<PrintersViewProps> = ({
           queueCount: 0,
         }));
 
+  const allPrinterNames = displayPrinters.map((p) => p.name);
+
   return (
     <div className="pb-view">
       {/* Page Header */}
       <div className="pb-page-header">
         <div>
           <span className="pb-page-eyebrow">HARDWARE CONNECTIONS / WIN32</span>
-          <h1 className="pb-page-title">Printer Fleet</h1>
+          <h1 className="pb-page-title">Printer Fleet &amp; Auto-Routing</h1>
           <p className="pb-page-subtitle">
-            Zero-config Win32 spooler discovery. Jobs dispatch directly through Windows native printing APIs.
+            Configure dedicated B&amp;W, Color, and Duplex printers. Jobs dispatch automatically with zero-config Windows spooler bindings.
           </p>
         </div>
 
-        <div className="pb-header-actions">
+        <div className="pb-header-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {onPrintStandee && (
+            <button
+              type="button"
+              className="pb-btn pb-btn-secondary"
+              onClick={onPrintStandee}
+              disabled={isPrintingStandee || displayPrinters.length === 0}
+              title="Print high-resolution A4 QR counter standee flyer"
+            >
+              <QrCode size={14} className={isPrintingStandee ? 'pb-spin' : ''} />
+              <span>{isPrintingStandee ? 'Generating Standee...' : 'Print Counter QR Standee'}</span>
+            </button>
+          )}
+
           <button
             type="button"
             className="pb-btn pb-btn-primary"
@@ -89,9 +124,154 @@ export const PrintersView: React.FC<PrintersViewProps> = ({
         </div>
       </div>
 
+      {/* Smart Dedicated Routing Panel */}
+      <div
+        className="pb-panel"
+        style={{
+          padding: '20px',
+          marginBottom: '24px',
+          background: 'var(--pb-desk-surface)',
+          border: '1px solid var(--pb-desk-border-subtle)',
+          borderRadius: '12px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                background: 'var(--pb-desk-accent-subtle)',
+                color: 'var(--pb-desk-accent)',
+                display: 'grid',
+                placeItems: 'center',
+              }}
+            >
+              <Zap size={18} />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 750, color: 'var(--pb-desk-text)' }}>
+                Smart Printer Auto-Routing (By Job Specifications)
+              </h3>
+              <p style={{ margin: '2px 0 0', fontSize: '11.5px', color: 'var(--pb-desk-text-dim)' }}>
+                Incoming orders are automatically dispatched to the matching printer based on Color, B&amp;W, and Double-Sided options.
+              </p>
+            </div>
+          </div>
+          <span className="pb-badge pb-badge-success" style={{ fontSize: '11px' }}>
+            <Check size={12} /> Auto-Dispatch Engine Active
+          </span>
+        </div>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: '16px',
+          }}
+        >
+          {/* Black & White Dedicated */}
+          <div
+            style={{
+              padding: '14px',
+              borderRadius: '8px',
+              background: 'var(--pb-desk-surface-alt)',
+              border: '1px solid var(--pb-desk-border-subtle)',
+            }}
+          >
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 750, color: 'var(--pb-desk-text)', marginBottom: '6px' }}>
+              ⚫ Black &amp; White Dedicated Printer:
+            </label>
+            <select
+              className="pb-select"
+              value={printerRouting.bwPrinter}
+              onChange={(e) =>
+                onUpdatePrinterRouting({ ...printerRouting, bwPrinter: e.target.value })
+              }
+              style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+            >
+              <option value="">-- Use Default Counter Printer --</option>
+              {allPrinterNames.map((name) => (
+                <option key={`bw-${name}`} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--pb-desk-text-dim)' }}>
+              Handles regular monochrome document print jobs and xerox sheets.
+            </div>
+          </div>
+
+          {/* Color Dedicated */}
+          <div
+            style={{
+              padding: '14px',
+              borderRadius: '8px',
+              background: 'var(--pb-desk-surface-alt)',
+              border: '1px solid var(--pb-desk-border-subtle)',
+            }}
+          >
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 750, color: 'var(--pb-desk-text)', marginBottom: '6px' }}>
+              🎨 Color Dedicated Printer:
+            </label>
+            <select
+              className="pb-select"
+              value={printerRouting.colorPrinter}
+              onChange={(e) =>
+                onUpdatePrinterRouting({ ...printerRouting, colorPrinter: e.target.value })
+              }
+              style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+            >
+              <option value="">-- Use Default Counter Printer --</option>
+              {allPrinterNames.map((name) => (
+                <option key={`color-${name}`} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--pb-desk-text-dim)' }}>
+              Handles color certificates, glossy photos, and passport sheets.
+            </div>
+          </div>
+
+          {/* Duplex / Double-Sided Dedicated */}
+          <div
+            style={{
+              padding: '14px',
+              borderRadius: '8px',
+              background: 'var(--pb-desk-surface-alt)',
+              border: '1px solid var(--pb-desk-border-subtle)',
+            }}
+          >
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 750, color: 'var(--pb-desk-text)', marginBottom: '6px' }}>
+              🔄 Double-Side Dedicated Printer (Duplex):
+            </label>
+            <select
+              className="pb-select"
+              value={printerRouting.duplexPrinter}
+              onChange={(e) =>
+                onUpdatePrinterRouting({ ...printerRouting, duplexPrinter: e.target.value })
+              }
+              style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+            >
+              <option value="">-- Use Default Counter Printer --</option>
+              {allPrinterNames.map((name) => (
+                <option key={`duplex-${name}`} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--pb-desk-text-dim)' }}>
+              Dedicated machine with auto-duplex unit for 2-sided book printing.
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Spooler Status Banner */}
       <div className="pb-panel" style={{ padding: '16px 20px', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div className="pb-badge-icon" style={{ background: 'var(--pb-desk-success-subtle)', color: 'var(--pb-desk-success)', width: '36px', height: '36px', borderRadius: '8px', display: 'grid', placeItems: 'center' }}>
               <ShieldCheck size={20} />
@@ -136,62 +316,100 @@ export const PrintersView: React.FC<PrintersViewProps> = ({
         </div>
       ) : (
         <div className="pb-printers-grid">
-          {displayPrinters.map((prn) => (
-            <div key={prn.id} className="pb-printer-card">
-              <div className="pb-printer-card-hero">
-                <div className="pb-printer-icon-wrap">
-                  <Printer size={32} />
-                </div>
-                {prn.isDefault && (
-                  <span className="pb-printer-default-badge">
-                    <Check size={11} /> Default Counter Printer
-                  </span>
-                )}
-              </div>
+          {displayPrinters.map((prn) => {
+            const isBwAssigned = printerRouting.bwPrinter === prn.name;
+            const isColorAssigned = printerRouting.colorPrinter === prn.name;
+            const isDuplexAssigned = printerRouting.duplexPrinter === prn.name;
+            const isTesting = testingPrinterName === prn.name;
 
-              <div className="pb-printer-card-body">
-                <div className="pb-printer-name-row">
-                  <h3 className="pb-printer-title" title={prn.name}>
-                    {prn.name}
-                  </h3>
-                  <span className={`pb-badge ${prn.isOnline ? 'pb-badge-success' : 'pb-badge-neutral'}`}>
-                    <span
-                      className="pb-pulse-dot"
-                      style={{ background: prn.isOnline ? 'var(--pb-desk-success)' : 'var(--pb-desk-text-dim)' }}
-                    />
-                    {prn.isOnline ? 'Online / Ready' : 'Spooler Attached'}
-                  </span>
-                </div>
-
-                <div className="pb-printer-driver-text">{prn.statusText}</div>
-
-                {/* Capabilities specs table */}
-                <div className="pb-printer-specs-table">
-                  <div className="pb-printer-spec-row">
-                    <span className="pb-printer-spec-label">Print Channels</span>
-                    <span className="pb-printer-spec-val">{prn.channels}</span>
+            return (
+              <div key={prn.id} className="pb-printer-card">
+                <div className="pb-printer-card-hero">
+                  <div className="pb-printer-icon-wrap">
+                    <Printer size={32} />
                   </div>
-                  <div className="pb-printer-spec-row">
-                    <span className="pb-printer-spec-label">Duplex Engine</span>
-                    <span className="pb-printer-spec-val">{prn.duplex}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
+                    {prn.isDefault && (
+                      <span className="pb-printer-default-badge">
+                        <Check size={11} /> Default Counter Printer
+                      </span>
+                    )}
+                    {isBwAssigned && (
+                      <span style={{ fontSize: '10.5px', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', background: '#0f172a', color: '#ffffff' }}>
+                        ⚫ B&amp;W Default
+                      </span>
+                    )}
+                    {isColorAssigned && (
+                      <span style={{ fontSize: '10.5px', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', background: '#ec4899', color: '#ffffff' }}>
+                        🎨 Color Default
+                      </span>
+                    )}
+                    {isDuplexAssigned && (
+                      <span style={{ fontSize: '10.5px', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', background: '#2563eb', color: '#ffffff' }}>
+                        🔄 Duplex Default
+                      </span>
+                    )}
                   </div>
-                  <div className="pb-printer-spec-row">
-                    <span className="pb-printer-spec-label">Supported Media</span>
-                    <span className="pb-printer-spec-val" title={prn.fullMediaList}>
-                      {prn.supportedMedia}
+                </div>
+
+                <div className="pb-printer-card-body">
+                  <div className="pb-printer-name-row">
+                    <h3 className="pb-printer-title" title={prn.name}>
+                      {prn.name}
+                    </h3>
+                    <span className={`pb-badge ${prn.isOnline ? 'pb-badge-success' : 'pb-badge-neutral'}`}>
+                      <span
+                        className="pb-pulse-dot"
+                        style={{ background: prn.isOnline ? 'var(--pb-desk-success)' : 'var(--pb-desk-text-dim)' }}
+                      />
+                      {prn.isOnline ? 'Online / Ready' : 'Spooler Attached'}
                     </span>
                   </div>
-                  <div className="pb-printer-spec-row">
-                    <span className="pb-printer-spec-label">Spooler Protocol</span>
-                    <span className="pb-printer-spec-val">{prn.protocol}</span>
+
+                  <div className="pb-printer-driver-text">{prn.statusText}</div>
+
+                  {/* Capabilities specs table */}
+                  <div className="pb-printer-specs-table">
+                    <div className="pb-printer-spec-row">
+                      <span className="pb-printer-spec-label">Print Channels</span>
+                      <span className="pb-printer-spec-val">{prn.channels}</span>
+                    </div>
+                    <div className="pb-printer-spec-row">
+                      <span className="pb-printer-spec-label">Duplex Engine</span>
+                      <span className="pb-printer-spec-val">{prn.duplex}</span>
+                    </div>
+                    <div className="pb-printer-spec-row">
+                      <span className="pb-printer-spec-label">Supported Media</span>
+                      <span className="pb-printer-spec-val" title={prn.fullMediaList}>
+                        {prn.supportedMedia}
+                      </span>
+                    </div>
+                    <div className="pb-printer-spec-row">
+                      <span className="pb-printer-spec-label">Spooler Protocol</span>
+                      <span className="pb-printer-spec-val">{prn.protocol}</span>
+                    </div>
+                  </div>
+
+                  {/* Test Print Action Button */}
+                  <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--pb-desk-border-subtle)', display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      className="pb-btn pb-btn-secondary pb-btn-sm"
+                      onClick={() => onTestPrint(prn.name)}
+                      disabled={isTesting || !prn.isOnline}
+                      style={{ gap: '6px' }}
+                      title={`Send diagnostic test alignment page to ${prn.name}`}
+                    >
+                      <Play size={12} className={isTesting ? 'pb-spin' : ''} />
+                      <span>{isTesting ? 'Sending Test Page...' : 'Test Print'}</span>
+                    </button>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
   );
 };
-

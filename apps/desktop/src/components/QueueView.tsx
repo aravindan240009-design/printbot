@@ -39,6 +39,8 @@ interface QueueViewProps {
   setSelectedPrinterName?: (val: string) => void;
   nativePrinters?: Array<{ name: string; is_default?: boolean; is_online?: boolean }>;
   onDirectPrint?: (jobId: string, specificItemIndex?: number) => void;
+  printerRouting?: { bwPrinter: string; colorPrinter: string; duplexPrinter: string };
+  onWhatsAppCustomer?: (job: PrintJob) => void;
 }
 
 export const QueueView: React.FC<QueueViewProps> = ({
@@ -63,6 +65,8 @@ export const QueueView: React.FC<QueueViewProps> = ({
   setSelectedPrinterName,
   nativePrinters,
   onDirectPrint,
+  printerRouting,
+  onWhatsAppCustomer,
 }) => {
   const [isClearDialogOpen, setIsClearDialogOpen] = React.useState(false);
   const [clearError, setClearError] = React.useState<string | null>(null);
@@ -367,6 +371,21 @@ export const QueueView: React.FC<QueueViewProps> = ({
                           📸 {((job.options as any).photo_preset || (job.options as any).photoPreset) === 'passport_8up' ? 'Passport 8-Up Sheet' : ((job.options as any).photo_preset || (job.options as any).photoPreset) === 'photo_4x6' ? '4×6 Studio Photo' : 'ID Card 2-Up Sheet'}
                         </span>
                     )}
+                    {(() => {
+                      const isDuplex = job.options.duplex_mode === 'duplex_long' || job.options.duplex_mode === 'duplex_short';
+                      const isColor = job.options.color_mode === 'color';
+                      const routed =
+                        (isDuplex && printerRouting?.duplexPrinter) ||
+                        (isColor && printerRouting?.colorPrinter) ||
+                        (!isColor && printerRouting?.bwPrinter) ||
+                        selectedPrinterName ||
+                        'Default Spooler';
+                      return (
+                        <span className="pb-chip" style={{ borderColor: 'var(--pb-desk-accent-border)', color: 'var(--pb-desk-accent)', fontWeight: 700 }}>
+                          ⚡ Route: {routed}
+                        </span>
+                      );
+                    })()}
                   </div>
 
                   {job.items && job.items.length > 1 && (
@@ -524,6 +543,24 @@ export const QueueView: React.FC<QueueViewProps> = ({
                           <FileText size={13} /> {job.items && job.items.length > 1 ? 'View Primary Doc' : 'View File'}
                         </a>
                       )}
+                      {onWhatsAppCustomer && (
+                        <button
+                          type="button"
+                          className="pb-btn pb-btn-secondary pb-btn-sm"
+                          onClick={() => onWhatsAppCustomer(job)}
+                          style={{
+                            borderColor: '#22c55e',
+                            color: '#15803d',
+                            background: '#f0fdf4',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                          title="Send pickup PIN and details to customer WhatsApp"
+                        >
+                          💬 WhatsApp PIN
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -546,6 +583,24 @@ export const QueueView: React.FC<QueueViewProps> = ({
                         >
                           <FileText size={13} /> {job.items && job.items.length > 1 ? 'View Primary Doc' : 'View File'}
                         </a>
+                      )}
+                      {onWhatsAppCustomer && (
+                        <button
+                          type="button"
+                          className="pb-btn pb-btn-secondary pb-btn-sm"
+                          onClick={() => onWhatsAppCustomer(job)}
+                          style={{
+                            borderColor: '#22c55e',
+                            color: '#15803d',
+                            background: '#f0fdf4',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                          title="Send pickup PIN and details to customer WhatsApp"
+                        >
+                          💬 WhatsApp PIN
+                        </button>
                       )}
                     </div>
                   )}
@@ -578,6 +633,24 @@ export const QueueView: React.FC<QueueViewProps> = ({
                           <FileText size={13} /> {job.items && job.items.length > 1 ? 'View Primary Doc' : 'View File'}
                         </a>
                       )}
+                      {onWhatsAppCustomer && (
+                        <button
+                          type="button"
+                          className="pb-btn pb-btn-secondary pb-btn-sm"
+                          onClick={() => onWhatsAppCustomer(job)}
+                          style={{
+                            borderColor: '#22c55e',
+                            color: '#15803d',
+                            background: '#f0fdf4',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                          title="Send pickup PIN and details to customer WhatsApp"
+                        >
+                          💬 WhatsApp PIN
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -601,6 +674,24 @@ export const QueueView: React.FC<QueueViewProps> = ({
                         >
                           <FileText size={13} /> {job.items && job.items.length > 1 ? 'View Primary Doc' : 'View File'}
                         </a>
+                      )}
+                      {onWhatsAppCustomer && (
+                        <button
+                          type="button"
+                          className="pb-btn pb-btn-secondary pb-btn-sm"
+                          onClick={() => onWhatsAppCustomer(job)}
+                          style={{
+                            borderColor: '#22c55e',
+                            color: '#15803d',
+                            background: '#f0fdf4',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                          title="Send pickup PIN and details to customer WhatsApp"
+                        >
+                          💬 WhatsApp PIN
+                        </button>
                       )}
                     </div>
                   )}

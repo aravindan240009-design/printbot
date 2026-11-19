@@ -95,6 +95,19 @@ Your files are purged from server memory after printing.
     URL.revokeObjectURL(url);
   };
 
+  const handleShareWhatsApp = () => {
+    const text =
+      `📄 *Print Bot Order Receipt* ⚡\n\n` +
+      `🔑 *Pickup PIN:* *${order.pickupPin}*\n` +
+      `📋 *Order ID:* #${order.orderId}\n` +
+      `🏬 *Print Shop:* ${order.shopName}\n` +
+      `📑 *Specs:* ${order.totalSheets} sheets • ₹${order.totalRupees.toFixed(2)}\n\n` +
+      `Show this 4-digit PIN at the counter to collect your prints.`;
+
+    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <div className="pb-confirmation-panel" role="region" aria-label="Order Tracking Status">
       {/* Header Badge */}
@@ -276,7 +289,28 @@ Your files are purged from server memory after printing.
       </div>
 
       {/* Actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+        <button
+          type="button"
+          onClick={handleShareWhatsApp}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            minHeight: '48px',
+            borderRadius: 'var(--pb-radius-md)',
+            border: '1px solid #22c55e',
+            background: '#f0fdf4',
+            color: '#15803d',
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+          title="Save your 4-digit pickup PIN to WhatsApp"
+        >
+          <span>💬 Save PIN to WhatsApp</span>
+        </button>
+
         {!testMode && <button
           type="button"
           onClick={handleDownloadReceipt}

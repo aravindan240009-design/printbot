@@ -40,6 +40,7 @@ interface DesktopShellProps {
   notice: string | null;
   onDismissNotice: () => void;
   globalBroadcast?: { active: boolean; message: string; type: 'info' | 'warning' | 'urgent' };
+  hardwareWarning?: { title: string; message: string; printerName?: string } | null;
   children: React.ReactNode;
 }
 
@@ -61,6 +62,7 @@ export const DesktopShell: React.FC<DesktopShellProps> = ({
   notice,
   onDismissNotice,
   globalBroadcast,
+  hardwareWarning,
   children,
 }) => {
   return (
@@ -255,6 +257,64 @@ export const DesktopShell: React.FC<DesktopShellProps> = ({
               <span>
                 <strong>Network Announcement:</strong> {globalBroadcast.message}
               </span>
+            </div>
+          )}
+
+          {/* Hardware Disconnection / Printer Offline Alert Banner */}
+          {hardwareWarning && (
+            <div
+              style={{
+                padding: '12px 20px',
+                background: '#fef2f2',
+                borderBottom: '1px solid #fecaca',
+                color: '#991b1b',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+                fontSize: '13px',
+                fontWeight: 700,
+                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.08)',
+              }}
+              role="alert"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    background: '#fee2e2',
+                    color: '#dc2626',
+                    flexShrink: 0,
+                  }}
+                >
+                  <AlertTriangle size={15} />
+                </span>
+                <span>
+                  <strong>{hardwareWarning.title}:</strong> {hardwareWarning.message}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('printers')}
+                style={{
+                  background: '#dc2626',
+                  color: '#ffffff',
+                  border: 0,
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  fontSize: '11.5px',
+                  fontWeight: 750,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Configure Printer Fleet →
+              </button>
             </div>
           )}
 
