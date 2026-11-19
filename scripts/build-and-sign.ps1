@@ -45,11 +45,15 @@ if (Test-Path $installerPath) {
         & $signtool sign /fd SHA256 /sha1 $Thumbprint /tr $TimestampUrl /td SHA256 $installerPath
     }
 
-    # 4. Copy to Release folder
+    # 4. Copy single official executable for all purposes
     $releaseDir = "d:\print bot\release"
     New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
-    Copy-Item $installerPath "$releaseDir\Print Bot_1.0.0_x64-setup.exe" -Force
-    Write-Host "[4/4] Release binary ready at: $releaseDir\Print Bot_1.0.0_x64-setup.exe" -ForegroundColor Green
+    Copy-Item $installerPath "$releaseDir\PrintBot-Setup.exe" -Force
+    Copy-Item $installerPath "d:\print bot\PrintBot-Setup.exe" -Force
+    Copy-Item $installerPath "d:\print bot\public\downloads\PrintBot-Setup.exe" -Force
+    # Backwards compatibility alias for web download
+    Copy-Item $installerPath "d:\print bot\public\downloads\Print-Bot-1.0.0-x64-Setup.exe" -Force
+    Write-Host "[4/4] Single professional executable ready at: d:\print bot\PrintBot-Setup.exe" -ForegroundColor Green
 } else {
     Write-Error "Installer file not found at expected path: $installerPath"
 }
