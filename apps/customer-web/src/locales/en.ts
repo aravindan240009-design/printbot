@@ -62,7 +62,7 @@ export const en = {
   colorGrayscalePrice: '₹2.00/pg',
   duplex: 'Print Sides',
   duplexSimplex: 'One Side',
-  duplexLong: 'Double Side (Book)',
+  duplexLong: 'Double Side',
   duplexShort: 'Double Side (Calendar)',
   copies: 'Copies',
   paperSize: 'Paper Size',

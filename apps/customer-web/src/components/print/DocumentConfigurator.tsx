@@ -186,7 +186,7 @@ export const DocumentConfigurator: React.FC<DocumentConfiguratorProps> = ({
             </span>
           ) : null}
         </div>
-        <div className="pb-pill-grid pb-duplex-grid">
+        <div className="pb-pill-grid pb-duplex-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
           <button
             type="button"
             className={`pb-pill-choice ${options.duplex === 'simplex' ? 'active' : ''}`}
@@ -197,19 +197,11 @@ export const DocumentConfigurator: React.FC<DocumentConfiguratorProps> = ({
           </button>
           <button
             type="button"
-            className={`pb-pill-choice ${options.duplex === 'duplex_long' ? 'active' : ''}`}
+            className={`pb-pill-choice ${options.duplex !== 'simplex' ? 'active' : ''}`}
             onClick={() => onUpdateOptions({ duplex: 'duplex_long' })}
           >
             <span>{t.duplexLong}</span>
             <span className="pb-pill-subtext">Open like a book</span>
-          </button>
-          <button
-            type="button"
-            className={`pb-pill-choice ${options.duplex === 'duplex_short' ? 'active' : ''}`}
-            onClick={() => onUpdateOptions({ duplex: 'duplex_short' })}
-          >
-            <span>{t.duplexShort}</span>
-            <span className="pb-pill-subtext">Flip like a calendar</span>
           </button>
         </div>
       </div>
