@@ -7,6 +7,7 @@ import { FeaturesPage } from './pages/FeaturesPage';
 import { DownloadPage } from './pages/DownloadPage';
 import { AboutPage } from './pages/AboutPage';
 import { ContactPage } from './pages/ContactPage';
+import { BecomePartnerPage } from './pages/BecomePartnerPage';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { TermsPage } from './pages/TermsPage';
 import { resolveShopSlugFromUrl } from './customer-web/utils/tenant';
@@ -147,8 +148,14 @@ export const App: React.FC = () => {
             onOpenDownloadModal={() => setDownloadModalOpen(true)} 
           />
         )}
+        {(currentPath === '/partner' || currentPath === '/become-a-partner') && (
+          <BecomePartnerPage 
+            navigate={navigate}
+            onOpenDownloadModal={() => setDownloadModalOpen(true)}
+          />
+        )}
         {currentPath === '/contact' && (
-          <ContactPage />
+          <ContactPage navigate={navigate} />
         )}
         {currentPath === '/privacy' && (
           <PrivacyPolicyPage />

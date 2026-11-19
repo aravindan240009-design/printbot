@@ -29,6 +29,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, onOpenDow
   const navLinks = [
     { label: 'Home', path: '/' },
     { label: 'Features', path: '/features' },
+    { label: 'Become a Partner', path: '/partner' },
     { label: 'About', path: '/about' },
     { label: 'Contact', path: '/contact' },
   ];
@@ -84,7 +85,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, onOpenDow
           {/* Desktop Navigation Links */}
           <nav className="hidden md:flex items-center gap-1">
             {navLinks.map((link) => {
-              const isActive = currentPath === link.path;
+              const isActive = currentPath === link.path || (link.path === '/partner' && currentPath === '/become-a-partner');
               return (
                 <button
                   key={link.path}
@@ -144,7 +145,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, onOpenDow
         <div className="md:hidden bg-white border-b border-slate-200 shadow-xl px-4 pt-3 pb-6 space-y-3 animate-in fade-in slide-in-from-top-4 duration-200">
           <div className="grid gap-1">
             {navLinks.map((link) => {
-              const isActive = currentPath === link.path;
+              const isActive = currentPath === link.path || (link.path === '/partner' && currentPath === '/become-a-partner');
               return (
                 <button
                   key={link.path}

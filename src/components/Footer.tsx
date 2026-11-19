@@ -62,6 +62,14 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
                   Download for Windows
                 </button>
               </li>
+              <li>
+                <button
+                  onClick={() => handleNav('/partner')}
+                  className="text-slate-600 hover:text-blue-600 transition-colors cursor-pointer text-left"
+                >
+                  Become a Partner
+                </button>
+              </li>
             </ul>
           </div>
 
@@ -77,6 +85,14 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
                   className="text-slate-600 hover:text-blue-600 transition-colors cursor-pointer text-left"
                 >
                   About Print Bot
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => handleNav('/partner')}
+                  className="text-slate-600 hover:text-blue-600 transition-colors cursor-pointer text-left"
+                >
+                  Shop Pilot Program
                 </button>
               </li>
               <li>
