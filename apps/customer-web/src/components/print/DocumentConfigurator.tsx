@@ -1,11 +1,8 @@
 import React from 'react';
-import { SlidersHorizontal } from 'lucide-react';
 import {
   DocumentItem,
   PrintOptions,
   PaperSize,
-  PaperGsm,
-  PhotoPreset,
   OrientationOption,
   ShopRates,
 } from '../../types';
@@ -87,14 +84,14 @@ export const DocumentConfigurator: React.FC<DocumentConfiguratorProps> = ({
       {/* Color Mode Selection */}
       <div className="pb-form-group">
         <label className="pb-form-label">{t.colorMode}</label>
-        <div className="pb-pill-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        <div className="pb-pill-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
           <button
             type="button"
             className={`pb-pill-choice ${options.colorMode === 'bw' ? 'active' : ''}`}
             onClick={() => onUpdateOptions({ colorMode: 'bw' })}
           >
             <span>{t.colorBw}</span>
-            <span className="pb-pill-subtext">{t.colorBwPrice}</span>
+            <span className="pb-pill-subtext">{rates?.bwPerSideRupees ? `₹${rates.bwPerSideRupees.toFixed(2)}/pg` : t.colorBwPrice}</span>
           </button>
 
           <button
@@ -105,16 +102,7 @@ export const DocumentConfigurator: React.FC<DocumentConfiguratorProps> = ({
             <span style={{ color: options.colorMode === 'color' ? 'var(--pb-brand)' : undefined, fontWeight: 750 }}>
               {t.colorFull}
             </span>
-            <span className="pb-pill-subtext">{t.colorFullPrice}</span>
-          </button>
-
-          <button
-            type="button"
-            className={`pb-pill-choice ${options.colorMode === 'grayscale' ? 'active' : ''}`}
-            onClick={() => onUpdateOptions({ colorMode: 'grayscale' })}
-          >
-            <span>{t.colorGrayscale}</span>
-            <span className="pb-pill-subtext">{t.colorGrayscalePrice}</span>
+            <span className="pb-pill-subtext">{rates?.colorPerSideRupees ? `₹${rates.colorPerSideRupees.toFixed(2)}/pg` : t.colorFullPrice}</span>
           </button>
         </div>
       </div>
@@ -255,96 +243,6 @@ export const DocumentConfigurator: React.FC<DocumentConfiguratorProps> = ({
           </select>
         </div>
       </div>
-
-      <details className="pb-more-options">
-        <summary>
-          <SlidersHorizontal size={16} />
-          <span>More options</span>
-        </summary>
-
-        <div className="pb-more-options-content">
-          <div className="pb-form-group">
-            <label className="pb-form-label">{t.paperGsm}</label>
-            <select
-              className="pb-select-control"
-              value={options.paperGsm}
-              onChange={(e) => onUpdateOptions({ paperGsm: e.target.value as PaperGsm })}
-            >
-              <option value="75">{t.gsm75}</option>
-              <option value="100">{t.gsm100} (+₹1)</option>
-              <option value="220">{t.gsm220} (+₹4)</option>
-            </select>
-          </div>
-
-          <div className="pb-form-group">
-            <label className="pb-form-label">{t.finishing}</label>
-            <div className="pb-pill-grid pb-finishing-grid">
-              <button
-                type="button"
-                className={`pb-pill-choice ${options.finishing === 'none' ? 'active' : ''}`}
-                onClick={() => onUpdateOptions({ finishing: 'none' })}
-              >
-                <span>{t.finishingNone}</span>
-                <span className="pb-pill-subtext">Loose</span>
-              </button>
-              <button
-                type="button"
-                className={`pb-pill-choice ${options.finishing === 'staple' ? 'active' : ''}`}
-                onClick={() => onUpdateOptions({ finishing: 'staple' })}
-              >
-                <span>Corner Staple</span>
-                <span className="pb-pill-subtext">+₹5.00</span>
-              </button>
-              <button
-                type="button"
-                className={`pb-pill-choice ${options.finishing === 'spiral' ? 'active' : ''}`}
-                onClick={() => onUpdateOptions({ finishing: 'spiral' })}
-              >
-                <span>Spiral Coil</span>
-                <span className="pb-pill-subtext">+₹40.00</span>
-              </button>
-              <button
-                type="button"
-                className={`pb-pill-choice ${options.finishing === 'hard_bind' ? 'active' : ''}`}
-                onClick={() => onUpdateOptions({ finishing: 'hard_bind' })}
-              >
-                <span>Hard Bound</span>
-                <span className="pb-pill-subtext">+₹150.00</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="pb-form-group">
-            <label className="pb-form-label">{t.pagesPerSheet}</label>
-            <select
-              className="pb-select-control"
-              value={options.nup}
-              onChange={(e) => onUpdateOptions({ nup: parseInt(e.target.value, 10) || 1 })}
-            >
-              <option value={1}>{t.nup1}</option>
-              <option value={2}>{t.nup2}</option>
-              <option value={4}>{t.nup4}</option>
-              <option value={6}>{t.nup6}</option>
-              <option value={9}>{t.nup9}</option>
-              <option value={16}>{t.nup16}</option>
-            </select>
-          </div>
-
-          <div className="pb-form-group">
-            <label className="pb-form-label">Photo &amp; ID Layout Preset</label>
-            <select
-              className="pb-select-control"
-              value={options.photoPreset}
-              onChange={(e) => onUpdateOptions({ photoPreset: e.target.value as PhotoPreset })}
-            >
-              <option value="standard">{t.presetStandard}</option>
-              <option value="passport_8up">{t.presetPassport}</option>
-              <option value="id_card">{t.presetIdCard}</option>
-              <option value="photo_4x6">{t.presetPhoto4x6}</option>
-            </select>
-          </div>
-        </div>
-      </details>
     </div>
   );
 };

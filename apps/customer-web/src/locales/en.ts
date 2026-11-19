@@ -56,7 +56,7 @@ export const en = {
   colorMode: 'Color Mode',
   colorBw: 'Black & White',
   colorBwPrice: '₹1.50/pg',
-  colorFull: 'Vibrant Color',
+  colorFull: 'Color',
   colorFullPrice: '₹10.00/pg',
   colorGrayscale: 'Grayscale',
   colorGrayscalePrice: '₹2.00/pg',

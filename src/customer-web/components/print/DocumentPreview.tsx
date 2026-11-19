@@ -25,6 +25,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 }) => {
   const isPdf = isPdfFile(file);
   const isImage = isImageFile(file);
+  const isBw = file.options?.colorMode !== 'color';
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewAreaRef = useRef<HTMLDivElement>(null);
   const [objectUrl, setObjectUrl] = useState<{ source: File; url: string } | null>(null);
@@ -208,6 +209,24 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
             {pageCount} {pageCount === 1 ? 'page' : 'pages'}
           </p>
         </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+          <span
+            style={{
+              fontSize: '0.74rem',
+              fontWeight: 750,
+              padding: '3px 9px',
+              borderRadius: '999px',
+              background: isBw ? '#f1f5f9' : 'rgba(37, 99, 235, 0.1)',
+              color: isBw ? '#475569' : '#2563eb',
+              border: isBw ? '1px solid #cbd5e1' : '1px solid rgba(37, 99, 235, 0.25)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            {isBw ? '⚫ Black & White' : '🎨 Color'}
+          </span>
+        </div>
       </header>
 
       <div className="pb-preview-area" ref={previewAreaRef}>
@@ -216,6 +235,10 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
             className="pb-preview-image"
             src={fileUrl}
             alt={`${file.name} preview`}
+            style={{
+              filter: isBw ? 'grayscale(100%) contrast(108%)' : 'none',
+              transition: 'filter 0.25s ease-in-out',
+            }}
             onLoad={() => setStatus('ready')}
             onError={handleImageError}
           />
@@ -227,6 +250,10 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
             className="pb-preview-canvas"
             role="img"
             aria-label={`${file.name}, page ${pageNumber} of ${pageCount}`}
+            style={{
+              filter: isBw ? 'grayscale(100%) contrast(108%)' : 'none',
+              transition: 'filter 0.25s ease-in-out',
+            }}
           />
         )}
 
