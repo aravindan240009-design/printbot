@@ -116,6 +116,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
       description: `Print Order (${quote?.total_physical_sheets || 1} Sheets / ₹${amount})`,
       image: '/favicon.svg',
       handler: function (response: any) {
+        if (!response || !response.razorpay_payment_id || typeof response.razorpay_payment_id !== 'string') {
+          alert('Payment was not completed. Order not placed.');
+          setIsProcessingPayment(false);
+          return;
+        }
         void (async () => {
           if (paymentIntent.test_mode) {
             try {

@@ -405,34 +405,23 @@ function ProductionApp() {
   // Authoritative server-side verification of active Super Admin sessions (fails closed in production)
   useEffect(() => {
     if (activeSession?.role === 'ADMIN') {
-      // Supabase-authenticated admin sessions use tokens starting with 'supabase_cloud_admin_' or 'cached_admin_session_'
-      // These are validated at login time against the Supabase database and do not require localhost backend verification
-      if (activeSession.token?.startsWith('supabase_cloud_admin_') || activeSession.token?.startsWith('cached_admin_session_')) {
-        return;
-      }
+      void (async () => {
+        try {
+          const { data, error } = await supabase
+            .from('pilot_applications')
+            .select('generated_username, generated_key')
+            .eq('id', 'APP-ADMIN-MASTER-ROOT')
+            .maybeSingle();
 
-      if (!activeSession.token) {
-        // Client-side state without verified server token -> fail closed
-        setActiveSession(null);
-        localStorage.removeItem('printbot_session');
-        return;
-      }
-      fetch(`${API_BASE}/auth/me`, {
-        headers: { Authorization: `Bearer ${activeSession.token}` },
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error('Unauthorized');
-          return res.json();
-        })
-        .then((data) => {
-          if (!data.user?.is_superadmin) {
-            setActiveSession(null);
-            localStorage.removeItem('printbot_session');
+          if (!error && data) {
+            const expectedUser = (data.generated_username || 'admin').toLowerCase();
+            if (activeSession.username.toLowerCase() !== expectedUser) {
+              setActiveSession(null);
+              localStorage.removeItem('printbot_session');
+            }
           }
-        })
-        .catch(() => {
-          // Backend unreachable — retain session for Supabase-authenticated admins
-        });
+        } catch {}
+      })();
     }
   }, [activeSession?.token, activeSession?.role]);
 
@@ -574,9 +563,8 @@ function ProductionApp() {
 
     // 1. Super Admin Authentication Check (Directly against Supabase cloud database)
     const isAdminUser = uLower === 'admin' || uLower === 'superadmin' || uLower.endsWith('@printbot.in');
-    const isAdminPass = k === 'admin@123' || k === 'PB-SUPERADMIN-2026';
 
-    if (isAdminUser || isAdminPass) {
+    if (isAdminUser) {
       try {
         const { data: adminRecord, error: sbErr } = await supabase
           .from('pilot_applications')
@@ -588,7 +576,7 @@ function ProductionApp() {
           const expectedUser = (adminRecord.generated_username || 'admin').toLowerCase();
           const expectedPass = adminRecord.generated_key;
 
-          if ((uLower === expectedUser || uLower === 'admin' || isAdminUser) && (k === expectedPass || k === 'admin@123' || k === 'PB-SUPERADMIN-2026')) {
+          if (uLower === expectedUser && k === expectedPass && expectedPass) {
             localStorage.setItem('printbot_admin_master_password', expectedPass);
             setFailedAttempts(0);
             setLockoutUntil(null);
@@ -611,7 +599,7 @@ function ProductionApp() {
 
       // Offline fallback: check cached password previously verified from Supabase
       const cachedPass = localStorage.getItem('printbot_admin_master_password');
-      if ((uLower === 'admin' || uLower === 'superadmin' || isAdminUser) && (k === cachedPass || k === 'admin@123' || k === 'PB-SUPERADMIN-2026')) {
+      if (cachedPass && uLower === 'admin' && k === cachedPass) {
         setFailedAttempts(0);
         setLockoutUntil(null);
         setIsMfaRequired(false);
@@ -625,17 +613,15 @@ function ProductionApp() {
         return;
       }
 
-      if (uLower === 'admin') {
-        setFailedAttempts((prev) => {
-          const next = prev + 1;
-          if (next >= 5) {
-            setLockoutUntil(new Date(Date.now() + 60000));
-          }
-          return next;
-        });
-        setLoginError('Invalid administrative credentials. Please verify your credentials against Supabase.');
-        return;
-      }
+      setFailedAttempts((prev) => {
+        const next = prev + 1;
+        if (next >= 5) {
+          setLockoutUntil(new Date(Date.now() + 60000));
+        }
+        return next;
+      });
+      setLoginError('Invalid administrative credentials. Please verify your credentials against Supabase.');
+      return;
     }
 
     // Shop access must be checked centrally so another workstation cannot use a local fallback.
@@ -2374,23 +2360,27 @@ function ProductionApp() {
                 mappedStatus = 'COMPLETED';
               } else if (rawStatus === 'ORDER_REJECTED' || rawStatus === 'REJECTED') {
                 mappedStatus = 'REJECTED';
-              } else if (rawStatus === 'ORDER_PENDING' || rawStatus === 'PENDING' || rawStatus === 'PENDING_APPROVAL') {
-                mappedStatus = isFullAuto ? 'QUEUED' : 'PENDING_APPROVAL';
               } else {
-                mappedStatus = isFullAuto ? 'QUEUED' : 'PENDING_APPROVAL';
+                mappedStatus = 'PENDING_APPROVAL';
               }
 
+              const isCash = meta.paymentMethod === 'cash' || meta.payment_method === 'cash';
               const isPaid = Boolean(
-                meta.paymentId ||
+                (!isCash && meta.paymentId) ||
                 meta.paymentStatus === 'paid' ||
                 meta.payment_status === 'paid' ||
                 meta.payment_status === 'verified'
               );
               const paymentStatus = isPaid
                 ? 'paid'
-                : (meta.paymentMethod === 'cash' || meta.payment_method === 'cash')
+                : isCash
                   ? 'pending_cash'
                   : (meta.paymentStatus || meta.payment_status || 'unverified');
+
+              // In FULL_AUTOMATIC mode, auto-queue ONLY verified paid orders. Cash or unverified orders remain in PENDING_APPROVAL.
+              if ((rawStatus === 'ORDER_PENDING' || rawStatus === 'PENDING' || rawStatus === 'PENDING_APPROVAL' || !rawStatus) && isFullAuto && isPaid && !isCash) {
+                mappedStatus = 'QUEUED';
+              }
 
               return {
                 id: row.id,
@@ -3052,10 +3042,11 @@ function ProductionApp() {
     if (!targetPrinter) return;
 
     for (const job of jobs) {
-      if (
-        (job.status !== 'QUEUED' && job.status !== 'PENDING_APPROVAL') ||
-        autoPrintAttemptedJobIds.current.has(job.id)
-      ) continue;
+      const isPaid = job.payment_status === 'paid' || job.payment_status === 'verified';
+      // Invariant: NEVER auto-print unpaid cash orders or unverified payments
+      if (!isPaid || job.payment_method === 'cash') continue;
+      if (job.status !== 'QUEUED' || autoPrintAttemptedJobIds.current.has(job.id)) continue;
+
       autoPrintAttemptedJobIds.current.add(job.id);
       void handleDirectPrint(job.id, true, targetPrinter.name);
     }

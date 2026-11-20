@@ -105,7 +105,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
             <input
               type="text"
               className="pb-input"
-              placeholder="e.g. dummy (Shop) or admin (Platform Admin)"
+              placeholder="e.g. shop-slug (Shop) or admin (Platform Admin)"
               value={loginUsername}
               onChange={(e) => setLoginUsername(e.target.value)}
               disabled={isLocked}
