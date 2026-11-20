@@ -62,13 +62,13 @@ class PricingEngine:
 
         # 8. Final grand totals
         total_cents = int(round(total_print_cost + total_binding_cost))
-        # 1 cent = ~83 paise (exchange parity approx), or direct paise rate
-        total_paise = total_cents * 83
+        # In INR, 1 unit = 100 paise; ensure fallback exchange rate does not double-inflate
+        total_paise = total_cents if getattr(self.rule, "currency", "INR") == "INR" else total_cents * 83
 
         return {
             "total_cents": total_cents,
             "total_paise": total_paise,
-            "currency": "USD",
+            "currency": getattr(self.rule, "currency", "INR"),
             "logical_pages": logical_pages,
             "page_count": page_count,
             "copies": options.copies,

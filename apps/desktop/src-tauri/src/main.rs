@@ -94,6 +94,13 @@ fn verify_workstation_session(raw_token: &str, spool_root: &std::path::Path) -> 
         return Err("Unauthorized: device token is missing its authentication proof".into());
     }
 
+    let mut hasher = Sha256::new();
+    hasher.update(format!("{}:{}:{}", claims.shop_id, claims.device_id, claims.exp).as_bytes());
+    let expected_sig = hex::encode(hasher.finalize());
+    if !claims.sig.eq_ignore_ascii_case(&expected_sig) {
+        return Err("Unauthorized: device token signature is invalid".into());
+    }
+
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|e| e.to_string())?
@@ -256,6 +263,8 @@ pub struct NativePrintPayload {
     pub copies: Option<u32>,
     #[serde(default)]
     pub duplex_mode: DuplexMode,
+    #[serde(default)]
+    pub paper_size: Option<String>,
 }
 
 #[cfg(not(feature = "test-mode"))]
@@ -381,6 +390,7 @@ fn print_to_native_hardware(
         &payload.rendered_pages,
         copies,
         payload.duplex_mode,
+        payload.paper_size.as_deref(),
     )?;
 
     state

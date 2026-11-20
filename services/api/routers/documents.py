@@ -8,7 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from fastapi.responses import Response
 from typing import Optional
 import io
+import time
 import uuid
+from collections import OrderedDict
 
 from packages.contracts.models import (
     FileScanResult,
@@ -30,8 +32,57 @@ from services.api.services.shop_customization_service import shop_customization_
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
-# In-memory session store for temporary preview assets (TTL managed)
-MOCK_ASSET_CACHE = {}
+# Bounded, TTL-evicting in-memory store for temporary preview assets
+MAX_CACHE_ENTRIES = 50
+ASSET_CACHE_TTL_SECONDS = 900  # 15 minutes
+
+
+class BoundedAssetCache:
+    def __init__(self, max_entries: int = MAX_CACHE_ENTRIES, ttl_seconds: int = ASSET_CACHE_TTL_SECONDS):
+        self._max_entries = max_entries
+        self._ttl_seconds = ttl_seconds
+        self._store = OrderedDict()
+
+    def _evict_expired(self):
+        now = time.time()
+        expired_keys = [k for k, v in self._store.items() if now - v.get('_created_at', 0) > self._ttl_seconds]
+        for k in expired_keys:
+            self._store.pop(k, None)
+        while len(self._store) > self._max_entries:
+            self._store.popitem(last=False)
+
+    def get(self, key: str):
+        self._evict_expired()
+        entry = self._store.get(key)
+        if entry:
+            if time.time() - entry.get('_created_at', 0) > self._ttl_seconds:
+                self._store.pop(key, None)
+                return None
+            self._store.move_to_end(key)
+        return entry
+
+    def set(self, key: str, value: dict):
+        self._evict_expired()
+        value['_created_at'] = time.time()
+        self._store[key] = value
+        self._store.move_to_end(key)
+        while len(self._store) > self._max_entries:
+            self._store.popitem(last=False)
+
+    def __getitem__(self, key: str):
+        val = self.get(key)
+        if val is None:
+            raise KeyError(key)
+        return val
+
+    def __setitem__(self, key: str, value: dict):
+        self.set(key, value)
+
+    def __contains__(self, key: str):
+        return self.get(key) is not None
+
+
+MOCK_ASSET_CACHE = BoundedAssetCache()
 
 
 @router.post("/scan", response_model=FileScanResult)

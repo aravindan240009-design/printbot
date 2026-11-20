@@ -25,6 +25,8 @@ export function resolveShopSlugFromUrl(): string | null {
     'downloads',
     'about',
     'contact',
+    'partner',
+    'become-a-partner',
     'privacy',
     'terms',
     'customer',

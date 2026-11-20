@@ -2301,7 +2301,8 @@ function ProductionApp() {
       const { data: cloudOrders, error: sbError } = await supabase
         .from('pilot_applications')
         .select('*')
-        .order('applied_at', { ascending: false });
+        .order('applied_at', { ascending: false })
+        .limit(100);
 
       let cloudMapped: PrintJob[] = [];
       if (!sbError && Array.isArray(cloudOrders)) {
@@ -2920,6 +2921,7 @@ function ProductionApp() {
           rendered_pages: renderedPages,
           copies: targetItem.copies || 1,
           duplex_mode: targetItem.duplex_mode || targetJob.options.duplex_mode,
+          paper_size: targetItem.paper_size || targetJob.options.paper_size || 'A4',
         });
         setNotice(`Document "${targetItem.name}" submitted to ${itemPrinter} (Windows spooler job #${result.spooler_job_id}).`);
       } catch (err: any) {
@@ -2965,6 +2967,7 @@ function ProductionApp() {
             rendered_pages: renderedPages,
             copies: item.copies || 1,
             duplex_mode: item.duplex_mode || targetJob.options.duplex_mode,
+            paper_size: item.paper_size || targetJob.options.paper_size || 'A4',
           });
           spooledCount++;
           setNotice(`Spooled ${spooledCount}/${targetJob.items.length}: "${item.name}" to ${itemPrinter}...`);
@@ -2978,22 +2981,10 @@ function ProductionApp() {
       );
       try {
         await syncOrderStatusToCloud(jobId, 'ORDER_PRINTING');
-        setNotice(`All ${spooledCount} documents from Job #${jobId} submitted.`);
+        setNotice(`All ${spooledCount} documents from Job #${jobId} submitted to spooler. Click 'Mark Completed' when physical printing finishes.`);
       } catch (syncError) {
         setNotice(`Job #${jobId} submitted to spooler, but live status sync failed.`);
       }
-
-      setTimeout(async () => {
-        setJobs((prev) =>
-          prev.map((j) => (j.id === jobId ? { ...j, status: 'COMPLETED' } : j))
-        );
-        try {
-          await syncOrderStatusToCloud(jobId, 'ORDER_COMPLETED');
-          setNotice(`Job #${jobId} (${spooledCount} documents) completed & ready for counter pickup.`);
-        } catch (syncErr) {
-          console.warn('Sync completed status failed:', syncErr);
-        }
-      }, 1500);
       return;
     }
 
@@ -3029,6 +3020,7 @@ function ProductionApp() {
         rendered_pages: renderedPages,
         copies: targetJob.options.copies || 1,
         duplex_mode: targetJob.options.duplex_mode,
+        paper_size: targetJob.options.paper_size || 'A4',
       });
     } catch (err: any) {
       const message = `Hardware print error for ${singleEffectivePrinter}: ${err?.message || err}`;
@@ -3042,23 +3034,10 @@ function ProductionApp() {
     );
     try {
       await syncOrderStatusToCloud(jobId, 'ORDER_PRINTING');
-      setNotice(`Job #${jobId} submitted to ${targetPrinter} (Windows spooler job #${result.spooler_job_id}).`);
+      setNotice(`Job #${jobId} submitted to ${targetPrinter} (Windows spooler job #${result.spooler_job_id}). Click 'Mark Completed' once physical pages are printed.`);
     } catch (syncError) {
       setNotice(`Job #${jobId} was submitted to ${targetPrinter}, but live status sync failed: ${syncError instanceof Error ? syncError.message : syncError}`);
     }
-
-    // Automatically transition to COMPLETED once spool submission completes
-    setTimeout(async () => {
-      setJobs((prev) =>
-        prev.map((j) => (j.id === jobId ? { ...j, status: 'COMPLETED' } : j))
-      );
-      try {
-        await syncOrderStatusToCloud(jobId, 'ORDER_COMPLETED');
-        setNotice(`Job #${jobId} print completed & ready for counter pickup.`);
-      } catch (syncErr) {
-        console.warn('Sync completed status failed:', syncErr);
-      }
-    }, 1500);
   };
 
   useEffect(() => {

@@ -60,11 +60,13 @@ async def handle_payment_webhook(
         # Extract job_id from payment_intent_id or custom payload metadata
         job_id = payload.payment_intent_id.replace("pi_mock_", "")
         try:
+            is_inr = getattr(payload, "currency", "INR").upper() == "INR"
+            amount_paise = payload.amount_cents if is_inr else payload.amount_cents * 83
             updated_job = job_service.mark_paid(
                 tenant_id=payload.tenant_id,
                 job_id=job_id,
                 payment_intent_id=payload.payment_intent_id,
-                amount_paise=payload.amount_cents * 83
+                amount_paise=amount_paise
             )
             result = {
                 "status": "success",

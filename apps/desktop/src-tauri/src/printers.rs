@@ -130,6 +130,7 @@ pub fn submit_rendered_pages_to_windows_printer(
     pages: &[Vec<u8>],
     copies: u32,
     duplex_mode: DuplexMode,
+    paper_size: Option<&str>,
 ) -> Result<u32, String> {
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
@@ -285,6 +286,20 @@ pub fn submit_rendered_pages_to_windows_printer(
     }
     default_settings.dmFields |= DM_DUPLEX;
     default_settings.dmDuplex = DEVMODE_DUPLEX(devmode_duplex_value(duplex_mode));
+
+    if let Some(paper) = paper_size {
+        let paper_val = match paper.trim().to_ascii_uppercase().as_str() {
+            "A3" => Some(8),
+            "A4" => Some(9),
+            "LEGAL" => Some(5),
+            "LETTER" => Some(1),
+            _ => None,
+        };
+        if let Some(val) = paper_val {
+            default_settings.dmFields.0 |= 0x00000002; // DM_PAPERSIZE
+            default_settings.Anonymous1.Anonymous1.dmPaperSize = val;
+        }
+    }
 
     let mut effective_mode_words = vec![0usize; word_count];
     let effective_mode = effective_mode_words.as_mut_ptr() as *mut DEVMODEW;
@@ -481,6 +496,7 @@ pub fn submit_rendered_pages_to_windows_printer(
     _pages: &[Vec<u8>],
     _copies: u32,
     _duplex_mode: DuplexMode,
+    _paper_size: Option<&str>,
 ) -> Result<u32, String> {
     Err("Native printer output is only supported on Windows".into())
 }

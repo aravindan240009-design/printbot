@@ -36,6 +36,10 @@ class CatalogueService:
         catalogue_update: ShopServiceCatalogue,
         actor_id: str = "owner@shop.com",
     ) -> ShopServiceCatalogue:
+        if catalogue_update.slot_duration_minutes < 5:
+            catalogue_update.slot_duration_minutes = 15
+        if catalogue_update.capacity_per_slot < 1:
+            catalogue_update.capacity_per_slot = 1
         catalogue_update.shop_id = shop_id
         self._catalogues[shop_id] = catalogue_update
 
@@ -113,7 +117,10 @@ class CatalogueService:
 
         slots: List[AvailableSlot] = []
         cur = open_dt
-        duration = timedelta(minutes=catalogue.slot_duration_minutes)
+        slot_mins = max(5, catalogue.slot_duration_minutes or 15)
+        duration = timedelta(minutes=slot_mins)
+        if open_dt >= close_dt:
+            return []
 
         booked_counts = booked_counts_by_slot or {}
 

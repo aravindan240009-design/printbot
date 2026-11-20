@@ -393,9 +393,9 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
     }
 
     if (!isApiConfigured) {
-      const razorpayKeyId = (import.meta as any).env?.VITE_RAZORPAY_KEY_ID || 'rzp_test_Ts9MJsdti9RG2c';
+      const razorpayKeyId = (import.meta as any).env?.VITE_RAZORPAY_KEY_ID;
       if (!razorpayKeyId) {
-        throw new Error('Razorpay gateway is not configured for this shop.');
+        throw new Error('Razorpay gateway is not configured for this shop (missing VITE_RAZORPAY_KEY_ID).');
       }
       return {
         provider: 'RAZORPAY' as const,

@@ -46,11 +46,14 @@ import {
   quoteOrder,
   createOrder,
   createPaymentIntent,
+  createTestPaymentIntent,
   fetchOrderStatus,
+  getTestShopProfile,
+  verifyTestPayment,
   isApiConfigured,
   type CreateOrderPayload,
 } from './api';
-import { supabase } from './supabase';
+import { supabase, TEST_MODE, TEST_SHOP_SLUG } from './supabase';
 import {
   resolveShopSlugFromUrl,
   loadShopProfile,
@@ -89,15 +92,33 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
   const [applyToAll, setApplyAll] = useState<boolean>(true);
 
   // Dynamically resolve shop slug from props, URL path route, or query parameter
-  const resolvedSlug = useMemo(() => initialShopId?.trim().toLowerCase() || resolveShopSlugFromUrl(), [initialShopId]);
-  const [session, setSession] = useState<ShopSession>(defaultShopSession);
-  const [isResolvingShop, setIsResolvingShop] = useState<boolean>(Boolean(resolvedSlug));
+  const resolvedSlug = useMemo(
+    () => TEST_MODE ? TEST_SHOP_SLUG : initialShopId?.trim().toLowerCase() || resolveShopSlugFromUrl(),
+    [initialShopId],
+  );
+  const [session, setSession] = useState<ShopSession>(() => {
+    if (TEST_MODE) {
+      return {
+        ...defaultShopSession,
+        session_token: '',
+        shop_id: 'test-shop-loading',
+        shop_name: 'Loading Test Shop',
+        shop_slug: TEST_SHOP_SLUG,
+        shop_address: 'Test Environment',
+        shop_phone: '',
+        orderMode: 'MANUAL_APPROVAL',
+      };
+    }
+    return defaultShopSession;
+  });
+  const [isResolvingShop, setIsResolvingShop] = useState<boolean>(!TEST_MODE && Boolean(resolvedSlug));
   const [orders, setOrders] = useState<PlacedOrder[]>([]);
   const [activeOrder, setActiveOrder] = useState<PlacedOrder | null>(null);
   const [unlockingFileId, setUnlockingFileId] = useState<string | null>(null);
   const [quote, setQuote] = useState<ServerQuote | null>(null);
   const [quoteStatus, setQuoteStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [quoteError, setQuoteError] = useState('');
+  const [shopProfileError, setShopProfileError] = useState('');
 
   const t = getTranslation(lang);
 
@@ -129,6 +150,41 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
     if (!resolvedSlug) return;
     document.title = `${resolvedSlug.toUpperCase()} • Touchless Print Counter`;
     let unsubRealtime: (() => void) | undefined;
+
+    if (TEST_MODE) {
+      let active = true;
+      getTestShopProfile(TEST_SHOP_SLUG)
+        .then((profile) => {
+          if (!active) return;
+          setShopProfileError('');
+          setSession({
+            session_token: '',
+            shop_id: profile.id,
+            shop_name: profile.name,
+            shop_slug: profile.slug,
+            shop_address: profile.city,
+            shop_phone: profile.contact_phone,
+            operating_hours: 'Test Environment',
+            rates: {
+              bwPerSideRupees: Number(profile.rates.bwRate ?? 1.5),
+              colorPerSideRupees: Number(profile.rates.colorRate ?? 10),
+              duplexDiscountPercent: Number(profile.rates.duplexDiscountPercent ?? 15),
+            },
+            orderMode: 'MANUAL_APPROVAL',
+            expires_at: new Date(Date.now() + 86400000).toISOString(),
+          });
+          document.title = `TEST MODE • ${profile.name}`;
+        })
+        .catch((error) => {
+          if (!active) return;
+          console.error('Could not load isolated test shop profile:', error);
+          setShopProfileError(error instanceof Error ? error.message : 'Could not load the test shop.');
+        });
+
+      return () => {
+        active = false;
+      };
+    }
 
     loadShopProfile(resolvedSlug).then((profile) => {
       if (!profile) {
@@ -325,10 +381,21 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
       },
     };
 
+    if (TEST_MODE) {
+      if (!firstFile.source) throw new Error('The test document is no longer available. Upload it again before paying.');
+      return createTestPaymentIntent({
+        shopSlug: TEST_SHOP_SLUG,
+        file: firstFile.source,
+        pageCount: createPayload.page_count,
+        options: createPayload.options,
+        expectedTotalPaise: quote.total_paise,
+      });
+    }
+
     if (!isApiConfigured) {
-      const razorpayKeyId = (import.meta as any).env?.VITE_RAZORPAY_KEY_ID || 'rzp_test_Ts9MJsdti9RG2c';
+      const razorpayKeyId = (import.meta as any).env?.VITE_RAZORPAY_KEY_ID;
       if (!razorpayKeyId) {
-        throw new Error('Razorpay gateway is not configured for this shop.');
+        throw new Error('Razorpay gateway is not configured for this shop (missing VITE_RAZORPAY_KEY_ID).');
       }
       return {
         provider: 'RAZORPAY' as const,
@@ -355,6 +422,13 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
     return createPaymentIntent(serverJob.id, session.session_token, session.shop_id);
   };
 
+  const handleVerifyTestPayment = async (
+    intent: import('./api').PaymentIntent,
+    payment: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string },
+  ) => {
+    await verifyTestPayment(intent, payment);
+  };
+
   const handleConfirmOrder = async (details: {
     customerName: string;
     customerPhone: string;
@@ -365,6 +439,49 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
   }) => {
     if (!quote || quoteStatus !== 'ready' || files.length === 0) {
       alert('Wait for a server price before completing checkout.');
+      return;
+    }
+
+    if (TEST_MODE) {
+      if (details.paymentMethod !== 'upi' || !details.paymentId || !details.orderId) {
+        alert('A server-verified Razorpay Test Mode payment is required.');
+        return;
+      }
+      const firstFile = files[0];
+      const testOrder: PlacedOrder = {
+        orderId: details.orderId,
+        pickupPin: 'TEST',
+        shopId: session.shop_id,
+        shopName: session.shop_name,
+        shopPhone: session.shop_phone,
+        shopAddress: session.shop_address,
+        totalRupees: quote.total_rupees,
+        totalSheets: quote.total_physical_sheets,
+        totalLogicalPages: quote.total_logical_pages,
+        paymentMethod: 'upi',
+        paymentStatus: 'paid',
+        paymentId: details.paymentId,
+        status: 'ORDER_RECEIVED',
+        placedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        items: [{
+          name: firstFile.name,
+          copies: firstFile.options.copies,
+          colorMode: firstFile.options.colorMode === 'color'
+            ? 'Color'
+            : firstFile.options.colorMode === 'grayscale' ? 'Grayscale' : 'B&W',
+          sheets: quote.total_physical_sheets,
+          paperSize: firstFile.options.paperSize,
+          finishing: firstFile.options.finishing,
+        }],
+        qrToken: `printbot_test_${details.orderId}`,
+      };
+      saveOrderToStorage(testOrder);
+      setOrders((previous) => [testOrder, ...previous]);
+      setActiveOrder(testOrder);
+      setActiveView('tracking');
+      setFiles([]);
+      setActiveFileId('');
+      setPrintStep(1);
       return;
     }
 
@@ -667,6 +784,19 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
 
   return (
     <div className="pb-app-shell">
+      {TEST_MODE && (
+        <div
+          role="status"
+          style={{ padding: '10px 16px', background: '#7c2d12', color: '#fff', textAlign: 'center', fontWeight: 800 }}
+        >
+          TEST MODE — isolated Razorpay Test Mode checkout · no production queue · printing disabled
+        </div>
+      )}
+      {shopProfileError && (
+        <div role="alert" style={{ padding: '10px 16px', background: '#fee2e2', color: '#991b1b' }}>
+          Test shop could not be loaded: {shopProfileError}
+        </div>
+      )}
       {/* Top Header */}
       <Header
         session={session}
@@ -769,6 +899,7 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
                   onReorderFiles={handleReorderFiles}
                   onClearAll={() => setFiles([])}
                   onPromptPasswordUnlock={setUnlockingFileId}
+                  testMode={TEST_MODE}
                   t={t}
                 />
               </div>
@@ -829,6 +960,7 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
                     onReorderFiles={handleReorderFiles}
                     onClearAll={() => setFiles([])}
                     onPromptPasswordUnlock={setUnlockingFileId}
+                    testMode={TEST_MODE}
                     t={t}
                   />
 
@@ -930,6 +1062,8 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
               quoteError={quoteError}
               session={session}
               onPreparePaymentOrder={handlePreparePaymentOrder}
+              onVerifyTestPayment={handleVerifyTestPayment}
+              testMode={TEST_MODE}
               onConfirmOrder={handleConfirmOrder}
               onBack={() => {
                 setActiveView('print');
@@ -943,6 +1077,7 @@ export default function App({ initialShopId, onBackToHome }: CustomerWebAppProps
           {activeView === 'tracking' && activeOrder && (
             <OrderTracker
               order={activeOrder}
+              testMode={TEST_MODE}
               onPrintAnother={() => {
                 setActiveView('print');
                 setPrintStep(1);

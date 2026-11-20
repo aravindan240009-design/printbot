@@ -18,11 +18,12 @@ import { TranslationKeys } from '../../locales';
 
 interface OrderTrackerProps {
   order: PlacedOrder;
+  testMode?: boolean;
   onPrintAnother: () => void;
   t: TranslationKeys;
 }
 
-export const OrderTracker: React.FC<OrderTrackerProps> = ({ order, onPrintAnother, t }) => {
+export const OrderTracker: React.FC<OrderTrackerProps> = ({ order, testMode = false, onPrintAnother, t }) => {
   const [copiedPin, setCopiedPin] = useState(false);
 
   const steps = [
@@ -111,6 +112,11 @@ Your files are purged from server memory after printing.
     <div className="pb-confirmation-panel" role="region" aria-label="Order Tracking Status">
       {/* Header Badge */}
       <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+        {testMode && (
+          <p role="status" style={{ padding: '10px 14px', background: '#fff7ed', color: '#9a3412', borderRadius: 10 }}>
+            TEST MODE — payment verified. This order will not be printed or fulfilled.
+          </p>
+        )}
         <div
           style={{
             display: 'inline-grid',
@@ -133,7 +139,7 @@ Your files are purged from server memory after printing.
       </div>
 
       {/* 4-Digit Pickup PIN Card */}
-      <div className="pb-pin-display-card">
+      {!testMode && <div className="pb-pin-display-card">
         <span
           style={{
             fontSize: '0.82rem',
@@ -171,7 +177,7 @@ Your files are purged from server memory after printing.
             <span>{copiedPin ? 'Copied' : 'Copy'}</span>
           </button>
         </div>
-      </div>
+      </div>}
 
       {/* Live Vertical Status Stepper */}
       <div className="pb-status-stepper-vertical">
@@ -305,7 +311,7 @@ Your files are purged from server memory after printing.
           <span>💬 Save PIN to WhatsApp</span>
         </button>
 
-        <button
+        {!testMode && <button
           type="button"
           onClick={handleDownloadReceipt}
           style={{
@@ -324,7 +330,7 @@ Your files are purged from server memory after printing.
         >
           <Download size={16} />
           <span>{t.downloadReceipt}</span>
-        </button>
+        </button>}
 
         <button
           type="button"
