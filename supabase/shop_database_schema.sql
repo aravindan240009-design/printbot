@@ -33,7 +33,7 @@ CREATE INDEX IF NOT EXISTS idx_customers_phone ON public.customers(shop_id, phon
 CREATE TABLE IF NOT EXISTS public.printing_prices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     shop_id UUID NOT NULL,
-    paper_size VARCHAR(20) NOT NULL DEFAULT 'A4' CHECK (paper_size IN ('A4', 'A3', 'LEGAL', 'LETTER')),
+    paper_size VARCHAR(20) NOT NULL DEFAULT 'A4' CHECK (paper_size IN ('A4', 'LEGAL', 'LETTER')),
     print_type VARCHAR(20) NOT NULL DEFAULT 'BW' CHECK (print_type IN ('BW', 'COLOR')),
     is_duplex BOOLEAN NOT NULL DEFAULT FALSE,      -- Single-sided vs Back-to-Back
     price_per_page_paise INT NOT NULL,            -- e.g. 200 = ₹2.00, 1000 = ₹10.00

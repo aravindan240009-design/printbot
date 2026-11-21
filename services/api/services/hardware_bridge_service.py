@@ -54,7 +54,7 @@ class HardwareBridgeService:
     def route_print_job(self, req: IntelligentRoutingRequest) -> IntelligentRoutingResponse:
         """
         Dynamically selects the optimal printer within the shop based on:
-        1. Capabilities (Color, Duplex, Paper Size A3/A4/Legal).
+        1. Capabilities (Color, Duplex, Paper Size A4/Legal/Letter).
         2. Live Status (Must be online).
         3. Lowest Queue Depth (Load Balancing).
         Strict Tenant Isolation: Never inspects or routes to printers from another shop.

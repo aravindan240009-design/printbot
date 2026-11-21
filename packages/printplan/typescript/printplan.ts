@@ -6,7 +6,7 @@ export type { PrintPlanV1, NormalizedPlan } from './types.ts';
 
 type Json = any;
 const schema = JSON.parse(readFileSync(new URL('../schema.v1.json', import.meta.url), 'utf8'));
-const papers: Record<string, number[]> = { A3: [297000,420000], A4: [210000,297000], A5: [148000,210000], Letter: [215900,279400], Legal: [215900,355600] };
+const papers: Record<string, number[]> = { A4: [210000,297000], A5: [148000,210000], Letter: [215900,279400], Legal: [215900,355600] };
 const fail = (message: string): never => { throw new Error(message); };
 
 function structural(value: Json, rule: Json): void {

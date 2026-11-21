@@ -23,7 +23,10 @@ from packages.contracts.models import (
     PhotoLayoutPreset,
     PhoneCaptureRequest,
     PhoneCaptureResponse,
+    DocumentConversionOptions,
+    DocumentConversionResult,
 )
+from pydantic import BaseModel
 from services.api.services.conversion_engine import conversion_engine, MAX_FILE_SIZE_BYTES
 from services.api.services.preview_service import preview_service
 from services.api.services.accounting_engine import accounting_engine
@@ -97,18 +100,23 @@ async def scan_document(
     # Read one byte beyond the limit so oversized uploads are rejected without
     # allowing an attacker to force an unbounded in-memory allocation.
     content = await file.read(MAX_FILE_SIZE_BYTES + 1)
-    scan_res = conversion_engine.scan_file(content, file.filename, file.content_type)
+    scan_res, converted_pdf_bytes = conversion_engine.scan_and_convert(content, file.filename, file.content_type)
 
     # Cache asset buffer for preview rendering if valid
     asset_id = str(uuid.uuid4())
     tenant_id = getattr(request.state, "tenant_id", "default-tenant") if request else "default-tenant"
     if scan_res.is_valid:
+        pdf_bytes_to_store = converted_pdf_bytes if converted_pdf_bytes else (content if scan_res.format.value == "pdf" else None)
         MOCK_ASSET_CACHE[asset_id] = {
             "tenant_id": tenant_id,
             "filename": file.filename,
             "content": content,
+            "pdf_bytes": pdf_bytes_to_store,
             "scan": scan_res
         }
+        if converted_pdf_bytes:
+            scan_res.converted_asset_id = asset_id
+            scan_res.is_converted = True
         import hashlib
         sha = hashlib.sha256(content).hexdigest()
         asset_service.register_scanned_asset(
@@ -160,9 +168,11 @@ async def unlock_pdf(req: UnlockPdfRequest, request: Request):
 
     # Replace cached buffer with decrypted buffer in-memory
     cached["content"] = unlocked_bytes
+    cached["pdf_bytes"] = unlocked_bytes
     cached["scan"].is_encrypted = False
     cached["scan"].needs_password = False
     cached["scan"].page_count = page_count
+    cached["scan"].is_converted = True
 
     return UnlockPdfResponse(
         asset_id=req.asset_id,
@@ -228,20 +238,94 @@ async def get_page_preview(
     doc_name = cached["filename"]
     total_pages = cached["scan"].page_count
 
-    # If it's an image asset, return downscaled thumbnail
-    if cached and cached["scan"].format.value in ("jpeg", "png", "webp", "bmp", "tiff"):
-        thumb_bytes = preview_service.generate_image_thumbnail(cached["content"], max_width=600)
-        return Response(content=thumb_bytes, media_type="image/jpeg")
-
-    # Otherwise render page preview canvas
+    # Render page preview (using PDFium rasterization if PDF bytes are cached)
     preview_bytes = preview_service.generate_page_preview(
         page_num=page_num,
         total_pages=total_pages,
         doc_name=doc_name,
         color_mode=color_mode,
-        duplex_mode=duplex_mode
+        duplex_mode=duplex_mode,
+        pdf_bytes=cached.get("pdf_bytes")
     )
     return Response(content=preview_bytes, media_type="image/jpeg")
+
+
+class ConvertDocumentApiRequest(BaseModel):
+    asset_id: str
+    options: Optional[DocumentConversionOptions] = None
+    password: Optional[str] = None
+
+
+@router.post("/convert", response_model=DocumentConversionResult)
+async def convert_document(req: ConvertDocumentApiRequest, request: Request):
+    """
+    Explicitly converts or re-converts an uploaded document with custom options
+    (paper size, orientation, page range slicing, duplex padding).
+    """
+    tenant_id = getattr(request.state, "tenant_id", "default-tenant")
+    cached = MOCK_ASSET_CACHE.get(req.asset_id)
+    if not cached or cached["tenant_id"] != tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document asset not found."
+        )
+
+    res, pdf_bytes = conversion_engine.convert_to_pdf(
+        content=cached["content"],
+        filename=cached["filename"],
+        options=req.options,
+        password=req.password
+    )
+
+    if not res.is_success or not pdf_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=res.error_message or "Failed to convert document."
+        )
+
+    # Update cache with normalized PDF
+    cached["pdf_bytes"] = pdf_bytes
+    cached["scan"].page_count = res.page_count
+    cached["scan"].detected_pages = list(range(1, res.page_count + 1))
+    cached["scan"].width_pts = res.width_pts
+    cached["scan"].height_pts = res.height_pts
+    cached["scan"].is_converted = True
+
+    return res
+
+
+@router.get("/{asset_id}/download-pdf")
+async def download_normalized_pdf(asset_id: str, request: Request):
+    """
+    Streams the standardized, normalized printable PDF file.
+    """
+    import os
+    tenant_id = getattr(request.state, "tenant_id", "default-tenant")
+    cached = MOCK_ASSET_CACHE.get(asset_id)
+    if not cached or cached["tenant_id"] != tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document asset not found."
+        )
+
+    pdf_bytes = cached.get("pdf_bytes")
+    if not pdf_bytes:
+        res, converted = conversion_engine.convert_to_pdf(cached["content"], cached["filename"])
+        if res.is_success and converted:
+            pdf_bytes = converted
+            cached["pdf_bytes"] = converted
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Document could not be converted to PDF."
+            )
+
+    base_name = os.path.splitext(cached["filename"])[0]
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{base_name}_normalized.pdf"'}
+    )
 
 
 @router.post("/photo-layout", response_model=PhotoLayoutResponse)

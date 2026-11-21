@@ -17,7 +17,6 @@ class ColorMode(str, Enum):
 
 class PaperSize(str, Enum):
     A4 = "A4"
-    A3 = "A3"
     A5 = "A5"
     LEGAL = "Legal"
     LETTER = "Letter"
@@ -146,7 +145,6 @@ class PricingRule(BaseModel):
     duplex_discount_percent: int = 15  # 15% discount on double-sided sheets
     paper_size_multiplier: Dict[PaperSize, float] = {
         PaperSize.A4: 1.0,
-        PaperSize.A3: 2.0,
         PaperSize.LEGAL: 1.25,
         PaperSize.LETTER: 1.0,
     }
@@ -222,7 +220,7 @@ class PrinterDevice(BaseModel):
     is_default: bool = False
     is_online: bool = True
     status_text: str = "Ready"
-    supported_sizes: List[PaperSize] = [PaperSize.A4, PaperSize.LETTER, PaperSize.LEGAL, PaperSize.A3]
+    supported_sizes: List[PaperSize] = [PaperSize.A4, PaperSize.LETTER, PaperSize.LEGAL]
     supports_color: bool = True
     supports_duplex: bool = True
 
@@ -401,6 +399,31 @@ class FileScanResult(BaseModel):
     has_macros: bool = False
     error_message: Optional[str] = None
     detected_pages: List[int] = Field(default_factory=list)
+    converted_asset_id: Optional[str] = None
+    is_converted: bool = False
+
+
+class DocumentConversionOptions(BaseModel):
+    paper_size: PaperSize = PaperSize.A4
+    orientation: Orientation = Orientation.PORTRAIT
+    color_mode: ColorMode = ColorMode.BW
+    dpi: int = Field(default=300, ge=72, le=600)
+    fit_to_page: bool = True
+    margin_pts: float = Field(default=36.0, ge=0.0, le=144.0)
+    page_range: Optional[str] = "all"
+    duplex_padding: bool = False
+
+
+class DocumentConversionResult(BaseModel):
+    is_success: bool
+    format: SupportedFormat
+    page_count: int
+    pdf_bytes_len: int
+    sha256_hash: str
+    width_pts: float
+    height_pts: float
+    error_message: Optional[str] = None
+    warnings: List[str] = Field(default_factory=list)
 
 
 class UnlockPdfRequest(BaseModel):

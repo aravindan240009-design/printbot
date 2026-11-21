@@ -2,7 +2,7 @@
 export interface QuoteOptions {
   copies: number;
   color_mode: "bw" | "color" | "grayscale";
-  paper_size: "A4" | "A3" | "A5" | "Legal" | "Letter";
+  paper_size: "A4" | "A5" | "Legal" | "Letter";
   duplex_mode: "simplex" | "duplex_long" | "duplex_short";
   paper_gsm: number;
   binding: "none" | "staple" | "spiral" | "hard_bind";
@@ -29,7 +29,6 @@ export interface CalculatedQuote {
 
 const PAPER_SIZE_MULTIPLIERS: Record<QuoteOptions["paper_size"], number> = {
   A4: 1,
-  A3: 2,
   A5: 0.8,
   Legal: 1.25,
   Letter: 1,
@@ -79,7 +78,7 @@ export function normalizeQuoteOptions(value: unknown): QuoteOptions {
   return {
     copies: readInteger("copies", 1, 1, 500),
     color_mode: readChoice("color_mode", ["bw", "color", "grayscale"], "bw"),
-    paper_size: readChoice("paper_size", ["A4", "A3", "A5", "Legal", "Letter"], "A4"),
+    paper_size: readChoice("paper_size", ["A4", "A5", "Legal", "Letter"], "A4"),
     duplex_mode: readChoice(
       "duplex_mode",
       ["simplex", "duplex_long", "duplex_short"],

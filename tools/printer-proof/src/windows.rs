@@ -397,7 +397,6 @@ pub fn print(
     }
     let paper_id = match text(s, "paper_size")? {
         "A4" => 9,
-        "A3" => 8,
         "A5" => 11,
         "Letter" => 1,
         "Legal" => 5,

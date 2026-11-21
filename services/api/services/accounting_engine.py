@@ -32,7 +32,6 @@ DEFAULT_SHOP_PRICING = {
     "duplex_discount_percent": 15,  # 15% discount on the back side of each sheet
     "paper_size_multiplier": {
         PaperSize.A4.value: 1.0,
-        PaperSize.A3.value: 2.0,
         PaperSize.A5.value: 0.8,
         PaperSize.LETTER.value: 1.0,
         PaperSize.LEGAL.value: 1.25,

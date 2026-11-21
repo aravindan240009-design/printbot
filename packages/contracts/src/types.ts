@@ -3,7 +3,7 @@
  */
 
 export type ColorMode = 'bw' | 'color';
-export type PaperSize = 'A4' | 'A3' | 'A5' | 'Legal' | 'Letter';
+export type PaperSize = 'A4' | 'A5' | 'Legal' | 'Letter';
 export type DuplexMode = 'simplex' | 'duplex_long' | 'duplex_short';
 export type Orientation = 'portrait' | 'landscape' | 'auto';
 export type BindingType = 'none' | 'staple' | 'spiral' | 'hard_bind';
@@ -85,6 +85,7 @@ export interface PrintOptions {
 }
 
 export interface FileScanResult {
+  assetId?: string;
   isValid: boolean;
   format: SupportedFormat;
   mimeType: string;
@@ -97,6 +98,31 @@ export interface FileScanResult {
   hasMacros?: boolean;
   errorMessage?: string;
   detectedPages?: number[];
+  convertedAssetId?: string;
+  isConverted?: boolean;
+}
+
+export interface DocumentConversionOptions {
+  paperSize?: PaperSize;
+  orientation?: Orientation;
+  colorMode?: ColorMode;
+  dpi?: number;
+  fitToPage?: boolean;
+  marginPts?: number;
+  pageRange?: string;
+  duplexPadding?: boolean;
+}
+
+export interface DocumentConversionResult {
+  isSuccess: boolean;
+  format: SupportedFormat;
+  pageCount: number;
+  pdfBytesLen: number;
+  sha256Hash: string;
+  widthPts: number;
+  heightPts: number;
+  errorMessage?: string;
+  warnings?: string[];
 }
 
 export interface FileQuoteItemRequest {

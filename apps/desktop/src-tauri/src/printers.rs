@@ -289,7 +289,6 @@ pub fn submit_rendered_pages_to_windows_printer(
 
     if let Some(paper) = paper_size {
         let paper_val = match paper.trim().to_ascii_uppercase().as_str() {
-            "A3" => Some(8),
             "A4" => Some(9),
             "LEGAL" => Some(5),
             "LETTER" => Some(1),

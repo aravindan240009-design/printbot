@@ -45,7 +45,7 @@ class ShopCustomizationConfig(BaseModel):
     allowed_file_types: List[str] = Field(
         default_factory=lambda: ["pdf", "jpeg", "png", "docx", "xlsx", "pptx", "txt"]
     )
-    allowed_paper_sizes: List[str] = Field(default_factory=lambda: ["A4", "A3", "A5", "Legal"])
+    allowed_paper_sizes: List[str] = Field(default_factory=lambda: ["A4", "A5", "Legal"])
     allowed_color_modes: List[str] = Field(default_factory=lambda: ["bw", "color"])
     allowed_duplex_modes: List[str] = Field(default_factory=lambda: ["simplex", "duplex_long", "duplex_short"])
     pricing_rates_paise: Dict[str, int] = Field(

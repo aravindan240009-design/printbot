@@ -35,7 +35,7 @@ test("quotes custom color, paper, copies, page range, and binding", () => {
     normalizeQuoteOptions({
       copies: 2,
       color_mode: "color",
-      paper_size: "A3",
+      paper_size: "A4",
       duplex_mode: "simplex",
       paper_gsm: 100,
       binding: "staple",
@@ -48,7 +48,7 @@ test("quotes custom color, paper, copies, page range, and binding", () => {
   assert.equal(quote.total_logical_pages, 6);
   assert.equal(quote.total_rendered_sides, 4);
   assert.equal(quote.total_physical_sheets, 4);
-  assert.equal(quote.total_paise, 9400);
+  assert.equal(quote.total_paise, 5400);
 });
 
 test("invalid page ranges follow the existing quote engine and select the whole document", () => {

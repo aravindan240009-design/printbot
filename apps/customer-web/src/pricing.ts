@@ -5,7 +5,7 @@
 export interface QuoteOptions {
   copies: number;
   color_mode: "bw" | "color" | "grayscale";
-  paper_size: "A4" | "A3" | "A5" | "Legal" | "Letter";
+  paper_size: "A4" | "A5" | "Legal" | "Letter";
   duplex_mode: "simplex" | "duplex_long" | "duplex_short";
   paper_gsm: number;
   binding: "none" | "staple" | "spiral" | "hard_bind";
@@ -43,7 +43,6 @@ const DEFAULT_RATES: PricingRatesPaise = {
 
 const PAPER_SIZE_MULTIPLIERS: Record<string, number> = {
   A4: 1,
-  A3: 2,
   A5: 0.8,
   Legal: 1.25,
   Letter: 1,
@@ -74,7 +73,7 @@ export function normalizeOptions(raw: any): QuoteOptions {
   return {
     copies: Math.max(1, Math.min(500, Number(raw.copies) || 1)),
     color_mode: ["bw", "color", "grayscale"].includes(raw.color_mode) ? raw.color_mode : "bw",
-    paper_size: ["A4", "A3", "A5", "Legal", "Letter"].includes(raw.paper_size) ? raw.paper_size : "A4",
+    paper_size: ["A4", "A5", "Legal", "Letter"].includes(raw.paper_size) ? raw.paper_size : "A4",
     duplex_mode: ["simplex", "duplex_long", "duplex_short"].includes(raw.duplex_mode) ? raw.duplex_mode : "simplex",
     paper_gsm: Number(raw.paper_gsm) || 75,
     binding: ["none", "staple", "spiral", "hard_bind"].includes(raw.binding) ? raw.binding : "none",

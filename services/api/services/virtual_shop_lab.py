@@ -23,7 +23,7 @@ class VirtualPrinterType(str, Enum):
     A4_BW = "A4_BW"                                   # Printer 1: A4 Black & White
     A4_COLOR = "A4_COLOR"                             # Printer 2: A4 Color
     A4_AUTO_DUPLEX = "A4_AUTO_DUPLEX"                 # Printer 3: A4 Automatic Duplex
-    A3_A4_COLOR = "A3_A4_COLOR"                       # Printer 4: A3 / A4 Color
+    HEAVY_DUTY_COLOR = "HEAVY_DUTY_COLOR"             # Printer 4: Heavy Duty A4 Color
     MFP_SIMULATOR = "MFP_SIMULATOR"                   # Printer 5: Multi-function printer
     DELIBERATELY_OFFLINE = "DELIBERATELY_OFFLINE"     # Printer 6: Deliberately offline
     PAPER_JAM_SIMULATOR = "PAPER_JAM_SIMULATOR"       # Printer 7: Paper-jam simulator
@@ -142,12 +142,12 @@ class VirtualShopLab:
                 speed_ppm=35,
             ),
             VirtualDeviceConfig(
-                id="virt-p4-a3-a4-color",
-                name="Printer 4 (A3 / A4 Heavy Duty Color Production)",
-                device_type=VirtualPrinterType.A3_A4_COLOR,
+                id="virt-p4-color-prod",
+                name="Printer 4 (Heavy Duty A4 Color Production)",
+                device_type=VirtualPrinterType.HEAVY_DUTY_COLOR,
                 is_online=True,
                 status_text="Idle / Ready",
-                supported_sizes=[PaperSize.A4, PaperSize.A3, PaperSize.LEGAL, PaperSize.LETTER],
+                supported_sizes=[PaperSize.A4, PaperSize.LEGAL, PaperSize.LETTER],
                 supports_color=True,
                 supports_duplex=True,
                 speed_ppm=50,
@@ -158,7 +158,7 @@ class VirtualShopLab:
                 device_type=VirtualPrinterType.MFP_SIMULATOR,
                 is_online=True,
                 status_text="Idle / Ready",
-                supported_sizes=[PaperSize.A4, PaperSize.A3, PaperSize.A5, PaperSize.LEGAL],
+                supported_sizes=[PaperSize.A4, PaperSize.A5, PaperSize.LEGAL],
                 supports_color=True,
                 supports_duplex=True,
                 supports_staple=True,
@@ -181,7 +181,7 @@ class VirtualShopLab:
                 device_type=VirtualPrinterType.PAPER_JAM_SIMULATOR,
                 is_online=True,
                 status_text="Ready (Armed for Mid-Job Jam)",
-                supported_sizes=[PaperSize.A4, PaperSize.A3],
+                supported_sizes=[PaperSize.A4],
                 supports_color=True,
                 supports_duplex=True,
                 current_fault=FaultInjectionType.PAPER_JAM,
@@ -501,11 +501,11 @@ class VirtualShopLab:
             # Alternate capabilities for balanced testing
             is_color = (i % 2 == 0)
             is_duplex = (i % 3 != 0)
-            sizes = [PaperSize.A4, PaperSize.A3] if (i % 4 == 0) else [PaperSize.A4]
+            sizes = [PaperSize.A4, PaperSize.LEGAL] if (i % 4 == 0) else [PaperSize.A4]
             dev = VirtualDeviceConfig(
                 id=dev_id,
                 name=f"Fleet Virtual Printer #{i} ({'Color' if is_color else 'Mono'}, {'Duplex' if is_duplex else 'Simplex'})",
-                device_type=VirtualPrinterType.A3_A4_COLOR if PaperSize.A3 in sizes else (VirtualPrinterType.A4_COLOR if is_color else VirtualPrinterType.A4_BW),
+                device_type=VirtualPrinterType.HEAVY_DUTY_COLOR if (is_color and is_duplex) else (VirtualPrinterType.A4_COLOR if is_color else VirtualPrinterType.A4_BW),
                 is_online=True,
                 status_text="Idle / Ready",
                 supported_sizes=sizes,

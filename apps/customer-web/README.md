@@ -63,7 +63,7 @@ creation and payment-intent flow still requires a reachable Print Bot API.
   - Color modes: Black & White, Color, Grayscale
   - Copies and collation
   - Duplex modes: Simplex (single-sided), Duplex Long-Edge, Duplex Short-Edge
-  - Paper sizes: A4, A3, Legal, Letter
+  - Paper sizes: A4, Legal, Letter
   - Non-contiguous page ranges: `1-3, 5, 8-`
   - Finishing: Stapling, Spiral Binding, Hard Binding
 - **Multi-Lingual Support**: English, Tamil (தமிழ்), and Hindi (हिन्दी) translations.

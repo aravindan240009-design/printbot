@@ -272,7 +272,7 @@ export const ServiceEditModal: React.FC<ServiceEditModalProps> = ({
               <textarea
                 className="pb-textarea"
                 rows={4}
-                placeholder={"A4, A3, Legal, Letter\nBlack & White or Color\nSingle or Double Sided\nHigh-density toner"}
+                placeholder={"A4, Legal, Letter\nBlack & White or Color\nSingle or Double Sided\nHigh-density toner"}
                 value={serviceFormFeatures}
                 onChange={(e) => setServiceFormFeatures(e.target.value)}
               />

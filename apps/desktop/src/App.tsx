@@ -817,7 +817,7 @@ function ProductionApp() {
       priceDisplay: '₹1.50 / page',
       turnaround: 'Instant Counter Print',
       badge: 'Most Popular',
-      features: ['A4, A3, Legal, Letter', 'Black & White or Color', 'Single or Double-sided'],
+      features: ['A4, Legal, Letter', 'Black & White or Color', 'Single or Double-sided'],
       hasDiscount: false,
       discountNote: '',
     },

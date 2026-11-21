@@ -146,7 +146,7 @@ export const FeaturesPage: React.FC<FeaturesPageProps> = ({ navigate, onOpenDown
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
                 <span className="text-slate-500 block text-[10px] font-medium">Supported Paper:</span>
-                <span className="text-slate-900 font-bold">A4, A3, Legal, Letter, Photo</span>
+                <span className="text-slate-900 font-bold">A4, Legal, Letter, Photo</span>
               </div>
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
                 <span className="text-slate-500 block text-[10px] font-medium">Duplex Handling:</span>

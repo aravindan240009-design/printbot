@@ -13,7 +13,12 @@ from typing import Tuple, Optional, List
 from PIL import Image
 
 import pypdf
-from packages.contracts.models import SupportedFormat, FileScanResult
+from packages.contracts.models import (
+    SupportedFormat,
+    FileScanResult,
+    DocumentConversionOptions,
+    DocumentConversionResult,
+)
 
 # Safety Limits
 MAX_IMAGE_PIXELS = 100_000_000  # 100 Megapixels threshold against decompression bombs
@@ -450,6 +455,45 @@ class ConversionEngine:
                 page_count=0,
                 error_message=f"Malformed text file: {str(e)}"
             )
+
+
+    def convert_to_pdf(
+        self,
+        content: bytes,
+        filename: str,
+        options: Optional[DocumentConversionOptions] = None,
+        password: Optional[str] = None
+    ) -> Tuple[DocumentConversionResult, Optional[bytes]]:
+        """
+        Converts any supported format into a printable PDF via DocumentConverter.
+        """
+        from services.api.services.document_converter import document_converter
+        return document_converter.convert_to_pdf(content, filename, options=options, password=password)
+
+    def scan_and_convert(
+        self,
+        content: bytes,
+        file_name: str,
+        declared_mime: Optional[str] = None,
+        options: Optional[DocumentConversionOptions] = None,
+        password: Optional[str] = None
+    ) -> Tuple[FileScanResult, Optional[bytes]]:
+        """
+        Performs zero-trust scan and automatic conversion into printable PDF.
+        Returns: (FileScanResult, Optional[pdf_bytes])
+        """
+        scan_res = self.scan_file(content, file_name, declared_mime)
+        if not scan_res.is_valid or scan_res.is_encrypted:
+            return scan_res, None
+
+        conv_res, pdf_bytes = self.convert_to_pdf(content, file_name, options=options, password=password)
+        if conv_res.is_success and pdf_bytes:
+            scan_res.is_converted = True
+            scan_res.page_count = conv_res.page_count
+            scan_res.detected_pages = list(range(1, conv_res.page_count + 1))
+            scan_res.width_pts = conv_res.width_pts
+            scan_res.height_pts = conv_res.height_pts
+        return scan_res, pdf_bytes
 
 
 conversion_engine = ConversionEngine()

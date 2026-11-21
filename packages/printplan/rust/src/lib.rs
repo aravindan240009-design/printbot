@@ -205,7 +205,6 @@ pub fn validate(plan: &Value, expected_shop: &str) -> Result<Value, String> {
         return Err("unsupported executable operation".into());
     }
     let dimensions = match s["paper_size"].as_str().unwrap() {
-        "A3" => (297000, 420000),
         "A4" => (210000, 297000),
         "A5" => (148000, 210000),
         "Letter" => (215900, 279400),

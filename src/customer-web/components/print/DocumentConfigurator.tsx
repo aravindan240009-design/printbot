@@ -419,9 +419,9 @@ export const DocumentConfigurator: React.FC<DocumentConfiguratorProps> = ({
             value={options.paperSize}
             onChange={(e) => onUpdateOptions({ paperSize: e.target.value as PaperSize })}
           >
-            {(['A4', 'A3', 'A5', 'Legal', 'Letter'] as PaperSize[]).map((size) => (
+            {(['A4', 'A5', 'Legal', 'Letter'] as PaperSize[]).map((size) => (
               <option key={size} value={size}>
-                {size} {size === 'A3' ? '(2x rate)' : size === 'Legal' ? '(+25%)' : ''}
+                {size} {size === 'Legal' ? '(+25%)' : ''}
               </option>
             ))}
           </select>

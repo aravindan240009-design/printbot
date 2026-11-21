@@ -1,7 +1,7 @@
 /** Wire declarations correspond to schema.v1.json. Runtime validation is mandatory. */
 export type ColorMode = 'bw' | 'grayscale' | 'color';
 export type DuplexMode = 'simplex' | 'long_edge' | 'short_edge';
-export type PaperSize = 'A3' | 'A4' | 'A5' | 'Letter' | 'Legal';
+export type PaperSize = 'A4' | 'A5' | 'Letter' | 'Legal';
 export interface PrintPlanV1 {
   schema_version: 1;
   job_id: string;

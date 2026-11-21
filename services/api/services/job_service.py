@@ -54,9 +54,9 @@ class JobService:
         Validates whether the shop has a ready printer capable of printing the specified options.
         Preflight verification for color, duplex, and paper size.
         """
-        # AltaLink C8170 (Color/Duplex/A4/A3) and Canon imageRUNNER (B&W/Duplex/A4) are standard profiles
+        # AltaLink C8170 (Color/Duplex/A4) and Canon imageRUNNER (B&W/Duplex/A4) are standard profiles
         # In a real setup, capability snapshots from /printers/snapshots are evaluated
-        if options.paper_size not in (PaperSize.A4, PaperSize.A3, PaperSize.LEGAL, PaperSize.LETTER):
+        if options.paper_size not in (PaperSize.A4, PaperSize.LEGAL, PaperSize.LETTER):
             return False, f"Paper size '{options.paper_size}' not supported by any active shop printer."
         return True, None
 

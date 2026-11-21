@@ -12,7 +12,7 @@ from jsonschema import Draft202012Validator
 
 SCHEMA = json.loads((Path(__file__).resolve().parents[1] / "schema.v1.json").read_text())
 VALIDATOR = Draft202012Validator(SCHEMA)
-PAPERS = {"A3": (297000, 420000), "A4": (210000, 297000), "A5": (148000, 210000), "Letter": (215900, 279400), "Legal": (215900, 355600)}
+PAPERS = {"A4": (210000, 297000), "A5": (148000, 210000), "Letter": (215900, 279400), "Legal": (215900, 355600)}
 MAX_IMPRESSIONS = 100000
 
 

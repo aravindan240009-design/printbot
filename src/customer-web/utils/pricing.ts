@@ -149,7 +149,6 @@ export function calculateDocumentQuote(
 
     const paperMultipliers: Record<string, number> = {
       A4: 1.0,
-      A3: 2.0,
       A5: 0.8,
       Legal: 1.25,
       Letter: 1.0,

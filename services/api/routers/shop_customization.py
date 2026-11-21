@@ -78,7 +78,7 @@ async def validate_capability(
     shop_id: str,
     format_ext: str = Query(..., description="File extension, e.g. 'pdf', 'docx'"),
     color_mode: str = Query(default="bw", description="'bw' or 'color'"),
-    paper_size: str = Query(default="A4", description="'A4', 'A3', 'Legal', etc.")
+    paper_size: str = Query(default="A4", description="'A4', 'A5', 'Legal', etc.")
 ):
     """
     Pre-flight quote capability validator.

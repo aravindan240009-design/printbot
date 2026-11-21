@@ -34,7 +34,7 @@ def list_printers():
             is_default=True,
             is_online=True,
             status_text="Idle / Ready",
-            supported_sizes=[PaperSize.A4, PaperSize.A3, PaperSize.LEGAL, PaperSize.LETTER],
+            supported_sizes=[PaperSize.A4, PaperSize.LEGAL, PaperSize.LETTER],
             supports_color=True,
             supports_duplex=True
         ),

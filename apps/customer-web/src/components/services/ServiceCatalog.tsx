@@ -79,7 +79,7 @@ export const ServiceCatalog: React.FC<ServiceCatalogProps> = ({ t, rates, servic
         badge: 'Most Popular',
         badgeColor: 'brand',
         features: [
-          'A4, A3, Legal, Letter',
+          'A4, Legal, Letter',
           `B&W (₹${bwPrice.toFixed(2)}) · Color (₹${colorPrice.toFixed(2)})`,
           'Single or Double-sided printing',
         ],

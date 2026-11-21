@@ -15,7 +15,7 @@ Limits: 32 files, 10,000 pages/file, 512 range characters, 500 copies,
 before allocation. Ranges use ASCII positive integers, union/deduplication,
 ascending order and original-page odd/even parity; empty selections fail.
 
-Named paper sizes use unrotated dimensions in micrometres: A3 297000×420000,
+Named paper sizes use unrotated dimensions in micrometres:
 A4 210000×297000, A5 148000×210000, Letter 215900×279400 and Legal
 215900×355600. Orientation is independent. Explicit landscape swaps the page axes
 for margins; portrait/auto use canonical axes. The eventual renderer must resolve

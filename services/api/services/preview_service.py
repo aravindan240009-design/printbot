@@ -57,18 +57,74 @@ class PreviewService:
             # Fallback placeholder thumbnail
             return self._create_error_thumbnail(f"Preview unavailable: {str(e)}")
 
+    def render_pdf_page_preview(
+        self,
+        pdf_bytes: bytes,
+        page_num: int,
+        color_mode: str = "bw",
+        duplex_mode: str = "simplex",
+        target_dpi: int = 150
+    ) -> Optional[bytes]:
+        """
+        Renders real high-fidelity PDF page preview using Google PDFium engine (pypdfium2).
+        Simulates B&W/color mode and duplex punch hole indicators.
+        """
+        try:
+            import pypdfium2
+            doc = pypdfium2.PdfDocument(pdf_bytes)
+            total = len(doc)
+            if page_num < 1 or page_num > total:
+                return None
+            page = doc[page_num - 1]
+            scale = target_dpi / 72.0
+            bitmap = page.render(scale=scale)
+            pil_img = bitmap.to_pil()
+
+            # Apply Color Mode simulation
+            if color_mode in ("bw", "grayscale"):
+                pil_img = pil_img.convert("L").convert("RGB")
+            else:
+                pil_img = pil_img.convert("RGB")
+
+            # Draw duplex binding indicator overlay if duplex
+            if duplex_mode in ("duplex_long", "duplex_short"):
+                draw = ImageDraw.Draw(pil_img)
+                w, h = pil_img.size
+                hole_r = max(4, int(6 * scale))
+                margin_x = int(12 * scale)
+                draw.ellipse([(margin_x - hole_r, h // 4 - hole_r), (margin_x + hole_r, h // 4 + hole_r)], outline="#CBD5E1", width=2)
+                draw.ellipse([(margin_x - hole_r, 3 * h // 4 - hole_r), (margin_x + hole_r, 3 * h // 4 + hole_r)], outline="#CBD5E1", width=2)
+
+            out = io.BytesIO()
+            pil_img.save(out, format="JPEG", quality=85, optimize=True)
+            return out.getvalue()
+        except Exception:
+            return None
+
     def generate_page_preview(
         self,
         page_num: int,
         total_pages: int,
         doc_name: str,
         color_mode: str = "bw",
-        duplex_mode: str = "simplex"
+        duplex_mode: str = "simplex",
+        pdf_bytes: Optional[bytes] = None
     ) -> bytes:
         """
         Generates realistic page preview canvas showing page geometry, margins,
         color mode simulation, and duplex status.
+        If real PDF bytes are provided, renders using PDFium engine.
         """
+        if pdf_bytes:
+            real_rendered = self.render_pdf_page_preview(
+                pdf_bytes=pdf_bytes,
+                page_num=page_num,
+                color_mode=color_mode,
+                duplex_mode=duplex_mode
+            )
+            if real_rendered:
+                return real_rendered
+
         # Canvas at 150 DPI for crisp mobile display (A4 ratio ~ 1240 x 1754 px)
         canvas_w, canvas_h = 595, 842
         img = Image.new("RGB", (canvas_w, canvas_h), color="#FFFFFF")

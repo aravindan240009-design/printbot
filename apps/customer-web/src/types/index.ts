@@ -2,7 +2,7 @@ export type Language = 'en' | 'ta' | 'hi';
 
 export type ColorMode = 'bw' | 'color' | 'grayscale';
 export type DuplexMode = 'simplex' | 'duplex_long' | 'duplex_short';
-export type PaperSize = 'A4' | 'A3' | 'A5' | 'Legal' | 'Letter';
+export type PaperSize = 'A4' | 'A5' | 'Legal' | 'Letter';
 export type PaperGsm = '75' | '100' | '220';
 export type FinishingOption = 'none' | 'staple' | 'spiral' | 'hard_bind';
 export type PhotoPreset = 'standard' | 'passport_8up' | 'id_card' | 'photo_4x6';
