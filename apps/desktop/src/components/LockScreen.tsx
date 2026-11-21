@@ -3,8 +3,6 @@ import {
   Printer,
   Lock,
   AlertTriangle,
-  Eye,
-  EyeOff,
   LogIn,
 } from 'lucide-react';
 
@@ -14,8 +12,8 @@ interface LockScreenProps {
   loginKey: string;
   setLoginKey: (val: string) => void;
   handleKeyChange: (val: string) => void;
-  showPassword: boolean;
-  setShowPassword: (val: boolean) => void;
+  showPassword?: boolean;
+  setShowPassword?: (val: boolean) => void;
   isMfaRequired: boolean;
   adminMfaCode: string;
   setAdminMfaCode: (val: string) => void;
@@ -28,10 +26,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   loginUsername,
   setLoginUsername,
   loginKey,
-  setLoginKey,
   handleKeyChange,
-  showPassword,
-  setShowPassword,
   isMfaRequired,
   adminMfaCode,
   setAdminMfaCode,
@@ -90,6 +85,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
             <input
               type="text"
               className="pb-input"
+              style={{ width: '100%', boxSizing: 'border-box' }}
               placeholder="Enter user name"
               value={loginUsername}
               onChange={(e) => setLoginUsername(e.target.value)}
@@ -101,37 +97,16 @@ export const LockScreen: React.FC<LockScreenProps> = ({
 
           <div className="pb-form-group">
             <label className="pb-form-label">License Key</label>
-            <div style={{ position: 'relative' }}>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                className="pb-input"
-                placeholder="Enter license key"
-                value={loginKey}
-                onChange={(e) => handleKeyChange(e.target.value)}
-                disabled={isLocked}
-                style={{ paddingRight: '42px' }}
-                required
-              />
-              <button
-                type="button"
-                className="pb-input-addon-btn"
-                onClick={() => setShowPassword(!showPassword)}
-                aria-label={showPassword ? 'Hide license key' : 'Show license key'}
-                style={{
-                  position: 'absolute',
-                  right: '8px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'transparent',
-                  border: 0,
-                  color: 'var(--pb-desk-text-dim)',
-                  cursor: 'pointer',
-                  padding: '6px',
-                }}
-              >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
+            <input
+              type="text"
+              className="pb-input"
+              style={{ width: '100%', boxSizing: 'border-box' }}
+              placeholder="Enter license key"
+              value={loginKey}
+              onChange={(e) => handleKeyChange(e.target.value)}
+              disabled={isLocked}
+              required
+            />
           </div>
 
           {/* MFA TOTP code if required for admin */}
@@ -143,11 +118,11 @@ export const LockScreen: React.FC<LockScreenProps> = ({
               <input
                 type="text"
                 className="pb-input"
+                style={{ width: '100%', boxSizing: 'border-box', letterSpacing: '4px', textAlign: 'center', fontWeight: 800, fontSize: '18px' }}
                 maxLength={6}
                 placeholder="000000"
                 value={adminMfaCode}
                 onChange={(e) => setAdminMfaCode(e.target.value.replace(/\D/g, ''))}
-                style={{ letterSpacing: '4px', textAlign: 'center', fontWeight: 800, fontSize: '18px' }}
                 autoFocus
                 required
               />
