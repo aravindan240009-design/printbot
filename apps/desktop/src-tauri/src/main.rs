@@ -420,6 +420,80 @@ fn print_to_native_hardware(_payload: serde_json::Value) -> Result<(), String> {
     Err("Printing is disabled in this test build.".into())
 }
 
+#[tauri::command]
+async fn download_and_launch_update(download_url: String) -> Result<String, String> {
+    let url = download_url.trim().to_string();
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        return Err("Invalid download URL: protocol must be http or https".to_string());
+    }
+
+    let temp_dir = std::env::temp_dir();
+    let installer_path = temp_dir.join("PrintBot-Setup-Update.exe");
+    let installer_str = installer_path
+        .to_str()
+        .ok_or_else(|| "Failed to resolve temp installer path".to_string())?
+        .to_string();
+
+    // 1. Download via Windows native curl.exe
+    let curl_status = std::process::Command::new("curl.exe")
+        .args(["-L", "-f", "-s", "-S", &url, "-o", &installer_str])
+        .status();
+
+    let mut download_ok = match curl_status {
+        Ok(s) => s.success(),
+        Err(_) => false,
+    };
+
+    // 2. Fallback to PowerShell WebClient if curl fails
+    if !download_ok {
+        let ps_cmd = format!(
+            "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object System.Net.WebClient).DownloadFile('{}', '{}')",
+            url.replace('\'', "''"),
+            installer_str.replace('\'', "''")
+        );
+        let ps_status = std::process::Command::new("powershell.exe")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &ps_cmd])
+            .status();
+        download_ok = match ps_status {
+            Ok(s) => s.success(),
+            Err(_) => false,
+        };
+    }
+
+    if !download_ok {
+        return Err("Failed to download update installer via curl or PowerShell".to_string());
+    }
+
+    // 3. Verify file exists and has valid size (> 200 KB)
+    let meta = std::fs::metadata(&installer_path)
+        .map_err(|e| format!("Downloaded update installer not found on disk: {e}"))?;
+    if meta.len() < 200_000 {
+        return Err(format!(
+            "Downloaded file is too small ({} bytes). Download may have failed.",
+            meta.len()
+        ));
+    }
+
+    // 4. Launch the installer in a background PowerShell process after short sleep
+    let launch_cmd = format!(
+        "Start-Sleep -Milliseconds 600; Start-Process -FilePath '{}'",
+        installer_str.replace('\'', "''")
+    );
+
+    let _ = std::process::Command::new("powershell.exe")
+        .args(["-NoProfile", "-WindowStyle", "Hidden", "-Command", &launch_cmd])
+        .spawn()
+        .map_err(|e| format!("Failed to launch installer process: {e}"))?;
+
+    // 5. Exit this app process after 500ms so files are unlocked for the installer
+    tokio::spawn(async {
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        std::process::exit(0);
+    });
+
+    Ok("Update downloaded successfully. Launching setup...".to_string())
+}
+
 #[cfg(not(feature = "test-mode"))]
 fn main() {
     tauri::Builder::default()
@@ -447,7 +521,8 @@ fn main() {
             get_spool_job,
             read_spool_file,
             mark_spool_unknown,
-            print_to_native_hardware
+            print_to_native_hardware,
+            download_and_launch_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -458,7 +533,8 @@ fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             get_system_printers,
-            print_to_native_hardware
+            print_to_native_hardware,
+            download_and_launch_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running test workstation");

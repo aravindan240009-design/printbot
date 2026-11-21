@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { type ShopLicense } from '../App';
 import type { LicenseExpiryInfo } from '../utils/licenseExpiry';
+import type { DesktopReleaseInfo } from '../utils/versionCheck';
 import { LicenseExpiryBanner } from './LicenseExpiryBanner';
 
 export type Tab = 'queue' | 'printers' | 'services' | 'analytics' | 'website' | 'settings';
@@ -50,6 +51,8 @@ interface DesktopShellProps {
   onOpenCountdownModal?: () => void;
   onVerifyLicense?: () => void;
   isVerifyingLicense?: boolean;
+  updateAvailable?: DesktopReleaseInfo | null;
+  onOpenUpdateModal?: () => void;
   children: React.ReactNode;
 }
 
@@ -77,6 +80,8 @@ export const DesktopShell: React.FC<DesktopShellProps> = ({
   onOpenCountdownModal,
   onVerifyLicense,
   isVerifyingLicense,
+  updateAvailable,
+  onOpenUpdateModal,
   children,
 }) => {
   return (
@@ -141,6 +146,34 @@ export const DesktopShell: React.FC<DesktopShellProps> = ({
         </div>
 
         <div className="pb-titlebar-right">
+          {/* 🚀 New Update Pill if an update is available */}
+          {updateAvailable && (
+            <button
+              type="button"
+              className="pb-btn pb-btn-sm"
+              onClick={onOpenUpdateModal}
+              style={{
+                height: '26px',
+                padding: '0 10px',
+                fontSize: '11px',
+                fontWeight: 750,
+                background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(37, 99, 235, 0.4)',
+              }}
+              title={`Click to install update v${updateAvailable.version}`}
+            >
+              <Sparkles size={12} color="#fef08a" />
+              <span>Update v{updateAvailable.version} Available</span>
+            </button>
+          )}
+
           {/* Audio Alerts Toggle */}
           <button
             type="button"

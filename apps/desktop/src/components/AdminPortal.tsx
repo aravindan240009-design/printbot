@@ -42,8 +42,10 @@ import {
   DollarSign,
   ArrowLeft,
   ChevronRight,
+  Download,
 } from 'lucide-react';
 import { type PrintJob } from '../App';
+import { type DesktopReleaseInfo } from '../utils/versionCheck';
 import { DateRangePicker } from './DateRangePicker';
 import { InteractiveLineGraph } from './InteractiveLineGraph';
 import {
@@ -195,6 +197,8 @@ interface AdminPortalProps {
   } | null;
   setIssuedCredsModal: (val: any) => void;
   jobs?: PrintJob[];
+  desktopRelease?: DesktopReleaseInfo | null;
+  handlePublishDesktopRelease?: (release: DesktopReleaseInfo) => Promise<void>;
 }
 
 export const AdminPortal: React.FC<AdminPortalProps> = ({
@@ -251,12 +255,25 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   issuedCredsModal,
   setIssuedCredsModal,
   jobs = [],
+  desktopRelease,
+  handlePublishDesktopRelease,
 }) => {
   const [adminActiveTab, setAdminActiveTab] = useState<AdminTab>('APPLICATIONS');
   const [appSearchQuery, setAppSearchQuery] = useState('');
   const [appStatusFilter, setAppStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
   const [licenseSearchQuery, setLicenseSearchQuery] = useState('');
   const [licenseStatusFilter, setLicenseStatusFilter] = useState<'ALL' | 'ACTIVE' | 'REVOKED'>('ALL');
+
+  // Desktop Release Auto-Update State
+  const [releaseVersionDraft, setReleaseVersionDraft] = useState(desktopRelease?.version || '1.0.1');
+  const [releaseUrlDraft, setReleaseUrlDraft] = useState(
+    desktopRelease?.downloadUrl || 'https://github.com/aravindan2004/print-bot-saas/raw/main/PrintBot-Setup.exe'
+  );
+  const [releaseNotesDraft, setReleaseNotesDraft] = useState(
+    desktopRelease?.releaseNotes || '- Automated 1-Click In-App Update flow\n- Performance enhancements and native Win32 fixes'
+  );
+  const [releaseMandatoryDraft, setReleaseMandatoryDraft] = useState(desktopRelease?.mandatory ?? false);
+  const [isPublishingRelease, setIsPublishingRelease] = useState(false);
 
   // Shop Directory & Devices Drill-Down View State
   const [selectedShopUsername, setSelectedShopUsername] = useState<string | null>(null);
@@ -3113,6 +3130,150 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       style={{ height: '40px', padding: '0 24px', fontSize: '13px', fontWeight: 700 }}
                     >
                       <Megaphone size={15} /> Publish Network Broadcast
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Desktop App Release & Auto-Updater Section */}
+              <div className="pb-admin-card" style={{ padding: '24px', marginTop: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div
+                      style={{
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '10px',
+                        background: '#eff6ff',
+                        color: '#2563eb',
+                        display: 'grid',
+                        placeItems: 'center',
+                      }}
+                    >
+                      <Sparkles size={18} />
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0, color: '#0f172a' }}>
+                        Desktop Workstation Auto-Update Releases
+                      </h3>
+                      <div style={{ color: '#64748b', fontSize: '12px' }}>
+                        Publish new versions to trigger 1-Click in-app auto-updates for all connected shop counters.
+                      </div>
+                    </div>
+                  </div>
+
+                  {desktopRelease && (
+                    <div
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '8px',
+                        background: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        color: '#334155',
+                      }}
+                    >
+                      Live Active Release: <strong style={{ color: '#2563eb' }}>v{desktopRelease.version}</strong>
+                    </div>
+                  )}
+                </div>
+
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!handlePublishDesktopRelease) return;
+                    setIsPublishingRelease(true);
+                    try {
+                      await handlePublishDesktopRelease({
+                        version: releaseVersionDraft.trim(),
+                        downloadUrl: releaseUrlDraft.trim(),
+                        releaseNotes: releaseNotesDraft.trim(),
+                        mandatory: releaseMandatoryDraft,
+                        publishedAt: new Date().toISOString().replace('T', ' ').slice(0, 10),
+                      });
+                    } finally {
+                      setIsPublishingRelease(false);
+                    }
+                  }}
+                >
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '14px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 700, marginBottom: '5px', color: '#334155' }}>
+                        Target Release Version *
+                      </label>
+                      <input
+                        type="text"
+                        className="pb-input"
+                        placeholder="e.g. 1.0.1"
+                        value={releaseVersionDraft}
+                        onChange={(e) => setReleaseVersionDraft(e.target.value)}
+                        required
+                        style={{ fontSize: '13px' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 700, marginBottom: '5px', color: '#334155' }}>
+                        Installer Download URL (.exe) *
+                      </label>
+                      <input
+                        type="url"
+                        className="pb-input"
+                        placeholder="https://.../PrintBot-Setup.exe"
+                        value={releaseUrlDraft}
+                        onChange={(e) => setReleaseUrlDraft(e.target.value)}
+                        required
+                        style={{ fontSize: '13px' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '14px' }}>
+                    <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 700, marginBottom: '5px', color: '#334155' }}>
+                      Release Notes / What's New (One item per line) *
+                    </label>
+                    <textarea
+                      className="pb-input"
+                      rows={3}
+                      placeholder="- Added 1-Click Auto Update mechanism&#10;- Improved spooling stability and print reliability"
+                      value={releaseNotesDraft}
+                      onChange={(e) => setReleaseNotesDraft(e.target.value)}
+                      required
+                      style={{ fontSize: '13px', resize: 'vertical' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <input
+                        type="checkbox"
+                        id="mandatoryReleaseToggle"
+                        checked={releaseMandatoryDraft}
+                        onChange={(e) => setReleaseMandatoryDraft(e.target.checked)}
+                        style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                      />
+                      <label htmlFor="mandatoryReleaseToggle" style={{ fontSize: '13px', fontWeight: 650, color: '#0f172a', cursor: 'pointer' }}>
+                        Mandatory Update (Counters must update before proceeding)
+                      </label>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isPublishingRelease}
+                      className="pb-btn pb-btn-primary"
+                      style={{ height: '40px', padding: '0 24px', fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}
+                    >
+                      {isPublishingRelease ? (
+                        <>
+                          <RefreshCw size={15} className="animate-spin" />
+                          <span>Publishing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={15} />
+                          <span>Publish Update to All Counters</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </form>

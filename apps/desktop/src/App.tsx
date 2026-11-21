@@ -69,6 +69,9 @@ import { generateTestPagePngBytes } from './utils/hardwareCalibration';
 import { generateCounterStandeePngBytes } from './utils/qrStandeeGenerator';
 import { playOrderChime } from './utils/audioChime';
 import { openWhatsAppForOrder } from './utils/whatsappNotification';
+import { UpdateModal } from './components/UpdateModal';
+import { CURRENT_DESKTOP_VERSION, isNewerVersion, type DesktopReleaseInfo } from './utils/versionCheck';
+import { downloadAndLaunchUpdate } from './native';
 
 const API_BASE = ((import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '');
 
@@ -1133,6 +1136,8 @@ function ProductionApp() {
             r.plan !== 'AUDIT_LOG' &&
             r.plan !== 'BROADCAST' &&
             r.id !== 'SYS-BROADCAST' &&
+            r.plan !== 'RELEASE' &&
+            r.id !== 'SYS-DESKTOP-RELEASE' &&
             !r.id?.startsWith('PB-') &&
             !r.status?.startsWith('ORDER_') &&
             !r.id?.startsWith('AUDIT-')
@@ -1176,6 +1181,21 @@ function ProductionApp() {
             setBroadcastDraft(b.message || '');
             setBroadcastTypeDraft(b.type || 'info');
             setBroadcastEnabledDraft(b.active ?? true);
+          } catch {}
+        }
+
+        // 4. Load live Desktop Release from Supabase
+        const releaseRow = data.find((r: any) => r.id === 'SYS-DESKTOP-RELEASE' || r.plan === 'RELEASE');
+        if (releaseRow?.notes) {
+          try {
+            const rel: DesktopReleaseInfo = typeof releaseRow.notes === 'string' ? JSON.parse(releaseRow.notes) : releaseRow.notes;
+            setDesktopRelease(rel);
+            if (isNewerVersion(rel.version, CURRENT_DESKTOP_VERSION)) {
+              const dismissed = sessionStorage.getItem(`dismissed_update_${rel.version}`);
+              if (!dismissed) {
+                setShowUpdateModal(true);
+              }
+            }
           } catch {}
         }
         return;
@@ -1589,6 +1609,74 @@ function ProductionApp() {
       });
     } catch (err) {
       console.warn('Failed to sync broadcast to Supabase:', err);
+    }
+  };
+
+  // --- Desktop Workstation Release & Auto-Updater State ---
+  const [desktopRelease, setDesktopRelease] = useState<DesktopReleaseInfo | null>(() => {
+    try {
+      const saved = localStorage.getItem('printbot_desktop_release');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      version: '1.0.0',
+      downloadUrl: 'https://github.com/aravindan2004/print-bot-saas/raw/main/PrintBot-Setup.exe',
+      releaseNotes: 'Print Bot Workstation production release with Windows native spooling.',
+      mandatory: false,
+      publishedAt: '2026-11-21',
+    };
+  });
+
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+
+  const handlePublishDesktopRelease = async (release: DesktopReleaseInfo) => {
+    setDesktopRelease(release);
+    try {
+      localStorage.setItem('printbot_desktop_release', JSON.stringify(release));
+    } catch {}
+
+    try {
+      await supabase.from('pilot_applications').upsert({
+        id: 'SYS-DESKTOP-RELEASE',
+        shop_name: 'Print Bot Desktop Release',
+        city: 'release',
+        contact_number: release.version,
+        plan: 'RELEASE',
+        status: 'ACTIVE',
+        generated_username: 'platform_release',
+        applied_at: new Date().toISOString(),
+        notes: JSON.stringify(release),
+      });
+      logAdminAction('BROADCAST_PUBLISHED', `Published desktop release v${release.version}`);
+      setAdminNotice(`Desktop update v${release.version} published! All connected shop counters will be prompted.`);
+    } catch (err: any) {
+      console.warn('Failed to publish desktop release to Supabase:', err);
+      setAdminNotice(`Published locally, but cloud sync warning: ${err?.message || err}`);
+    }
+  };
+
+  const handleTriggerUpdate = async () => {
+    if (!desktopRelease?.downloadUrl) return;
+    setIsUpdating(true);
+    setUpdateStatus('Downloading update installer to temporary storage...');
+    setUpdateError(null);
+
+    try {
+      const msg = await downloadAndLaunchUpdate(desktopRelease.downloadUrl);
+      setUpdateStatus(msg || 'Launching installer... Print Bot will close in a moment.');
+    } catch (err: any) {
+      setIsUpdating(false);
+      setUpdateError(`Update failed: ${err?.message || String(err)}`);
+    }
+  };
+
+  const handleDismissUpdateModal = () => {
+    setShowUpdateModal(false);
+    if (desktopRelease?.version) {
+      sessionStorage.setItem(`dismissed_update_${desktopRelease.version}`, 'true');
     }
   };
 
@@ -3139,21 +3227,33 @@ function ProductionApp() {
   // ==========================================
   if (screen === 'LOCK_SCREEN') {
     return (
-      <LockScreen
-        loginUsername={loginUsername}
-        setLoginUsername={setLoginUsername}
-        loginKey={loginKey}
-        setLoginKey={setLoginKey}
-        handleKeyChange={handleKeyChange}
-        showPassword={showPassword}
-        setShowPassword={setShowPassword}
-        isMfaRequired={isMfaRequired}
-        adminMfaCode={adminMfaCode}
-        setAdminMfaCode={setAdminMfaCode}
-        loginError={loginError}
-        lockoutUntil={lockoutUntil}
-        onUnifiedLogin={handleUnifiedLogin}
-      />
+      <>
+        <LockScreen
+          loginUsername={loginUsername}
+          setLoginUsername={setLoginUsername}
+          loginKey={loginKey}
+          setLoginKey={setLoginKey}
+          handleKeyChange={handleKeyChange}
+          showPassword={showPassword}
+          setShowPassword={setShowPassword}
+          isMfaRequired={isMfaRequired}
+          adminMfaCode={adminMfaCode}
+          setAdminMfaCode={setAdminMfaCode}
+          loginError={loginError}
+          lockoutUntil={lockoutUntil}
+          onUnifiedLogin={handleUnifiedLogin}
+        />
+        <UpdateModal
+          isOpen={showUpdateModal}
+          onClose={handleDismissUpdateModal}
+          currentVersion={CURRENT_DESKTOP_VERSION}
+          release={desktopRelease}
+          onUpdateNow={handleTriggerUpdate}
+          isUpdating={isUpdating}
+          updateStatus={updateStatus}
+          updateError={updateError}
+        />
+      </>
     );
   }
 
@@ -3237,6 +3337,8 @@ function ProductionApp() {
         handleChangeAdminPassword={handleChangeAdminPassword}
         issuedCredsModal={issuedCredsModal}
         setIssuedCredsModal={setIssuedCredsModal}
+        desktopRelease={desktopRelease}
+        handlePublishDesktopRelease={handlePublishDesktopRelease}
       />
     );
   }
@@ -3440,6 +3542,8 @@ function ProductionApp() {
       onOpenCountdownModal={() => setShowCountdownModal(true)}
       onVerifyLicense={handleVerifyLicense}
       isVerifyingLicense={isVerifyingLicense}
+      updateAvailable={isNewerVersion(desktopRelease?.version, CURRENT_DESKTOP_VERSION) ? desktopRelease : null}
+      onOpenUpdateModal={() => setShowUpdateModal(true)}
     >
       {activeTab === 'queue' && (
         <QueueView
@@ -3668,6 +3772,18 @@ function ProductionApp() {
           isVerifying={isVerifyingLicense}
         />
       )}
+
+      {/* 🚀 1-Click Desktop Update Modal */}
+      <UpdateModal
+        isOpen={showUpdateModal}
+        onClose={handleDismissUpdateModal}
+        currentVersion={CURRENT_DESKTOP_VERSION}
+        release={desktopRelease}
+        onUpdateNow={handleTriggerUpdate}
+        isUpdating={isUpdating}
+        updateStatus={updateStatus}
+        updateError={updateError}
+      />
     </DesktopShell>
   );
 }

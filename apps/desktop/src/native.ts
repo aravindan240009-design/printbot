@@ -129,3 +129,16 @@ export async function printToHardware(payload: PrintToHardwarePayload): Promise<
     throw new NativeWorkstationError(String(error));
   }
 }
+
+export async function downloadAndLaunchUpdate(downloadUrl: string): Promise<string> {
+  try {
+    return await invoke<string>('download_and_launch_update', { downloadUrl });
+  } catch (error) {
+    // If not in Tauri or native invoke failed, fallback to opening in browser
+    if (typeof window !== 'undefined' && downloadUrl) {
+      window.open(downloadUrl, '_blank');
+      return 'Web fallback: Opened download URL in browser.';
+    }
+    throw new NativeWorkstationError(String(error));
+  }
+}
